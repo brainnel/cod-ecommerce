@@ -1,0 +1,383 @@
+.order-success-page {
+  min-height: 100vh;
+  background: #f8f9fa;
+}
+
+/* 顶部标题栏 */
+.order-success-header {
+  background: white;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  position: relative;
+}
+
+.order-success-header .back-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 6px;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #666;
+  width: 36px;
+  height: 36px;
+}
+
+.order-success-header .back-btn:hover {
+  background: #f5f5f5;
+  color: #333;
+  transform: scale(1.05);
+}
+
+.order-success-header .back-btn svg {
+  transition: all 0.3s ease;
+}
+
+.header-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+  margin: 0;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.success-content {
+  max-width: 600px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+/* 成功标题区域 */
+.success-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.success-icon {
+  margin-bottom: 16px;
+  animation: successPulse 0.6s ease-out;
+}
+
+@keyframes successPulse {
+  0% {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.success-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: #28a745;
+  margin: 0 0 12px 0;
+}
+
+.success-subtitle {
+  font-size: 16px;
+  color: #666;
+  line-height: 1.5;
+  margin: 0;
+  max-width: 400px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* 订单摘要 */
+.order-summary {
+  background: white;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+}
+
+/* 订单项 */
+.order-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.item-image {
+  width: 60px;
+  height: 60px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.item-details {
+  flex: 1;
+}
+
+.item-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 4px;
+}
+
+.item-info {
+  font-size: 13px;
+  color: #666;
+}
+
+/* 取件码区域 */
+.pickup-code-section {
+  background: #ff6b35;
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 20px;
+  text-align: center;
+  box-shadow: 0 8px 32px rgba(255, 107, 53, 0.3);
+  border: 3px solid #e55a2b;
+}
+
+.code-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: white;
+  margin-bottom: 12px;
+  letter-spacing: 1px;
+}
+
+.pickup-code {
+  font-size: 32px;
+  font-weight: 900;
+  color: white;
+  font-family: 'Courier New', monospace;
+  letter-spacing: 4px;
+  margin-bottom: 12px;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+  background: rgba(255, 255, 255, 0.2);
+  padding: 16px 24px;
+  border-radius: 12px;
+  border: 2px dashed rgba(255, 255, 255, 0.5);
+}
+
+.code-notice {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 500;
+}
+
+/* 提货点信息 */
+.pickup-info {
+  background: white;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  border-left: 4px solid #ff6b35;
+}
+
+.pickup-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.pickup-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.pickup-details {
+  flex: 1;
+}
+
+.pickup-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 4px;
+}
+
+.pickup-address {
+  font-size: 13px;
+  color: #666;
+  line-height: 1.4;
+}
+
+/* 电话通知 */
+.phone-notice {
+  background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid #90caf9;
+}
+
+.notice-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.notice-text {
+  flex: 1;
+  font-size: 14px;
+  color: #1976d2;
+  line-height: 1.4;
+}
+
+.notice-text strong {
+  color: #1565c0;
+}
+
+
+/* 操作按钮 */
+.success-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 0;
+}
+
+.download-btn {
+  width: 100%;
+  padding: 16px 20px;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: none;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.download-btn:hover {
+  background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
+}
+
+.whatsapp-btn {
+  width: 100%;
+  padding: 16px 20px;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: none;
+  background: linear-gradient(135deg, #25d366 0%, #128c7e 100%);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.whatsapp-btn:hover {
+  background: linear-gradient(135deg, #1fd655 0%, #0f7a6e 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(37, 211, 102, 0.3);
+}
+
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .order-success-header {
+    padding: 14px 16px;
+  }
+  
+  .header-title {
+    font-size: 16px;
+  }
+  
+  .order-success-header .back-btn {
+    padding: 6px;
+    width: 32px;
+    height: 32px;
+  }
+  
+  .order-success-header .back-btn svg {
+    width: 18px;
+    height: 18px;
+  }
+  
+  .success-content {
+    max-width: none;
+    padding: 16px;
+  }
+  
+  .order-summary,
+  .pickup-code-section,
+  .pickup-info {
+    padding: 14px;
+    margin-bottom: 14px;
+  }
+  
+  .pickup-code {
+    font-size: 24px;
+    letter-spacing: 2px;
+    padding: 12px 16px;
+  }
+  
+  .item-image {
+    width: 50px;
+    height: 50px;
+  }
+  
+  .phone-notice {
+    padding: 14px;
+    margin-bottom: 20px;
+  }
+}
+
+@media (max-width: 480px) {
+  .success-title {
+    font-size: 24px;
+  }
+  
+  .success-subtitle {
+    font-size: 14px;
+  }
+  
+  .order-summary,
+  .pickup-code-section,
+  .pickup-info {
+    padding: 12px;
+  }
+  
+  .pickup-code {
+    font-size: 20px;
+    letter-spacing: 2px;
+    padding: 12px 16px;
+  }
+  
+  .pickup-code-section {
+    padding: 20px;
+  }
+  
+  .phone-notice {
+    padding: 12px;
+  }
+}

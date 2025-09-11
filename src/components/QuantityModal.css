@@ -1,0 +1,275 @@
+/* 弹窗遮罩层 */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 1000;
+  opacity: 0;
+  animation: fadeIn 0.3s ease forwards;
+}
+
+.modal-overlay.closing {
+  animation: fadeOut 0.3s ease forwards;
+}
+
+/* 弹窗内容 */
+.modal-content {
+  background: white;
+  border-radius: 16px 16px 0 0;
+  padding: 24px;
+  width: 100%;
+  max-width: 500px;
+  max-height: 80vh;
+  overflow-y: auto;
+  position: relative;
+  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.3);
+  transform: translateY(100%);
+  animation: slideUp 0.3s ease forwards;
+}
+
+.modal-overlay.closing .modal-content {
+  animation: slideDown 0.3s ease forwards;
+}
+
+/* 动画定义 */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+@keyframes slideDown {
+  from { transform: translateY(0); }
+  to { transform: translateY(100%); }
+}
+
+/* 关闭按钮 */
+.modal-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: #999;
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+}
+
+.modal-close:hover {
+  background: #f5f5f5;
+  color: #333;
+}
+
+/* 产品信息 */
+.modal-product-info {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 24px;
+  padding-right: 40px; /* 为关闭按钮留出空间 */
+}
+
+.modal-product-image {
+  width: 80px;
+  height: 80px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.modal-product-details {
+  flex: 1;
+}
+
+.modal-product-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  margin: 0 0 8px 0;
+  line-height: 1.4;
+}
+
+.modal-product-price {
+  font-size: 18px;
+  font-weight: bold;
+  color: #ff6b35;
+  margin-bottom: 4px;
+}
+
+.modal-stock-info {
+  font-size: 12px;
+  color: #666;
+}
+
+/* 数量选择区域 */
+.quantity-section {
+  margin-bottom: 24px;
+}
+
+.quantity-label {
+  display: block;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 12px;
+}
+
+.quantity-controls {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  border: 2px solid #eee;
+  border-radius: 8px;
+  overflow: hidden;
+  width: fit-content;
+}
+
+.quantity-btn {
+  background: #f8f8f8;
+  border: none;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: bold;
+  color: #333;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.quantity-btn:hover:not(:disabled) {
+  background: #ff6b35;
+  color: white;
+}
+
+.quantity-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.quantity-input {
+  border: none;
+  width: 60px;
+  height: 44px;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  outline: none;
+  background: white;
+}
+
+.quantity-input::-webkit-outer-spin-button,
+.quantity-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.quantity-input[type=number] {
+  -moz-appearance: textfield;
+}
+
+/* 总价区域 */
+.total-price-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 0;
+  border-top: 1px solid #eee;
+  border-bottom: 1px solid #eee;
+  margin-bottom: 24px;
+}
+
+.total-price-label {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+.total-price-value {
+  font-size: 20px;
+  font-weight: bold;
+  color: #ff6b35;
+}
+
+/* 操作按钮 */
+.modal-actions {
+  display: flex;
+  flex-direction: column;
+}
+
+.confirm-btn {
+  background: #ff6b35;
+  color: white;
+  border: none;
+  padding: 16px 24px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.confirm-btn:hover {
+  background: #e55a2b;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 107, 53, 0.3);
+}
+
+/* 响应式设计 */
+@media (max-width: 480px) {
+  .modal-content {
+    padding: 20px;
+    max-height: 85vh;
+    border-radius: 20px 20px 0 0;
+  }
+  
+  .modal-product-info {
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  
+  .modal-product-image {
+    width: 70px;
+    height: 70px;
+  }
+  
+  .modal-product-title {
+    font-size: 15px;
+  }
+  
+  .modal-product-price {
+    font-size: 16px;
+  }
+  
+  .quantity-label {
+    font-size: 15px;
+  }
+  
+  .total-price-section {
+    margin-bottom: 20px;
+  }
+}

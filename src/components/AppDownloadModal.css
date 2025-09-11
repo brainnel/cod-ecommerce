@@ -1,0 +1,294 @@
+/* 弹窗遮罩层 */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+  backdrop-filter: blur(2px);
+  /* 确保弹窗始终居中 */
+  min-height: 100vh;
+  min-width: 100vw;
+}
+
+/* 弹窗主体 */
+.modal-content {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+  max-width: 420px;
+  width: 100%;
+  max-height: 90vh;
+  overflow: hidden;
+  animation: modalSlideIn 0.3s ease-out;
+  /* 确保弹窗内容居中 */
+  position: relative;
+  margin: auto;
+  /* 防止内容跳动 */
+  flex-shrink: 0;
+  /* 强制居中定位 */
+  align-self: center;
+  justify-self: center;
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-30px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes modalSlideInMobile {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* 弹窗头部 */
+.modal-header {
+  position: relative;
+  padding: 24px 24px 16px;
+  text-align: center;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.success-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+  display: block;
+}
+
+.modal-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #333;
+  margin: 0;
+}
+
+.modal-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: none;
+  border: none;
+  font-size: 28px;
+  color: #999;
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.modal-close:hover {
+  background: #f5f5f5;
+  color: #666;
+}
+
+/* 弹窗内容 */
+.modal-body {
+  padding: 20px 24px;
+}
+
+.success-message {
+  font-size: 16px;
+  color: #333;
+  margin: 0 0 20px 0;
+  text-align: center;
+  line-height: 1.5;
+}
+
+.instruction-box {
+  background: #fff8f5;
+  border-radius: 12px;
+  padding: 18px;
+  border-left: 4px solid #ff6b35;
+  border: 1px solid #ffe8db;
+}
+
+.instruction-text {
+  width: 100%;
+  text-align: center;
+}
+
+.instruction-text p {
+  font-size: 14px;
+  color: #555;
+  margin: 0 0 16px 0;
+  line-height: 1.5;
+}
+
+.whatsapp-number {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: white;
+  padding: 10px 16px;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+  margin: 0 auto;
+  width: fit-content;
+}
+
+.number {
+  font-size: 16px;
+  font-weight: 700;
+  color: #333;
+  font-family: monospace;
+}
+
+.copy-button {
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6c757d;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  min-width: 50px;
+}
+
+.copy-button:hover {
+  background: #e9ecef;
+  border-color: #adb5bd;
+  color: #495057;
+}
+
+.copy-button:active {
+  transform: translateY(1px);
+}
+
+.copy-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.8;
+}
+
+/* 弹窗底部 */
+.modal-footer {
+  padding: 20px 24px 24px;
+  display: flex;
+  justify-content: center;
+  border-top: 1px solid #f0f0f0;
+}
+
+.btn-confirm {
+  padding: 14px 32px;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+  background: #ff6b35;
+  color: white;
+  min-width: 200px;
+  box-shadow: 0 2px 8px rgba(255, 107, 53, 0.2);
+}
+
+.btn-confirm:hover {
+  background: #e55a2b;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(255, 107, 53, 0.3);
+}
+
+.btn-confirm:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(255, 107, 53, 0.2);
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .modal-overlay {
+    padding: 16px;
+    /* 移动端确保完全居中 */
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .modal-content {
+    max-width: none;
+    border-radius: 12px;
+    /* 移动端固定定位，防止跳动 */
+    position: relative;
+    top: 0;
+    transform: none;
+    animation: modalSlideInMobile 0.3s ease-out;
+  }
+  
+  .modal-header {
+    padding: 20px 20px 16px;
+  }
+  
+  .success-icon {
+    font-size: 40px;
+    margin-bottom: 8px;
+  }
+  
+  .modal-title {
+    font-size: 20px;
+  }
+  
+  .modal-body {
+    padding: 20px;
+  }
+  
+  .instruction-box {
+    padding: 16px;
+    text-align: center;
+  }
+  
+  .modal-footer {
+    padding: 20px 20px 24px;
+  }
+  
+  .btn-confirm {
+    width: 100%;
+    min-width: auto;
+    padding: 16px 24px;
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .modal-overlay {
+    padding: 12px;
+  }
+  
+  .modal-header {
+    padding: 16px 16px 12px;
+  }
+  
+  .modal-body {
+    padding: 16px;
+  }
+  
+  .modal-footer {
+    padding: 12px 16px 16px;
+  }
+  
+  .instruction-box {
+    padding: 12px;
+  }
+}
