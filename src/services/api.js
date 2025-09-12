@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-const BASE_URL = 'https://api.brainnel.com/test'
+const BASE_URL = 'https://api.brainnel.com/backend'
 
 // 创建axios实例
 const api = axios.create({

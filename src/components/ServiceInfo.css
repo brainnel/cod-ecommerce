@@ -1,0 +1,101 @@
+/* 服务信息组件样式 */
+.service-info {
+  padding: 16px 16px 20px 16px;
+  background: #fff;
+  border-bottom: 8px solid #f8f8f8;
+}
+
+.service-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px 12px;
+}
+
+.service-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 6px;
+  transition: all 0.3s ease;
+  background: #fafafa;
+  border: 1px solid #f0f0f0;
+}
+
+.service-item:hover {
+  background: #f5f5f5;
+  border-color: #e0e0e0;
+  transform: translateY(-1px);
+}
+
+.service-icon {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ff6b35;
+  font-size: 16px;
+}
+
+.service-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.service-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* 响应式设计 */
+@media (max-width: 480px) {
+  .service-info {
+    padding: 14px 12px 18px 12px;
+  }
+  
+  .service-grid {
+    gap: 12px 8px;
+  }
+  
+  .service-item {
+    padding: 6px;
+    gap: 6px;
+  }
+  
+  .service-icon {
+    width: 20px;
+    height: 20px;
+    font-size: 14px;
+  }
+  
+  .service-title {
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 360px) {
+  .service-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  
+  .service-item {
+    gap: 8px;
+    padding: 8px;
+  }
+  
+  .service-icon {
+    width: 22px;
+    height: 22px;
+    font-size: 15px;
+  }
+  
+  .service-title {
+    font-size: 13px;
+  }
+}

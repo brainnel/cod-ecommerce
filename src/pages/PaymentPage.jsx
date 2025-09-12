@@ -15,6 +15,11 @@ const PaymentPage = () => {
     whatsapp: ''
   })
   
+  const [phoneErrors, setPhoneErrors] = useState({
+    phone: '',
+    whatsapp: ''
+  })
+  
   const [pickupLocations, setPickupLocations] = useState([])
   const [selectedLocation, setSelectedLocation] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -48,11 +53,57 @@ const PaymentPage = () => {
     fetchPickupLocations()
   }, [])
 
+  // 号码验证工具函数
+  const validatePhoneNumber = (number) => {
+    if (!number) {
+      return { isValid: false, error: 'Le numéro de téléphone est requis' }
+    }
+    
+    // 只允许数字
+    const cleanNumber = number.replace(/\D/g, '')
+    
+    // 检查长度：8位或10位
+    if (cleanNumber.length !== 8 && cleanNumber.length !== 10) {
+      return { 
+        isValid: false, 
+        error: 'Le numéro doit contenir 8 ou 10 chiffres' 
+      }
+    }
+    
+    return { isValid: true, error: '' }
+  }
+  
+  const formatPhoneWithCountryCode = (localNumber) => {
+    const cleanNumber = localNumber.replace(/\D/g, '')
+    return `225${cleanNumber}`
+  }
+
   const handleUserInfoChange = (field, value) => {
-    setUserInfo(prev => ({
-      ...prev,
-      [field]: value
-    }))
+    if (field === 'phone' || field === 'whatsapp') {
+      // 只允许数字输入
+      const cleanValue = value.replace(/\D/g, '')
+      
+      // 限制最大长度为10位
+      const limitedValue = cleanValue.slice(0, 10)
+      
+      // 更新值
+      setUserInfo(prev => ({
+        ...prev,
+        [field]: limitedValue
+      }))
+      
+      // 实时验证
+      const validation = validatePhoneNumber(limitedValue)
+      setPhoneErrors(prev => ({
+        ...prev,
+        [field]: validation.error
+      }))
+    } else {
+      setUserInfo(prev => ({
+        ...prev,
+        [field]: value
+      }))
+    }
   }
 
   const formatPrice = (price) => {
@@ -108,9 +159,12 @@ const PaymentPage = () => {
   }
 
   const isUserInfoValid = () => {
+    const phoneValidation = validatePhoneNumber(userInfo.phone)
+    const whatsappValidation = validatePhoneNumber(userInfo.whatsapp)
+    
     return userInfo.fullName.trim() !== '' && 
-           userInfo.phone.trim() !== '' && 
-           userInfo.whatsapp.trim() !== ''
+           phoneValidation.isValid && 
+           whatsappValidation.isValid
   }
 
   const isFormValid = () => {
@@ -161,8 +215,8 @@ const PaymentPage = () => {
         discount_amount: 0,
         currency: "FCFA",
         full_name: userInfo.fullName,
-        phone: userInfo.phone,
-        whatsapp: userInfo.whatsapp,
+        phone: formatPhoneWithCountryCode(userInfo.phone),
+        whatsapp: formatPhoneWithCountryCode(userInfo.whatsapp),
         is_web: 1
       }
 
@@ -314,25 +368,37 @@ const PaymentPage = () => {
               </div>
               <div className="form-group">
                 <label htmlFor="phone" className="form-label">Téléphone *</label>
-                <input
-                  id="phone"
-                  type="tel"
-                  className="form-input"
-                  value={userInfo.phone}
-                  onChange={(e) => handleUserInfoChange('phone', e.target.value)}
-                  placeholder="Entrez votre numéro de téléphone"
-                />
+                <div className={`phone-input-group ${phoneErrors.phone ? 'error' : ''}`}>
+                  <div className="country-code-prefix">+225</div>
+                  <input
+                    id="phone"
+                    type="tel"
+                    className="form-input phone-input"
+                    value={userInfo.phone}
+                    onChange={(e) => handleUserInfoChange('phone', e.target.value)}
+                    placeholder="XXXXXXXX"
+                  />
+                </div>
+                {phoneErrors.phone && (
+                  <div className="error-message">{phoneErrors.phone}</div>
+                )}
               </div>
               <div className="form-group">
                 <label htmlFor="whatsapp" className="form-label">WhatsApp *</label>
-                <input
-                  id="whatsapp"
-                  type="tel"
-                  className="form-input"
-                  value={userInfo.whatsapp}
-                  onChange={(e) => handleUserInfoChange('whatsapp', e.target.value)}
-                  placeholder="Entrez votre numéro WhatsApp"
-                />
+                <div className={`phone-input-group ${phoneErrors.whatsapp ? 'error' : ''}`}>
+                  <div className="country-code-prefix">+225</div>
+                  <input
+                    id="whatsapp"
+                    type="tel"
+                    className="form-input phone-input"
+                    value={userInfo.whatsapp}
+                    onChange={(e) => handleUserInfoChange('whatsapp', e.target.value)}
+                    placeholder="XXXXXXXX"
+                  />
+                </div>
+                {phoneErrors.whatsapp && (
+                  <div className="error-message">{phoneErrors.whatsapp}</div>
+                )}
               </div>
               <div className="step-actions">
                 <button 
@@ -443,8 +509,8 @@ const PaymentPage = () => {
                 <div className="summary-section">
                   <h4>Informations personnelles</h4>
                   <p>{userInfo.fullName}</p>
-                  <p>Tél: {userInfo.phone}</p>
-                  <p>WhatsApp: {userInfo.whatsapp}</p>
+                  <p>Tél: +225 {userInfo.phone}</p>
+                  <p>WhatsApp: +225 {userInfo.whatsapp}</p>
                 </div>
                 <div className="summary-section">
                   <h4>Point de retrait</h4>

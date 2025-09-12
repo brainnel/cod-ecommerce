@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { productAPI } from '../services/api';
 import Countdown from './Countdown';
 import QuantityModal from './QuantityModal';
+import ServiceInfo from './ServiceInfo';
 import logoImage from '../assets/logo.png';
 
 // Import Swiper styles
@@ -170,6 +171,9 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
         </div>
 
       </div>
+
+      {/* 服务信息 */}
+      <ServiceInfo />
 
       {/* 产品描述 */}
       <div className="product-description">
