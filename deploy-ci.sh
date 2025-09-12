@@ -16,7 +16,9 @@ fi
 cd /home/admin/projects/cod-ecommerce
 
 echo "📥 拉取最新代码..."
-git pull origin main
+# 强制更新本地代码以处理强制推送的情况
+git fetch origin main
+git reset --hard origin/main
 
 echo "📦 安装/更新依赖..."
 npm install --production=false
