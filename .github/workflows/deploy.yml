@@ -37,6 +37,15 @@ jobs:
         port: ${{ secrets.PORT }}
         script: |
           cd /home/admin/projects/cod-ecommerce
+          
+          # 强制更新本地代码以处理强制推送的情况
+          git fetch origin main
+          git reset --hard origin/main
+          
+          # 确保脚本有执行权限
+          chmod +x deploy-ci.sh
+          
+          # 执行部署脚本
           ./deploy-ci.sh
           
     - name: Notify deployment status
