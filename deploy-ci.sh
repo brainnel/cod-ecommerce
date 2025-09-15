@@ -24,7 +24,7 @@ echo "📦 安装/更新依赖..."
 npm install --production=false
 
 echo "🏗️ 构建生产版本..."
-npm run build
+npm run build:prod
 
 # 检查构建是否成功
 if [ ! -d "dist" ] || [ ! -f "dist/index.html" ]; then
