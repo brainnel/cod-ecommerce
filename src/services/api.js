@@ -1,15 +1,69 @@
 import axios from 'axios'
+import { getCurrentConfig, API_ENDPOINTS } from '../config/api.config.js'
 
-const BASE_URL = 'https://api.brainnel.com/backend'
+// 获取当前环境配置
+const config = getCurrentConfig()
 
 // 创建axios实例
 const api = axios.create({
-  baseURL: BASE_URL,
-  timeout: 10000,
+  baseURL: config.BASE_URL,
+  timeout: config.TIMEOUT,
   headers: {
     'Content-Type': 'application/json'
   }
 })
+
+// 请求拦截器 - 根据环境配置决定是否记录日志
+api.interceptors.request.use(
+  (requestConfig) => {
+    if (config.LOG_REQUESTS) {
+      console.log('🚀 发送请求:', {
+        method: requestConfig.method?.toUpperCase(),
+        url: requestConfig.url,
+        baseURL: requestConfig.baseURL,
+        fullURL: `${requestConfig.baseURL}${requestConfig.url}`,
+        data: requestConfig.data,
+        timeout: requestConfig.timeout
+      })
+    }
+    return requestConfig
+  },
+  (error) => {
+    if (config.LOG_REQUESTS) {
+      console.error('❌ 请求拦截器错误:', error)
+    }
+    return Promise.reject(error)
+  }
+)
+
+// 响应拦截器 - 根据环境配置决定是否记录日志
+api.interceptors.response.use(
+  (response) => {
+    if (config.LOG_RESPONSES) {
+      console.log('✅ 收到响应:', {
+        status: response.status,
+        statusText: response.statusText,
+        url: response.config.url,
+        data: response.data
+      })
+    }
+    return response
+  },
+  (error) => {
+    if (config.LOG_RESPONSES) {
+      console.error('❌ 响应错误:', {
+        message: error.message,
+        code: error.code,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        url: error.config?.url,
+        fullURL: error.config ? `${error.config.baseURL}${error.config.url}` : 'unknown',
+        responseData: error.response?.data
+      })
+    }
+    return Promise.reject(error)
+  }
+)
 
 // 产品相关接口
 export const productAPI = {
@@ -26,7 +80,7 @@ export const productAPI = {
     }
     
     try {
-      const response = await api.get(`/api/flash-local/?${queryParams}`)
+      const response = await api.get(`${API_ENDPOINTS.PRODUCTS}/?${queryParams}`)
       return response.data
     } catch (error) {
       console.error('获取产品列表失败:', error)
@@ -37,7 +91,7 @@ export const productAPI = {
   // 获取单个产品详情
   getProductDetail: async (productId) => {
     try {
-      const response = await api.get(`/api/flash-local/${productId}`)
+      const response = await api.get(`${API_ENDPOINTS.PRODUCT_DETAIL(productId)}`)
       return response.data
     } catch (error) {
       console.error('获取产品详情失败:', error)
@@ -51,7 +105,7 @@ export const categoryAPI = {
   // 获取一级分类列表
   getLevel1Categories: async () => {
     try {
-      const response = await api.get('/api/flash-local/categories/level1/')
+      const response = await api.get(`${API_ENDPOINTS.CATEGORIES}/`)
       return response.data
     } catch (error) {
       console.error('获取分类列表失败:', error)
@@ -65,7 +119,7 @@ export const pickupAPI = {
   // 获取取货点列表
   getPickupLocations: async () => {
     try {
-      const response = await api.get('/api/flash-local/pickup-locations/')
+      const response = await api.get(`${API_ENDPOINTS.PICKUP_LOCATIONS}/`)
       return response.data
     } catch (error) {
       console.error('获取取货点列表失败:', error)
@@ -79,7 +133,22 @@ export const orderAPI = {
   // 创建订单
   createOrder: async (orderData) => {
     try {
-      const response = await api.post('/api/flash-local/orders/', orderData)
+      // 确保orderData包含必要的字段，包括ad_id
+      const requestData = {
+        ...orderData,
+        // 如果没有提供ad_id，确保字段存在但值为null
+        ad_id: orderData.ad_id || null
+      }
+      
+      // 调试日志 - 记录包含ad_id的完整请求数据
+      if (import.meta.env.VITE_ENABLE_CONSOLE_LOGS === 'true') {
+        console.log('=== 创建订单请求数据 ===')
+        console.log('广告ID (ad_id):', requestData.ad_id)
+        console.log('完整订单数据:', JSON.stringify(requestData, null, 2))
+        console.log('==========================')
+      }
+      
+      const response = await api.post(`${API_ENDPOINTS.ORDERS}/`, requestData)
       // 返回完整的响应对象，而不只是data
       return response
     } catch (error) {

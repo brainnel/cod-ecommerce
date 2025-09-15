@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { pickupAPI, orderAPI } from '../services/api'
+import { useAdId } from '../contexts/AdTrackingContext.jsx'
 import mapImage from '../assets/map.png'
 import './PaymentPage.css'
 
@@ -8,6 +9,9 @@ const PaymentPage = () => {
   const location = useLocation()
   const navigate = useNavigate()
   const { product, quantity } = location.state || {}
+  
+  // 获取Facebook广告ID
+  const adId = useAdId()
 
   const [userInfo, setUserInfo] = useState({
     fullName: '',
@@ -217,7 +221,9 @@ const PaymentPage = () => {
         full_name: userInfo.fullName,
         phone: formatPhoneWithCountryCode(userInfo.phone),
         whatsapp: formatPhoneWithCountryCode(userInfo.whatsapp),
-        is_web: 1
+        is_web: 1,
+        // 添加Facebook广告ID
+        ad_id: adId
       }
 
       // 调试日志 - 显示即将发送的订单数据
@@ -232,6 +238,7 @@ const PaymentPage = () => {
       console.log('用户信息:', userInfo)
       console.log('选择的取货点:', selectedLocation)
       console.log('总价:', totalPrice)
+      console.log('Facebook广告ID:', adId || '未设置')
       console.log('即将发送的订单数据:', JSON.stringify(orderData, null, 2))
       console.log('请求URL:', 'https://api.brainnel.com/test/api/flash-local/orders/')
       console.log('==================')

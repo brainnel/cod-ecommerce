@@ -7,7 +7,12 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "env:dev": "node scripts/env-manager.cjs dev",
+    "env:prod": "node scripts/env-manager.cjs prod",
+    "env:status": "node scripts/env-manager.cjs status",
+    "build:dev": "npm run env:dev && vite build",
+    "build:prod": "npm run env:prod && vite build"
   },
   "dependencies": {
     "axios": "^1.11.0",
