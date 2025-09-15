@@ -91,7 +91,6 @@ const DownloadPage = () => {
               </svg>
             </div>
             <div className="btn-content">
-              <div className="btn-subtitle">Télécharger sur</div>
               <div className="btn-title">App Store</div>
             </div>
           </button>
@@ -108,7 +107,6 @@ const DownloadPage = () => {
               </svg>
             </div>
             <div className="btn-content">
-              <div className="btn-subtitle">Télécharger sur</div>
               <div className="btn-title">Google Play</div>
             </div>
           </button>
@@ -126,7 +124,6 @@ const DownloadPage = () => {
               </svg>
             </div>
             <div className="btn-content">
-              <div className="btn-subtitle">Téléchargement direct</div>
               <div className="btn-title">Fichier APK</div>
             </div>
           </button>
