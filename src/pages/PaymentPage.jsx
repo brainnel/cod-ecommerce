@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { pickupAPI, orderAPI } from '../services/api'
-import { useAdId } from '../contexts/AdTrackingContext.jsx'
+import { useAdId } from '../hooks/useAdTrackingHooks.js'
 import mapImage from '../assets/map.png'
 import './PaymentPage.css'
 
