@@ -19,13 +19,15 @@ const API_CONFIG = {
     BASE_URL: 'https://api.brainnel.com/test', // 测试环境
     TIMEOUT: 30000, // 30秒
     LOG_REQUESTS: true, // 开发环境记录请求日志
-    LOG_RESPONSES: true // 开发环境记录响应日志
+    LOG_RESPONSES: true, // 开发环境记录响应日志
+    FACEBOOK_API_URL: 'http://ec2-13-245-80-24.af-south-1.compute.amazonaws.com:8000' // Facebook API 服务器
   },
   [ENV.PRODUCTION]: {
     BASE_URL: 'https://api.brainnel.com/backend', // 生产环境
     TIMEOUT: 30000, // 30秒
     LOG_REQUESTS: false, // 生产环境不记录请求日志
-    LOG_RESPONSES: false // 生产环境不记录响应日志
+    LOG_RESPONSES: false, // 生产环境不记录响应日志
+    FACEBOOK_API_URL: 'http://ec2-13-245-80-24.af-south-1.compute.amazonaws.com:8000' // Facebook API 服务器
   }
 }
 

@@ -76,7 +76,6 @@ const OrderSuccessPage = () => {
       }
     }
   }, [product, quantity, totalPrice, userInfo, location.state])
-  }, [product, quantity, totalPrice])
 
   const formatPrice = (price) => {
     return price.toString()

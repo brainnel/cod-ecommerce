@@ -112,13 +112,6 @@ const buildUserData = async (userInfo, clientInfo = {}) => {
 const sendConversionEvent = async (eventData) => {
   const config = getCurrentConfig()
   
-  if (!FACEBOOK_CONFIG.ACCESS_TOKEN) {
-    console.warn('⚠️ Facebook Access Token 未配置，跳过服务器端事件发送')
-    return { success: false, error: 'Access token not configured' }
-  }
-  
-  const url = `${FACEBOOK_CONFIG.CONVERSION_API_BASE_URL}/${FACEBOOK_CONFIG.PIXEL_ID}/events`
-  
   const requestData = {
     data: [eventData],
     // 测试环境使用测试事件代码
@@ -128,24 +121,15 @@ const sendConversionEvent = async (eventData) => {
   }
   
   try {
-    // 如果在浏览器环境，我们实际上需要通过后端发送这个请求
-    // 这里只是示例代码，实际应该发送到你的后端API
     if (config.LOG_REQUESTS) {
       console.log('📊 Facebook 转化事件数据:', {
-        url,
         data: JSON.stringify(requestData, null, 2)
       })
     }
     
-    // 通过后端API发送Facebook转化事件
-    // 使用现有的API服务
+    // 通过你的服务器API发送Facebook转化事件
     const { facebookAPI } = await import('./api.js')
-    const response = await facebookAPI.sendConversionEvent({
-      pixel_id: FACEBOOK_CONFIG.PIXEL_ID,
-      access_token: FACEBOOK_CONFIG.ACCESS_TOKEN,
-      test_event_code: FACEBOOK_CONFIG.TEST_EVENT_CODE,
-      event_data: eventData
-    })
+    const response = await facebookAPI.sendConversionEvent(requestData)
     
     if (response && response.success !== false) {
       if (config.LOG_RESPONSES) {

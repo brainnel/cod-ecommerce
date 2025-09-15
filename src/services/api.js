@@ -158,12 +158,25 @@ export const orderAPI = {
   }
 }
 
+// 创建 Facebook API 专用客户端
+const createFacebookAPIClient = () => {
+  const config = getCurrentConfig()
+  return axios.create({
+    baseURL: config.FACEBOOK_API_URL,
+    timeout: config.TIMEOUT,
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
+}
+
 // Facebook 转化 API 相关接口
 export const facebookAPI = {
-  // 发送转化事件到后端（后端再转发到Facebook）
+  // 发送转化事件到你的服务器（服务器再转发到Facebook）
   sendConversionEvent: async (eventData) => {
     try {
-      const response = await api.post(`${API_ENDPOINTS.FACEBOOK_CONVERSIONS}/`, eventData)
+      const facebookClient = createFacebookAPIClient()
+      const response = await facebookClient.post(`${API_ENDPOINTS.FACEBOOK_CONVERSIONS}`, eventData)
       return response.data
     } catch (error) {
       console.error('发送Facebook转化事件失败:', error)

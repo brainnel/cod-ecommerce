@@ -15,6 +15,10 @@ build/
 .env.test.local
 .env.production.local
 
+# SSH Keys
+brainnel.pem
+*.pem
+
 # IDE and editor files
 .vscode/
 .idea/
