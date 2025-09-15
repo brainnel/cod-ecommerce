@@ -1,6 +1,7 @@
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import AppDownloadModal from '../components/AppDownloadModal'
+import { trackPurchaseEvent, getClientInfo } from '../services/facebookConversions'
 import './OrderSuccessPage.css'
 
 const OrderSuccessPage = () => {
@@ -28,18 +29,17 @@ const OrderSuccessPage = () => {
       console.log('=====================================')
     }
   }, [product, quantity, userInfo, selectedLocation, navigate, location.state])
-
-  // Facebook Pixel Purchase事件追踪
+  // Facebook Pixel Purchase事件追踪 + 服务器端事件作为备份
   useEffect(() => {
     if (product && quantity && totalPrice) {
-      // 确保fbq存在
+      // 客户端 Pixel 追踪
       if (typeof window !== 'undefined' && window.fbq) {
         // 将FCFA转换为USD（大概汇率 1 USD = 600 FCFA）
         const valueInUSD = (totalPrice / 560).toFixed(2)
         
         window.fbq('track', 'Purchase', {
           value: parseFloat(valueInUSD),
-          currency: 'USD', // 使用USD便于Facebook广告转化跟踪
+          currency: 'USD', // 使用USD便于Facebook广告转化追踪
         })
         
         // 调试日志
@@ -48,7 +48,34 @@ const OrderSuccessPage = () => {
           currency: 'USD',
         })
       }
+      
+      // 服务器端事件作为备份（防止客户端被阻止）
+      try {
+        const clientInfo = getClientInfo()
+        const orderData = {
+          productId: product.product_id,
+          quantity: quantity,
+          totalPrice: totalPrice,
+          unitPrice: product.price,
+          orderNo: location.state?.orderResponse?.order_no || location.state?.orderResponse?.order_id
+        }
+        
+        // 从用户信息中提取姓名
+        const userInfoForFB = {
+          firstName: userInfo?.fullName?.split(' ')[0] || '',
+          lastName: userInfo?.fullName?.split(' ').slice(1).join(' ') || '',
+          phone: userInfo?.phone || '',
+          email: userInfo?.email || ''
+        }
+        
+        trackPurchaseEvent(orderData, userInfoForFB, clientInfo).catch(error => {
+          console.warn('服务器端 Facebook Purchase 事件发送失败:', error)
+        })
+      } catch (error) {
+        console.warn('发送服务器端 Facebook 事件时出错:', error)
+      }
     }
+  }, [product, quantity, totalPrice, userInfo, location.state])
   }, [product, quantity, totalPrice])
 
   const formatPrice = (price) => {

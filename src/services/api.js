@@ -158,4 +158,19 @@ export const orderAPI = {
   }
 }
 
+// Facebook 转化 API 相关接口
+export const facebookAPI = {
+  // 发送转化事件到后端（后端再转发到Facebook）
+  sendConversionEvent: async (eventData) => {
+    try {
+      const response = await api.post(`${API_ENDPOINTS.FACEBOOK_CONVERSIONS}/`, eventData)
+      return response.data
+    } catch (error) {
+      console.error('发送Facebook转化事件失败:', error)
+      // 不抛出错误，因为转化事件失败不应该影响主要业务流程
+      return { success: false, error: error.message }
+    }
+  }
+}
+
 export default api

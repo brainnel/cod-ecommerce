@@ -62,7 +62,10 @@ export const API_ENDPOINTS = {
   ORDERS: '/api/flash-local/orders',
   
   // 取货点相关
-  PICKUP_LOCATIONS: '/api/flash-local/pickup-locations'
+  PICKUP_LOCATIONS: '/api/flash-local/pickup-locations',
+  
+  // Facebook 转化 API
+  FACEBOOK_CONVERSIONS: '/api/facebook-conversions'
 }
 
 // 构建完整的API URL

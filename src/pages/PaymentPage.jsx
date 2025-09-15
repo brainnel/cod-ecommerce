@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { pickupAPI, orderAPI } from '../services/api'
 import { useAdId } from '../hooks/useAdTrackingHooks.js'
+import { trackInitiateCheckoutEvent, trackAddPaymentInfoEvent, trackPurchaseEvent, getClientInfo } from '../services/facebookConversions'
 import mapImage from '../assets/map.png'
 import './PaymentPage.css'
 
@@ -30,12 +31,31 @@ const PaymentPage = () => {
   const [error, setError] = useState(null)
   const [currentStep, setCurrentStep] = useState(1)
   const [isPlacingOrder, setIsPlacingOrder] = useState(false)
+  const [clientInfo, setClientInfo] = useState({})
 
   // 如果没有产品信息，重定向回首页
   useEffect(() => {
     if (!product || !quantity) {
       navigate('/')
       return
+    }
+    
+    // 获取客户端信息用于Facebook转化API
+    const info = getClientInfo()
+    setClientInfo(info)
+    
+    // 触发初始化结账事件
+    if (product && quantity) {
+      const orderData = {
+        productId: product.product_id,
+        quantity: quantity,
+        totalPrice: product.price * quantity,
+        unitPrice: product.price
+      }
+      
+      trackInitiateCheckoutEvent(orderData, {}, info).catch(error => {
+        console.warn('Facebook InitiateCheckout 事件发送失败:', error)
+      })
     }
   }, [product, quantity, navigate])
 
@@ -178,6 +198,20 @@ const PaymentPage = () => {
   const handleNextStep = () => {
     if (currentStep === 1 && isUserInfoValid()) {
       setCurrentStep(2)
+      
+      // 触发添加支付信息事件
+      if (product && quantity) {
+        const orderData = {
+          productId: product.product_id,
+          quantity: quantity,
+          totalPrice: product.price * quantity,
+          unitPrice: product.price
+        }
+        
+        trackAddPaymentInfoEvent(orderData, userInfo, clientInfo).catch(error => {
+          console.warn('Facebook AddPaymentInfo 事件发送失败:', error)
+        })
+      }
     } else if (currentStep === 2 && selectedLocation) {
       setCurrentStep(3)
     }
@@ -259,6 +293,26 @@ const PaymentPage = () => {
         console.log('警告：响应中没有data字段')
       }
       console.log('==================')
+      
+      // 下单成功后，发送Facebook Purchase事件
+      if (response?.data && response.status >= 200 && response.status < 300) {
+        try {
+          const purchaseOrderData = {
+            productId: product.product_id,
+            quantity: quantity,
+            totalPrice: totalPrice,
+            unitPrice: product.price,
+            orderNo: response.data.order_no || response.data.order_id
+          }
+          
+          // 发送购买事件到Facebook
+          trackPurchaseEvent(purchaseOrderData, userInfo, clientInfo).catch(error => {
+            console.warn('Facebook Purchase 事件发送失败:', error)
+          })
+        } catch (fbError) {
+          console.warn('发送Facebook Purchase事件时出错:', fbError)
+        }
+      }
 
       // 下单成功，跳转到订单成功页面
       navigate('/order-success', {
