@@ -49,28 +49,6 @@ export const useAdTrackingContext = () => {
 }
 
 /**
- * 高阶组件：为组件提供广告追踪功能
- * @param {React.Component} WrappedComponent - 要包装的组件
- * @returns {React.Component} 包装后的组件
- */
-export const withAdTracking = (WrappedComponent) => {
-  const WithAdTrackingComponent = (props) => {
-    const adTracking = useAdTrackingContext()
-    
-    return (
-      <WrappedComponent
-        {...props}
-        adTracking={adTracking}
-      />
-    )
-  }
-  
-  WithAdTrackingComponent.displayName = `withAdTracking(${WrappedComponent.displayName || WrappedComponent.name})`
-  
-  return WithAdTrackingComponent
-}
-
-/**
  * 便捷Hook：直接获取广告ID
  * @returns {string|null} 当前的广告ID
  */

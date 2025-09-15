@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import './QuantityModal.css'
 
-const QuantityModal = ({ isOpen, onClose, product, onConfirm }) => {
+const QuantityModal = ({ isOpen, onClose, product }) => {
   const navigate = useNavigate()
   const [quantity, setQuantity] = useState(1)
   const [isClosing, setIsClosing] = useState(false)

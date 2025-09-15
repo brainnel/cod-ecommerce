@@ -22,8 +22,8 @@ const ProductList = ({ categoryId }) => {
     return (off * 100).toFixed(0)
   }
 
-  // 加载产品数据
-  const loadProducts = async (pageNum = 1, isNewCategory = false) => {
+  // 加载产品数据 - 使用useCallback包装
+  const loadProducts = useCallback(async (pageNum = 1, isNewCategory = false) => {
     try {
       if (pageNum === 1) {
         setInitialLoading(true)
@@ -72,7 +72,7 @@ const ProductList = ({ categoryId }) => {
       setLoading(false)
       setInitialLoading(false)
     }
-  }
+  }, [categoryId])
 
   // 当分类改变时重新加载
   useEffect(() => {
@@ -80,7 +80,7 @@ const ProductList = ({ categoryId }) => {
     setHasMore(true)
     setError(null)
     loadProducts(1, true)
-  }, [categoryId])
+  }, [categoryId, loadProducts])
 
   // 无限滚动的观察者
   const lastProductElementCallback = useCallback(node => {
@@ -95,7 +95,7 @@ const ProductList = ({ categoryId }) => {
     })
     
     if (node) observerRef.current.observe(node)
-  }, [loading, hasMore, products.length])
+  }, [loading, hasMore, products.length, loadProducts])
 
   // 处理产品点击
   const handleProductClick = (product) => {
