@@ -3,6 +3,7 @@ import HomePage from './pages/HomePage'
 import ProductPage from './pages/ProductPage'
 import PaymentPage from './pages/PaymentPage'
 import OrderSuccessPage from './pages/OrderSuccessPage'
+import DownloadPage from './pages/DownloadPage'
 import './components/ProductDetail.css'
 import './App.css'
 
@@ -14,6 +15,7 @@ function App() {
         <Route path="/product/:productId" element={<ProductPage />} />
         <Route path="/payment" element={<PaymentPage />} />
         <Route path="/order-success" element={<OrderSuccessPage />} />
+        <Route path="/download" element={<DownloadPage />} />
       </Routes>
     </div>
   )

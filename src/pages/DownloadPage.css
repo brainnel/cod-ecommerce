@@ -1,0 +1,321 @@
+/* 下载页面样式 */
+.download-page {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #333;
+}
+
+/* 顶部导航 */
+.download-header {
+  display: flex;
+  align-items: center;
+  padding: 1rem;
+  position: relative;
+  background: white;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.back-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: #f8f9fa;
+  border-radius: 50%;
+  color: #333;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.back-btn:hover {
+  background: #e9ecef;
+  transform: translateX(-2px);
+}
+
+.header-title {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #333;
+  margin: 0;
+}
+
+/* 主要内容 */
+.download-content {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+/* 应用介绍部分 */
+.app-intro {
+  text-align: center;
+  margin-bottom: 3rem;
+  color: white;
+}
+
+.app-icon {
+  margin-bottom: 1.5rem;
+}
+
+.app-icon-image {
+  width: 120px;
+  height: 120px;
+  border-radius: 24px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.app-title {
+  font-size: 2.5rem;
+  font-weight: bold;
+  margin: 1rem 0 0.5rem 0;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+.app-subtitle {
+  font-size: 1.25rem;
+  margin-bottom: 1.5rem;
+  opacity: 0.9;
+  font-weight: 300;
+}
+
+.app-description {
+  font-size: 1rem;
+  line-height: 1.6;
+  opacity: 0.8;
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+/* 特性列表 */
+.app-features {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 3rem;
+  padding: 2rem;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  backdrop-filter: blur(10px);
+}
+
+.feature {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: white;
+}
+
+.feature-icon {
+  font-size: 1.5rem;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+
+.feature-text {
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+/* 下载按钮区域 */
+.download-buttons {
+  margin-bottom: 3rem;
+}
+
+.download-title {
+  text-align: center;
+  font-size: 1.5rem;
+  font-weight: bold;
+  margin-bottom: 2rem;
+  color: white;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+.download-btn {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 1rem 1.5rem;
+  margin-bottom: 1rem;
+  border: none;
+  border-radius: 16px;
+  background: white;
+  color: #333;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  text-decoration: none;
+}
+
+.download-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.download-btn:active {
+  transform: translateY(0);
+}
+
+/* 不同平台的按钮颜色 */
+.download-btn.app-store {
+  background: linear-gradient(135deg, #000000 0%, #333333 100%);
+  color: white;
+}
+
+.download-btn.google-play {
+  background: linear-gradient(135deg, #34a853 0%, #0f9d58 100%);
+  color: white;
+}
+
+.download-btn.apk-download {
+  background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%);
+  color: white;
+}
+
+.btn-icon {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  margin-right: 1rem;
+  flex-shrink: 0;
+}
+
+.btn-content {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+}
+
+.btn-subtitle {
+  font-size: 0.8rem;
+  opacity: 0.8;
+  margin-bottom: 0.25rem;
+}
+
+.btn-title {
+  font-size: 1.1rem;
+  font-weight: bold;
+}
+
+
+/* 支持信息 */
+.support-info {
+  text-align: center;
+  padding: 2rem;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  backdrop-filter: blur(10px);
+}
+
+.support-text {
+  color: white;
+  font-size: 0.9rem;
+  margin: 0;
+  opacity: 0.9;
+}
+
+.support-link {
+  color: #ffd700;
+  text-decoration: none;
+  font-weight: 500;
+  margin-left: 0.25rem;
+}
+
+.support-link:hover {
+  text-decoration: underline;
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+  .download-content {
+    padding: 1rem;
+  }
+  
+  .app-title {
+    font-size: 2rem;
+  }
+  
+  .app-features {
+    grid-template-columns: 1fr;
+    padding: 1.5rem;
+  }
+  
+  .download-btn {
+    padding: 0.875rem 1.25rem;
+  }
+  
+  .btn-icon {
+    width: 40px;
+    height: 40px;
+  }
+  
+  .support-info {
+    padding: 1.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .app-icon-image {
+    width: 100px;
+    height: 100px;
+  }
+  
+  .app-title {
+    font-size: 1.75rem;
+  }
+  
+  .download-btn {
+    padding: 0.75rem 1rem;
+  }
+  
+  .btn-content {
+    gap: 0.125rem;
+  }
+}
+
+/* 加载动画 */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.download-page > * {
+  animation: fadeInUp 0.6s ease-out forwards;
+}
+
+.download-content > * {
+  animation: fadeInUp 0.8s ease-out forwards;
+}
+
+.download-content > *:nth-child(2) {
+  animation-delay: 0.1s;
+}
+
+.download-content > *:nth-child(3) {
+  animation-delay: 0.2s;
+}
+
+.download-content > *:nth-child(4) {
+  animation-delay: 0.3s;
+}
