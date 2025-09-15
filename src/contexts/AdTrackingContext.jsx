@@ -1,4 +1,4 @@
-import React, { createContext, useContext } from 'react'
+import React, { createContext } from 'react'
 import useAdTracking from '../hooks/useAdTracking'
 
 // 创建广告追踪Context
