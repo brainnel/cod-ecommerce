@@ -28,28 +28,6 @@ const OrderSuccessPage = () => {
       console.log('=====================================')
     }
   }, [product, quantity, userInfo, selectedLocation, navigate, location.state])
-  // Facebook Pixel Purchase事件追踪 + 服务器端事件作为备份
-  useEffect(() => {
-    if (product && quantity && totalPrice) {
-      // 客户端 Pixel 追踪
-      if (typeof window !== 'undefined' && window.fbq) {
-        // 将FCFA转换为USD（大概汇率 1 USD = 600 FCFA）
-        const valueInUSD = (totalPrice / 560).toFixed(2)
-        
-        window.fbq('track', 'Purchase', {
-          value: parseFloat(valueInUSD),
-          currency: 'USD', // 使用USD便于Facebook广告转化追踪
-        })
-        
-        // 调试日志
-        console.log('Facebook Pixel Purchase 事件:', {
-          value: parseFloat(valueInUSD),
-          currency: 'USD',
-        })
-      }
-      
-    }
-  }, [product, quantity, totalPrice, userInfo, location.state])
 
   const formatPrice = (price) => {
     return price.toString()
