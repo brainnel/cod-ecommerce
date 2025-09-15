@@ -1,7 +1,6 @@
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import AppDownloadModal from '../components/AppDownloadModal'
-import { trackPurchaseEvent, getClientInfo } from '../services/facebookConversions'
 import './OrderSuccessPage.css'
 
 const OrderSuccessPage = () => {
@@ -49,31 +48,6 @@ const OrderSuccessPage = () => {
         })
       }
       
-      // 服务器端事件作为备份（防止客户端被阻止）
-      try {
-        const clientInfo = getClientInfo()
-        const orderData = {
-          productId: product.product_id,
-          quantity: quantity,
-          totalPrice: totalPrice,
-          unitPrice: product.price,
-          orderNo: location.state?.orderResponse?.order_no || location.state?.orderResponse?.order_id
-        }
-        
-        // 从用户信息中提取姓名
-        const userInfoForFB = {
-          firstName: userInfo?.fullName?.split(' ')[0] || '',
-          lastName: userInfo?.fullName?.split(' ').slice(1).join(' ') || '',
-          phone: userInfo?.phone || '',
-          email: userInfo?.email || ''
-        }
-        
-        trackPurchaseEvent(orderData, userInfoForFB, clientInfo).catch(error => {
-          console.warn('服务器端 Facebook Purchase 事件发送失败:', error)
-        })
-      } catch (error) {
-        console.warn('发送服务器端 Facebook 事件时出错:', error)
-      }
     }
   }, [product, quantity, totalPrice, userInfo, location.state])
 

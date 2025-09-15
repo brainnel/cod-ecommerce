@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { pickupAPI, orderAPI } from '../services/api'
 import { useAdId } from '../hooks/useAdTrackingHooks.js'
-import { trackInitiateCheckoutEvent, trackAddPaymentInfoEvent, trackPurchaseEvent, getClientInfo } from '../services/facebookConversions'
+import { trackPurchaseEvent, getClientInfo } from '../services/facebookConversions'
 import mapImage from '../assets/map.png'
 import './PaymentPage.css'
 
@@ -43,20 +43,6 @@ const PaymentPage = () => {
     // 获取客户端信息用于Facebook转化API
     const info = getClientInfo()
     setClientInfo(info)
-    
-    // 触发初始化结账事件
-    if (product && quantity) {
-      const orderData = {
-        productId: product.product_id,
-        quantity: quantity,
-        totalPrice: product.price * quantity,
-        unitPrice: product.price
-      }
-      
-      trackInitiateCheckoutEvent(orderData, {}, info).catch(error => {
-        console.warn('Facebook InitiateCheckout 事件发送失败:', error)
-      })
-    }
   }, [product, quantity, navigate])
 
   // 获取取货点数据
@@ -198,20 +184,6 @@ const PaymentPage = () => {
   const handleNextStep = () => {
     if (currentStep === 1 && isUserInfoValid()) {
       setCurrentStep(2)
-      
-      // 触发添加支付信息事件
-      if (product && quantity) {
-        const orderData = {
-          productId: product.product_id,
-          quantity: quantity,
-          totalPrice: product.price * quantity,
-          unitPrice: product.price
-        }
-        
-        trackAddPaymentInfoEvent(orderData, userInfo, clientInfo).catch(error => {
-          console.warn('Facebook AddPaymentInfo 事件发送失败:', error)
-        })
-      }
     } else if (currentStep === 2 && selectedLocation) {
       setCurrentStep(3)
     }

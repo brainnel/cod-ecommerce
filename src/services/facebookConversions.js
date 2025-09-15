@@ -198,70 +198,6 @@ export const trackPurchaseEvent = async (orderData, userInfo, clientInfo = {}) =
   }
 }
 
-/**
- * 跟踪添加支付信息事件
- */
-export const trackAddPaymentInfoEvent = async (orderData, userInfo, clientInfo = {}) => {
-  try {
-    const userData = await buildUserData(userInfo, clientInfo)
-    const eventTime = Math.floor(Date.now() / 1000)
-    
-    const customData = {
-      currency: 'XAF',
-      value: parseFloat(orderData.totalPrice || 0),
-      content_type: 'product',
-      content_ids: [orderData.productId?.toString()]
-    }
-    
-    const eventData = {
-      event_name: 'AddPaymentInfo',
-      event_time: eventTime,
-      user_data: userData,
-      custom_data: customData,
-      event_source_url: window.location.href,
-      action_source: 'website'
-    }
-    
-    return await sendConversionEvent(eventData)
-    
-  } catch (error) {
-    console.error('❌ 跟踪添加支付信息事件失败:', error)
-    return { success: false, error: error.message }
-  }
-}
-
-/**
- * 跟踪初始化结账事件
- */
-export const trackInitiateCheckoutEvent = async (orderData, userInfo, clientInfo = {}) => {
-  try {
-    const userData = await buildUserData(userInfo, clientInfo)
-    const eventTime = Math.floor(Date.now() / 1000)
-    
-    const customData = {
-      currency: 'XAF',
-      value: parseFloat(orderData.totalPrice || 0),
-      content_type: 'product',
-      content_ids: [orderData.productId?.toString()],
-      num_items: parseInt(orderData.quantity || 1)
-    }
-    
-    const eventData = {
-      event_name: 'InitiateCheckout',
-      event_time: eventTime,
-      user_data: userData,
-      custom_data: customData,
-      event_source_url: window.location.href,
-      action_source: 'website'
-    }
-    
-    return await sendConversionEvent(eventData)
-    
-  } catch (error) {
-    console.error('❌ 跟踪初始化结账事件失败:', error)
-    return { success: false, error: error.message }
-  }
-}
 
 /**
  * 获取客户端信息
@@ -319,8 +255,6 @@ export const setFacebookClickId = (fbclid) => {
 
 export default {
   trackPurchaseEvent,
-  trackAddPaymentInfoEvent,
-  trackInitiateCheckoutEvent,
   getClientInfo,
   setFacebookClickId
 }
