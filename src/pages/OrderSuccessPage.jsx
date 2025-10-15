@@ -6,7 +6,7 @@ import './OrderSuccessPage.css'
 const OrderSuccessPage = () => {
   const location = useLocation()
   const navigate = useNavigate()
-  const { product, quantity, userInfo, selectedLocation, totalPrice } = location.state || {}
+  const { product, quantity, userInfo, selectedLocation, totalPrice, orderResponse } = location.state || {}
   const [isModalOpen, setIsModalOpen] = useState(false)
 
   // 如果没有订单信息，重定向回首页
@@ -130,7 +130,7 @@ const OrderSuccessPage = () => {
           </div>
           <h2 className="success-title">Commande confirmée !</h2>
           <p className="success-subtitle">
-            Votre commande a été enregistrée avec succès. Vous recevrez un appel téléphonique avant la livraison.
+            Nous vous contacterons dans les 24 heures via WhatsApp ou par téléphone pour convenir d'un horaire de livraison.
           </p>
         </div>
 
@@ -149,29 +149,46 @@ const OrderSuccessPage = () => {
           </div>
         </div>
 
-        {/* 取件码 */}
-        <div className="pickup-code-section">
-          <div className="code-title">📸 CODE DE RETRAIT</div>
-          <div className="pickup-code">{pickupCode}</div>
-          <div className="code-notice">Prenez une capture d'écran !</div>
-        </div>
-
-        {/* 提货点信息 */}
-        <div className="pickup-info">
-          <div className="pickup-header">
-            <div className="pickup-icon">📍</div>
-            <div className="pickup-details">
-              <div className="pickup-name">{selectedLocation.name}</div>
-              <div className="pickup-address">{selectedLocation.address}</div>
-            </div>
+        {/* 订单信息 */}
+        <div className="order-info-section">
+          <h3 className="info-section-title">Informations de livraison</h3>
+          
+          <div className="info-row">
+            <div className="info-label">👤 Nom complet</div>
+            <div className="info-value">{userInfo.fullName}</div>
           </div>
+          
+          <div className="info-row">
+            <div className="info-label">📞 Téléphone</div>
+            <div className="info-value">+{userInfo.phone}</div>
+          </div>
+          
+          <div className="info-row">
+            <div className="info-label">💬 WhatsApp</div>
+            <div className="info-value">+{userInfo.whatsapp}</div>
+          </div>
+          
+          {userInfo.addressDescription && (
+            <div className="info-row address-row">
+              <div className="info-label">📍 Adresse</div>
+              <div className="info-value">{userInfo.addressDescription}</div>
+            </div>
+          )}
+          
+          {selectedLocation && (
+            <div className="info-row">
+              <div className="info-label">🏢 District</div>
+              <div className="info-value">{selectedLocation.name}</div>
+            </div>
+          )}
         </div>
 
         {/* 重要提醒 */}
-        <div className="phone-notice">
-          <div className="notice-icon">📞</div>
+        <div className="phone-notice delivery-notice">
+          <div className="notice-icon">⏰</div>
           <div className="notice-text">
-            <strong>Nous vous appellerons avant la livraison</strong> au {userInfo.phone}
+            <strong>Rendez-vous de livraison</strong>
+            <p>Notre équipe vous contactera dans les <strong>24 heures</strong> via WhatsApp (+{userInfo.whatsapp}) ou par téléphone (+{userInfo.phone}) pour planifier la livraison à votre convenance.</p>
           </div>
         </div>
 

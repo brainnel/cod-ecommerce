@@ -1,0 +1,143 @@
+.map-guide-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+  padding: 20px;
+}
+
+.map-guide-container {
+  width: 92%;
+  max-width: 500px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  animation: fadeIn 0.4s ease-out;
+}
+
+.map-guide-content {
+  width: 100%;
+  aspect-ratio: 1;
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.guide-map-image {
+  width: 100%;
+  height: 100%;
+  border-radius: 20px;
+  object-fit: contain;
+}
+
+.guide-finger-image {
+  position: absolute;
+  bottom: 35%;
+  right: 30%;
+  width: 60px;
+  height: 60px;
+  object-fit: contain;
+}
+
+.guide-point-image {
+  position: absolute;
+  bottom: 42%;
+  right: 38%;
+  width: 50px;
+  height: 50px;
+  object-fit: contain;
+  opacity: 0;
+}
+
+.guide-tip-container {
+  margin-top: 24px;
+  background-color: #FF5100;
+  padding: 14px 20px;
+  border-radius: 25px;
+  box-shadow: 0 4px 8px rgba(255, 81, 0, 0.3);
+}
+
+.guide-tip-text {
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+  text-align: center;
+}
+
+/* 手指点击动画 */
+@keyframes fingerTap {
+  0% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  50% {
+    transform: translateY(20px);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+}
+
+/* 标记点出现动画 */
+@keyframes pointAppear {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* 淡入动画 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-finger {
+  animation: fingerTap 1.2s ease-in-out 0.5s forwards;
+}
+
+.animate-point {
+  animation: pointAppear 0.4s ease-out 1.3s forwards;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .map-guide-container {
+    width: 95%;
+  }
+  
+  .guide-finger-image {
+    width: 50px;
+    height: 50px;
+  }
+  
+  .guide-point-image {
+    width: 40px;
+    height: 40px;
+  }
+  
+  .guide-tip-text {
+    font-size: 14px;
+  }
+}

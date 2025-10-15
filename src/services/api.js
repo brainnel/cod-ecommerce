@@ -128,6 +128,32 @@ export const pickupAPI = {
   }
 }
 
+// 大区相关接口
+export const districtAPI = {
+  // 获取城市和大区列表
+  getCitiesAndDistricts: async () => {
+    try {
+      const response = await api.get('/api/flash-local/cities-and-districts/')
+      return response.data
+    } catch (error) {
+      console.error('获取城市和大区列表失败:', error)
+      throw error
+    }
+  },
+  
+  // 获取所有城市（包含大区和坐标）
+  getAllDistricts: async () => {
+    try {
+      const response = await api.get('/api/flash-local/cities-and-districts/')
+      // 直接返回城市数据，保留districts结构
+      return response.data
+    } catch (error) {
+      console.error('获取城市列表失败:', error)
+      throw error
+    }
+  }
+}
+
 // 订单相关接口
 export const orderAPI = {
   // 创建订单

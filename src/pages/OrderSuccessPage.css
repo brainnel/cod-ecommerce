@@ -218,6 +218,62 @@
   line-height: 1.4;
 }
 
+/* 订单信息区域 */
+.order-info-section {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  border-left: 4px solid #FF5100;
+}
+
+.info-section-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #333;
+  margin: 0 0 16px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.info-row {
+  display: flex;
+  align-items: flex-start;
+  padding: 12px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.info-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.info-row:first-child {
+  padding-top: 0;
+}
+
+.info-label {
+  font-size: 14px;
+  color: #666;
+  font-weight: 500;
+  min-width: 140px;
+  flex-shrink: 0;
+}
+
+.info-value {
+  font-size: 14px;
+  color: #1a1a1a;
+  font-weight: 600;
+  flex: 1;
+  word-break: break-word;
+}
+
+.address-row .info-value {
+  line-height: 1.6;
+}
+
 /* 电话通知 */
 .phone-notice {
   background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
@@ -230,8 +286,14 @@
   border: 1px solid #90caf9;
 }
 
+.delivery-notice {
+  background: linear-gradient(135deg, #FFF0E5 0%, #FFE5D0 100%);
+  border: 1px solid #FFB380;
+  align-items: flex-start;
+}
+
 .notice-icon {
-  font-size: 20px;
+  font-size: 24px;
   flex-shrink: 0;
 }
 
@@ -239,11 +301,27 @@
   flex: 1;
   font-size: 14px;
   color: #1976d2;
-  line-height: 1.4;
+  line-height: 1.6;
+}
+
+.delivery-notice .notice-text {
+  color: #D94300;
 }
 
 .notice-text strong {
   color: #1565c0;
+  display: block;
+  margin-bottom: 6px;
+  font-size: 15px;
+}
+
+.delivery-notice .notice-text strong {
+  color: #BF3600;
+}
+
+.notice-text p {
+  margin: 0;
+  line-height: 1.6;
 }
 
 
@@ -350,6 +428,19 @@
     padding: 14px;
     margin-bottom: 20px;
   }
+  
+  .order-info-section {
+    padding: 16px;
+  }
+  
+  .info-label {
+    min-width: 110px;
+    font-size: 13px;
+  }
+  
+  .info-value {
+    font-size: 13px;
+  }
 }
 
 @media (max-width: 480px) {
@@ -379,5 +470,24 @@
   
   .phone-notice {
     padding: 12px;
+  }
+  
+  .order-info-section {
+    padding: 14px;
+  }
+  
+  .info-row {
+    flex-direction: column;
+    gap: 4px;
+  }
+  
+  .info-label {
+    min-width: auto;
+    font-size: 12px;
+  }
+  
+  .info-value {
+    font-size: 13px;
+    padding-left: 0;
   }
 }

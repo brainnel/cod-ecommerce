@@ -72,11 +72,11 @@
 }
 
 .step.active {
-  color: #ff6b35;
+  color: #FF5100;
 }
 
 .step.completed {
-  color: #28a745;
+  color: #4CAF50;
 }
 
 .step-icon {
@@ -96,15 +96,15 @@
 }
 
 .step.active .step-icon {
-  background: #ff6b35;
+  background: #FF5100;
   color: white;
-  border-color: #ff6b35;
+  border-color: #FF5100;
 }
 
 .step.completed .step-icon {
-  background: #28a745;
+  background: #4CAF50;
   color: white;
-  border-color: #28a745;
+  border-color: #4CAF50;
 }
 
 .step-label {
@@ -150,6 +150,87 @@
   margin: 0 0 20px 0;
 }
 
+/* 橙色位置提示条 */
+.location-hint {
+  background: #FF5100;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  box-shadow: 0 2px 8px rgba(255, 81, 0, 0.2);
+}
+
+.hint-content {
+  flex: 1;
+}
+
+.hint-text {
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.5;
+  display: block;
+}
+
+.use-location-btn {
+  background: white;
+  border: none;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+  color: #FF5100;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.use-location-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.use-location-btn:active {
+  transform: scale(0.95);
+}
+
+.use-location-btn svg {
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+/* 大区信息徽章 */
+.district-info-badge {
+  background: #f8f9fa;
+  padding: 10px 16px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #495057;
+  font-weight: 500;
+}
+
+.badge-icon {
+  font-size: 16px;
+}
+
 /* 表单样式 */
 .form-group {
   margin-bottom: 16px;
@@ -175,12 +256,44 @@
 
 .form-input:focus {
   outline: none;
-  border-color: #ff6b35;
-  box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.1);
+  border-color: #FF5100;
+  box-shadow: 0 0 0 3px rgba(255, 81, 0, 0.1);
 }
 
 .form-input::placeholder {
   color: #adb5bd;
+}
+
+.form-textarea {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid #ddd;
+  border-radius: 12px;
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 100px;
+  background: #fafafa;
+  transition: all 0.3s ease;
+  box-sizing: border-box;
+}
+
+.form-textarea:focus {
+  outline: none;
+  border-color: #FF5100;
+  background: white;
+  box-shadow: 0 0 0 3px rgba(255, 81, 0, 0.1);
+}
+
+.form-textarea.error {
+  border-color: #dc3545;
+}
+
+.char-count {
+  font-size: 12px;
+  color: #999;
+  text-align: right;
+  margin-top: 4px;
 }
 
 /* 电话号码输入组合 */
@@ -194,8 +307,8 @@
 }
 
 .phone-input-group:focus-within {
-  border-color: #ff6b35;
-  box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.1);
+  border-color: #FF5100;
+  box-shadow: 0 0 0 3px rgba(255, 81, 0, 0.1);
 }
 
 .country-code-prefix {
@@ -240,12 +353,129 @@
   display: block;
 }
 
-/* 地图容器 */
+/* 大区选择区域 */
+.district-section {
+  /* 继承通用 section 样式 */
+}
+
+.district-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.district-card {
+  display: flex;
+  align-items: center;
+  padding: 16px;
+  background: white;
+  border: 2px solid #f0f0f0;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.district-card:hover {
+  border-color: #FF5100;
+  background: #FFF0E5;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 81, 0, 0.15);
+}
+
+.district-icon {
+  font-size: 24px;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #FFF0E5;
+  border-radius: 50%;
+  margin-right: 12px;
+  flex-shrink: 0;
+}
+
+.district-info {
+  flex: 1;
+}
+
+.district-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin-bottom: 2px;
+}
+
+.district-city {
+  font-size: 13px;
+  color: #666;
+}
+
+.district-arrow {
+  font-size: 20px;
+  color: #999;
+  margin-left: 8px;
+}
+
+/* 地图标记区域 */
+.map-section {
+  /* 继承通用 section 样式 */
+}
+
+.guide-bar {
+  display: flex;
+  align-items: center;
+  background: #FF5100;
+  padding: 12px 14px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  gap: 8px;
+  box-shadow: 0 2px 4px rgba(255, 81, 0, 0.3);
+}
+
+.guide-icon {
+  font-size: 24px;
+}
+
+.guide-text {
+  flex: 1;
+  font-size: 14px;
+  color: white;
+  font-weight: 700;
+}
+
+.district-badge {
+  background: white;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  color: #FF5100;
+  font-weight: 700;
+}
+
 .map-container {
-  margin-bottom: 20px;
+  height: 400px;
+  max-height: 60vh;
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  margin-bottom: 16px;
+}
+
+.marker-info {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px;
+  color: #4CAF50;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.marker-check {
+  font-size: 20px;
 }
 
 .pickup-map {
@@ -379,7 +609,7 @@
 .order-item-total {
   font-size: 15px;
   font-weight: 600;
-  color: #ff6b35;
+  color: #FF5100;
 }
 
 /* 订单总计 */
@@ -439,8 +669,8 @@
 }
 
 .payment-option.selected {
-  border-color: #ff6b35;
-  background: #fff8f5;
+  border-color: #FF5100;
+  background: #FFF0E5;
   color: #333;
 }
 
@@ -465,14 +695,14 @@
 }
 
 .place-order-btn.enabled {
-  background: #ff6b35;
+  background: #FF5100;
   color: white;
 }
 
 .place-order-btn.enabled:hover {
-  background: #e55a2b;
+  background: #e04600;
   transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(255, 107, 53, 0.3);
+  box-shadow: 0 4px 16px rgba(255, 81, 0, 0.3);
 }
 
 .place-order-btn.disabled {
@@ -501,14 +731,14 @@
 }
 
 .next-btn.enabled {
-  background: #ff6b35;
+  background: #FF5100;
   color: white;
 }
 
 .next-btn.enabled:hover {
-  background: #e55a2b;
+  background: #e04600;
   transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(255, 107, 53, 0.3);
+  box-shadow: 0 2px 8px rgba(255, 81, 0, 0.3);
 }
 
 .next-btn.disabled {
@@ -570,7 +800,7 @@
   width: 32px;
   height: 32px;
   border: 3px solid #f3f3f3;
-  border-top: 3px solid #ff6b35;
+  border-top: 3px solid #FF5100;
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin-bottom: 16px;

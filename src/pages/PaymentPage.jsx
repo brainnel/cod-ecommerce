@@ -1,326 +1,270 @@
 import { useState, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { pickupAPI, orderAPI } from '../services/api'
+import { districtAPI, orderAPI } from '../services/api'
 import { useAdId } from '../hooks/useAdTrackingHooks.js'
 import { trackPurchaseEvent, getClientInfo } from '../services/facebookConversions'
-import mapImage from '../assets/map.png'
+import MapSelector from '../components/MapSelector'
+import MapGuideModal from '../components/MapGuideModal'
+import { DISTRICT_CENTERS, DEFAULT_CENTER, DEFAULT_ZOOM } from '../constants/districtCenters'
 import './PaymentPage.css'
 
 const PaymentPage = () => {
   const location = useLocation()
   const navigate = useNavigate()
   const { product, quantity } = location.state || {}
-  
-  // 获取Facebook广告ID
   const adId = useAdId()
 
+  // 三步流程：1=选大区, 2=地图标记, 3=填写信息
+  const [currentStep, setCurrentStep] = useState(1)
+  const [loading, setLoading] = useState(false)
+
+  // 步顢1：大区选择
+  const [districts, setDistricts] = useState([])
+  const [selectedDistrict, setSelectedDistrict] = useState(null)
+
+  // 步顢2：地图标记
+  const [mapCenter, setMapCenter] = useState(DEFAULT_CENTER)
+  const [mapZoom, setMapZoom] = useState(DEFAULT_ZOOM)
+  const [customMarker, setCustomMarker] = useState(null)
+  const [userLocation, setUserLocation] = useState(null)  // 用户当前位置
+  const [showGuideModal, setShowGuideModal] = useState(false)
+
+  // 步骤3：用户信息
   const [userInfo, setUserInfo] = useState({
     fullName: '',
     phone: '',
-    whatsapp: ''
+    whatsapp: '',
+    addressDescription: ''
   })
-  
-  const [phoneErrors, setPhoneErrors] = useState({
-    phone: '',
-    whatsapp: ''
-  })
-  
-  const [pickupLocations, setPickupLocations] = useState([])
-  const [selectedLocation, setSelectedLocation] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-  const [currentStep, setCurrentStep] = useState(1)
+  const [errors, setErrors] = useState({})
   const [isPlacingOrder, setIsPlacingOrder] = useState(false)
   const [clientInfo, setClientInfo] = useState({})
 
-  // 如果没有产品信息，重定向回首页
+  // 重定向检查
   useEffect(() => {
     if (!product || !quantity) {
       navigate('/')
       return
     }
-    
-    // 获取客户端信息用于Facebook转化API
     const info = getClientInfo()
     setClientInfo(info)
   }, [product, quantity, navigate])
 
-  // 获取取货点数据
+  // 加载大区列表（扁平化）
   useEffect(() => {
-    const fetchPickupLocations = async () => {
+    const fetchDistricts = async () => {
       try {
         setLoading(true)
-        const data = await pickupAPI.getPickupLocations()
-        setPickupLocations(data)
+        const citiesData = await districtAPI.getAllDistricts()
+        
+        // 扁平化：将所有districts展开，保留城市信息
+        const allDistricts = []
+        citiesData.forEach(city => {
+          if (city.districts && city.districts.length > 0) {
+            city.districts.forEach(district => {
+              allDistricts.push({
+                ...district,
+                city_id: city.id,
+                city_name: city.name,
+                all_city_districts: city.districts  // 保存同城市所有districts用于计算中心点
+              })
+            })
+          }
+        })
+        
+        setDistricts(allDistricts)
       } catch (err) {
-        setError('Échec de récupération des points de retrait')
-        console.error('Error fetching pickup locations:', err)
+        console.error('获取大区列表失败:', err)
+        alert('Impossible de charger la liste des districts')
       } finally {
         setLoading(false)
       }
     }
-
-    fetchPickupLocations()
+    fetchDistricts()
   }, [])
 
-  // 号码验证工具函数
-  const validatePhoneNumber = (number) => {
-    if (!number) {
-      return { isValid: false, error: 'Le numéro de téléphone est requis' }
+  // 获取用户当前位置
+  const getUserLocation = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const userPos = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          }
+          setUserLocation(userPos)
+          console.log('用户位置:', userPos)
+        },
+        (error) => {
+          console.log('无法获取位置:', error.message)
+          // 不显示错误，只是不显示用户位置标记
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 5000,
+          maximumAge: 0
+        }
+      )
     }
+  }
+
+  // 选择大区
+  const handleSelectDistrict = (district) => {
+    setSelectedDistrict(district)
     
-    // 只允许数字
-    const cleanNumber = number.replace(/\D/g, '')
+    // 直接使用大区自己的坐标作为地图中心
+    const districtCenter = {
+      lat: parseFloat(district.latitude),
+      lng: parseFloat(district.longitude)
+    }
+    setMapCenter(districtCenter)
+    setMapZoom(14)  // 大区级别，用更高的缩放
     
-    // 检查长度：8位或10位
-    if (cleanNumber.length !== 8 && cleanNumber.length !== 10) {
-      return { 
-        isValid: false, 
-        error: 'Le numéro doit contenir 8 ou 10 chiffres' 
-      }
-    }
+    // 获取用户当前位置
+    getUserLocation()
     
-    return { isValid: true, error: '' }
-  }
-  
-  const formatPhoneWithCountryCode = (localNumber) => {
-    const cleanNumber = localNumber.replace(/\D/g, '')
-    return `225${cleanNumber}`
+    setCurrentStep(2)
+    // 显示引导动画
+    setTimeout(() => setShowGuideModal(true), 500)
   }
 
-  const handleUserInfoChange = (field, value) => {
-    if (field === 'phone' || field === 'whatsapp') {
-      // 只允许数字输入
-      const cleanValue = value.replace(/\D/g, '')
-      
-      // 限制最大长度为10位
-      const limitedValue = cleanValue.slice(0, 10)
-      
-      // 更新值
-      setUserInfo(prev => ({
-        ...prev,
-        [field]: limitedValue
-      }))
-      
-      // 实时验证
-      const validation = validatePhoneNumber(limitedValue)
-      setPhoneErrors(prev => ({
-        ...prev,
-        [field]: validation.error
-      }))
-    } else {
-      setUserInfo(prev => ({
-        ...prev,
-        [field]: value
-      }))
-    }
+  // 地图标记
+  const handleMapClick = (marker) => {
+    setCustomMarker(marker)
   }
 
-  const formatPrice = (price) => {
-    return price.toString()
-  }
-
-  const formatTime = (timeString) => {
-    return timeString.slice(0, 5) // 只显示 HH:MM
-  }
-
-
-  const formatTimetables = (timetables) => {
-    const weekdaySchedule = timetables.find(t => t.day_of_week === 'weekday')
-    const saturdaySchedule = timetables.find(t => t.day_of_week === 'saturday')
-    const sundaySchedule = timetables.find(t => t.day_of_week === 'sunday')
-
-    const result = []
-
-    // 检查周一到周五和周六时间是否相同
-    if (weekdaySchedule && saturdaySchedule && 
-        weekdaySchedule.start_time === saturdaySchedule.start_time && 
-        weekdaySchedule.end_time === saturdaySchedule.end_time) {
-      // 时间相同，合并显示
-      result.push({
-        day: 'Lun-Sam',
-        time: `${formatTime(weekdaySchedule.start_time)} - ${formatTime(weekdaySchedule.end_time)}`
-      })
-    } else {
-      // 时间不同，分开显示
-      if (weekdaySchedule) {
-        result.push({
-          day: 'Lun-Ven',
-          time: `${formatTime(weekdaySchedule.start_time)} - ${formatTime(weekdaySchedule.end_time)}`
-        })
-      }
-      if (saturdaySchedule) {
-        result.push({
-          day: 'Samedi',
-          time: `${formatTime(saturdaySchedule.start_time)} - ${formatTime(saturdaySchedule.end_time)}`
-        })
-      }
-    }
-
-    // 单独处理周日
-    if (sundaySchedule) {
-      result.push({
-        day: 'Dimanche',
-        time: `${formatTime(sundaySchedule.start_time)} - ${formatTime(sundaySchedule.end_time)}`
-      })
-    }
-
-    return result
-  }
-
-  const isUserInfoValid = () => {
-    const phoneValidation = validatePhoneNumber(userInfo.phone)
-    const whatsappValidation = validatePhoneNumber(userInfo.whatsapp)
-    
-    return userInfo.fullName.trim() !== '' && 
-           phoneValidation.isValid && 
-           whatsappValidation.isValid
-  }
-
-  const isFormValid = () => {
-    return isUserInfoValid() && selectedLocation !== null
-  }
-
-  const handleNextStep = () => {
-    if (currentStep === 1 && isUserInfoValid()) {
-      setCurrentStep(2)
-    } else if (currentStep === 2 && selectedLocation) {
-      setCurrentStep(3)
-    }
-  }
-
-  const handleStepClick = (step) => {
-    if (step === 1) {
-      setCurrentStep(1)
-    } else if (step === 2 && isUserInfoValid()) {
-      setCurrentStep(2)
-    } else if (step === 3 && isUserInfoValid() && selectedLocation) {
-      setCurrentStep(3)
-    }
-  }
-
-  const handlePlaceOrder = async () => {
-    if (!isFormValid()) {
-      alert('Veuillez remplir tous les champs et sélectionner un point de retrait')
+  // 确认标记，进入步骤3
+  const handleConfirmMarker = () => {
+    if (!customMarker) {
+      alert('Veuillez cliquer sur la carte pour choisir un emplacement')
       return
     }
+    setCurrentStep(3)
+  }
+
+  // 表单输入处理
+  const handleInputChange = (field, value) => {
+    if (field === 'phone' || field === 'whatsapp') {
+      const cleanValue = value.replace(/\D/g, '').slice(0, 10)
+      setUserInfo(prev => ({ ...prev, [field]: cleanValue }))
+      if (errors[field]) {
+        setErrors(prev => ({ ...prev, [field]: '' }))
+      }
+    } else if (field === 'addressDescription') {
+      const limitedValue = value.slice(0, 200)
+      setUserInfo(prev => ({ ...prev, [field]: limitedValue }))
+      if (errors[field]) {
+        setErrors(prev => ({ ...prev, [field]: '' }))
+      }
+    } else {
+      setUserInfo(prev => ({ ...prev, [field]: value }))
+      if (errors[field]) {
+        setErrors(prev => ({ ...prev, [field]: '' }))
+      }
+    }
+  }
+
+  // 验证表单
+  const validateForm = () => {
+    const newErrors = {}
+    
+    if (!userInfo.fullName.trim()) {
+      newErrors.fullName = 'Le nom complet est requis'
+    }
+    
+    if (!userInfo.phone.trim()) {
+      newErrors.phone = 'Le numéro de téléphone est requis'
+    } else if (userInfo.phone.length !== 8 && userInfo.phone.length !== 10) {
+      newErrors.phone = 'Le numéro doit contenir 8 ou 10 chiffres'
+    }
+    
+    if (!userInfo.whatsapp.trim()) {
+      newErrors.whatsapp = 'Le numéro WhatsApp est requis'
+    } else if (userInfo.whatsapp.length !== 8 && userInfo.whatsapp.length !== 10) {
+      newErrors.whatsapp = 'Le numéro doit contenir 8 ou 10 chiffres'
+    }
+    
+    if (!userInfo.addressDescription.trim()) {
+      newErrors.addressDescription = 'La description de l\'adresse est requise'
+    } else if (userInfo.addressDescription.trim().length < 5) {
+      newErrors.addressDescription = 'Au moins 5 caractères requis'
+    }
+    
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
+  // 提交订单
+  const handlePlaceOrder = async () => {
+    if (!validateForm()) return
     
     setIsPlacingOrder(true)
     
     try {
-      // 构建订单数据
       const orderData = {
         items: [{
-          product_id: product.product_id.toString(), // 使用真实的product_id
-          sku_id: product.skus && product.skus.length > 0 ? product.skus[0].sku_id : product.product_id.toString(), // 安全获取sku_idr
-          
+          product_id: product.product_id.toString(),
+          sku_id: product.skus && product.skus.length > 0 ? product.skus[0].sku_id : product.product_id.toString(),
           quantity: quantity,
           unit_price: product.price,
           total_price: product.price * quantity
         }],
-        pickup_location_id: selectedLocation.id,
+        district_id: selectedDistrict.id,
+        full_name: userInfo.fullName,
+        phone: `225${userInfo.phone}`,
+        whatsapp: `225${userInfo.whatsapp}`,
+        receiver_address: userInfo.addressDescription,
+        latitude: customMarker.lat,
+        longitude: customMarker.lng,
         payment_method: "cod",
-        total_amount: totalPrice,
-        actual_amount: totalPrice,
+        total_amount: product.price * quantity,
+        actual_amount: product.price * quantity,
         discount_amount: 0,
         currency: "FCFA",
-        full_name: userInfo.fullName,
-        phone: formatPhoneWithCountryCode(userInfo.phone),
-        whatsapp: formatPhoneWithCountryCode(userInfo.whatsapp),
         is_web: 1,
-        // 添加Facebook广告ID
         ad_id: adId
       }
 
-      // 调试日志 - 显示即将发送的订单数据
-      console.log('=== 下单调试信息 ===')
-      console.log('产品信息:', product)
-      console.log('产品ID (product_id):', product.product_id)
-      console.log('SKU信息:', product.skus)
-      console.log('SKU数组长度:', product.skus ? product.skus.length : 0)
-      const skuId = product.skus && product.skus.length > 0 ? product.skus[0].sku_id : product.product_id.toString()
-      console.log('使用的SKU ID:', skuId)
-      console.log('数量:', quantity)
-      console.log('用户信息:', userInfo)
-      console.log('选择的取货点:', selectedLocation)
-      console.log('总价:', totalPrice)
-      console.log('Facebook广告ID:', adId || '未设置')
-      console.log('即将发送的订单数据:', JSON.stringify(orderData, null, 2))
-      console.log('请求URL:', 'https://api.brainnel.com/test/api/flash-local/orders/')
-      console.log('==================')
-
-      // 调用下单接口
-      console.log('正在调用下单接口...')
+      console.log('提交订单:', orderData)
       const response = await orderAPI.createOrder(orderData)
-      console.log('下单接口调用完成，响应对象:', response)
+      console.log('订单响应:', response)
 
-      // 调试日志 - 显示服务器响应
-      console.log('=== 下单响应信息 ===')
-      console.log('完整响应对象:', response)
-      console.log('响应状态:', response?.status)
-      console.log('响应数据:', response?.data)
-      if (response?.data) {
-        console.log('后端返回的完整数据:', JSON.stringify(response.data, null, 2))
-      } else {
-        console.log('警告：响应中没有data字段')
-      }
-      console.log('==================')
-      
-      // 下单成功后，发送Facebook Purchase事件
+      // 发送Facebook购买事件
       if (response?.data && response.status >= 200 && response.status < 300) {
         try {
-          const purchaseOrderData = {
+          trackPurchaseEvent({
             productId: product.product_id,
             quantity: quantity,
-            totalPrice: totalPrice,
+            totalPrice: product.price * quantity,
             unitPrice: product.price,
             orderNo: response.data.order_no || response.data.order_id
-          }
-          
-          // 发送购买事件到Facebook
-          trackPurchaseEvent(purchaseOrderData, userInfo, clientInfo).catch(error => {
-            console.warn('Facebook Purchase 事件发送失败:', error)
-          })
+          }, userInfo, clientInfo).catch(err => console.warn('Facebook事件失败:', err))
         } catch (fbError) {
-          console.warn('发送Facebook Purchase事件时出错:', fbError)
+          console.warn('Facebook事件错误:', fbError)
         }
       }
 
-      // 下单成功，跳转到订单成功页面
+      // 跳转到订单成功页面
       navigate('/order-success', {
         state: {
           product,
           quantity,
           userInfo,
-          selectedLocation,
-          totalPrice,
+          selectedLocation: selectedDistrict,
+          totalPrice: product.price * quantity,
           orderResponse: response.data
         }
       })
 
     } catch (err) {
-      // 调试日志 - 显示错误详情
-      console.log('=== 下单错误信息 ===')
-      console.error('下单失败:', err)
-      console.log('错误状态码:', err.response?.status)
-      console.log('错误响应数据:', err.response?.data)
-      console.log('错误消息:', err.message)
-      console.log('================')
-      
-      // 显示错误信息
-      const errorMessage = err.response?.data?.message || 
-                          err.response?.data?.error || 
-                          'Une erreur est survenue lors de la commande. Veuillez réessayer.'
-      alert(errorMessage)
-      
+      console.error('订单失败:', err)
+      alert(err.response?.data?.message || 'Une erreur est survenue')
     } finally {
       setIsPlacingOrder(false)
     }
   }
 
-  if (!product || !quantity) {
-    return null
-  }
+  if (!product || !quantity) return null
 
   const totalPrice = product.price * quantity
 
@@ -328,234 +272,214 @@ const PaymentPage = () => {
     <div className="payment-page">
       {/* 顶部标题栏 */}
       <div className="payment-header">
-        <button type="button" className="back-btn" onClick={() => navigate(-1)}>
-          ←
-        </button>
+        <button type="button" className="back-btn" onClick={() => navigate(-1)}>←</button>
         <h1 className="payment-title">Finaliser la commande</h1>
       </div>
 
       <div className="payment-content">
         {/* 步骤指示器 */}
         <div className="steps-indicator">
-          <div 
-            className={`step ${currentStep >= 1 ? 'active' : ''} ${isUserInfoValid() ? 'completed' : ''}`}
-            onClick={() => handleStepClick(1)}
-            onKeyDown={(e) => e.key === 'Enter' && handleStepClick(1)}
-            role="button"
-            tabIndex={0}
-          >
-            <div className="step-icon">
-              {isUserInfoValid() ? '✓' : '1'}
-            </div>
+          <div className={`step ${currentStep >= 1 ? 'active' : ''} ${selectedDistrict ? 'completed' : ''}`}>
+            <div className="step-icon">{selectedDistrict ? '✓' : '1'}</div>
+            <span className="step-label">District</span>
+          </div>
+          <div className="step-divider"></div>
+          <div className={`step ${currentStep >= 2 ? 'active' : ''} ${customMarker ? 'completed' : ''}`}>
+            <div className="step-icon">{customMarker ? '✓' : '2'}</div>
+            <span className="step-label">Position</span>
+          </div>
+          <div className="step-divider"></div>
+          <div className={`step ${currentStep >= 3 ? 'active' : ''}`}>
+            <div className="step-icon">3</div>
             <span className="step-label">Informations</span>
           </div>
-          <div className="step-divider"></div>
-          <div 
-            className={`step ${currentStep >= 2 ? 'active' : ''} ${selectedLocation ? 'completed' : ''}`}
-            onClick={() => handleStepClick(2)}
-            onKeyDown={(e) => e.key === 'Enter' && handleStepClick(2)}
-            role="button"
-            tabIndex={0}
-          >
-            <div className="step-icon">
-              {selectedLocation ? '✓' : '2'}
-            </div>
-            <span className="step-label">Point de retrait</span>
-          </div>
-          <div className="step-divider"></div>
-          <div 
-            className={`step ${currentStep >= 3 ? 'active' : ''}`}
-            onClick={() => handleStepClick(3)}
-            onKeyDown={(e) => e.key === 'Enter' && handleStepClick(3)}
-            role="button"
-            tabIndex={0}
-          >
-            <div className="step-icon">3</div>
-            <span className="step-label">Confirmation</span>
-          </div>
         </div>
 
-        {/* 步骤1: 用户信息表单 */}
-        <div className={`section user-info-section ${currentStep !== 1 ? 'collapsed' : ''}`}>
-          <h2 className="section-title">
-            {currentStep !== 1 && isUserInfoValid() ? (
-              <span className="completed-title">
-                ✓ Informations personnelles
-              </span>
+        {/* 步顢1: 选择大区 */}
+        {currentStep === 1 && (
+          <div className="section district-section">
+            <h2 className="section-title">Sélectionnez votre district</h2>
+            {loading ? (
+              <div className="loading-container">
+                <div className="loading-spinner"></div>
+                <p>Chargement...</p>
+              </div>
             ) : (
-              'Informations personnelles'
+              <div className="district-list">
+                {districts.map((district) => (
+                  <div
+                    key={district.id}
+                    className="district-card"
+                    onClick={() => handleSelectDistrict(district)}
+                    role="button"
+                    tabIndex={0}
+                  >
+                    <div className="district-icon">📍</div>
+                    <div className="district-info">
+                      <div className="district-name">{district.name}</div>
+                      <div className="district-city">{district.city_name}</div>
+                    </div>
+                    <div className="district-arrow">›</div>
+                  </div>
+                ))}
+              </div>
             )}
-          </h2>
-          {currentStep === 1 && (
-            <>
-              <div className="form-group">
-                <label htmlFor="fullName" className="form-label">Nom complet *</label>
+          </div>
+        )}
+
+        {/* 步顢2: 地图标记 */}
+        {currentStep === 2 && (
+          <div className="section map-section">
+            {/* 橙色提示条 */}
+            <div className="location-hint">
+              <div className="hint-content">
+                <span className="hint-text">
+                  Choisissez votre adresse sur la carte ou cliquez sur le bouton pour utiliser votre position actuelle
+                </span>
+              </div>
+              <button 
+                className="use-location-btn"
+                onClick={() => {
+                  if (userLocation) {
+                    setCustomMarker(userLocation)
+                    setMapCenter(userLocation)
+                  } else {
+                    getUserLocation()
+                  }
+                }}
+                type="button"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="10"/>
+                  <circle cx="12" cy="12" r="3"/>
+                  <line x1="12" y1="2" x2="12" y2="4"/>
+                  <line x1="12" y1="20" x2="12" y2="22"/>
+                  <line x1="2" y1="12" x2="4" y2="12"/>
+                  <line x1="20" y1="12" x2="22" y2="12"/>
+                </svg>
+              </button>
+            </div>
+            
+            {selectedDistrict && (
+              <div className="district-info-badge">
+                <span className="badge-icon">📍</span>
+                <span>{selectedDistrict.name} - {selectedDistrict.city_name}</span>
+              </div>
+            )}
+
+            <div className="map-container">
+              <MapSelector
+                center={mapCenter}
+                zoom={mapZoom}
+                onMarkerSet={handleMapClick}
+                customMarker={customMarker}
+                userLocation={userLocation}
+              />
+            </div>
+
+            {customMarker && (
+              <div className="marker-info">
+                <span className="marker-check">✓</span>
+                <span>Position marquée</span>
+              </div>
+            )}
+
+            <div className="step-actions">
+              <button type="button" className="prev-btn" onClick={() => setCurrentStep(1)}>
+                Précédent
+              </button>
+              <button
+                type="button"
+                className={`next-btn ${customMarker ? 'enabled' : 'disabled'}`}
+                onClick={handleConfirmMarker}
+                disabled={!customMarker}
+              >
+                Suivant
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* 步骤3: 填写信息 */}
+        {currentStep === 3 && (
+          <div className="section info-section">
+            <h2 className="section-title">Informations de livraison</h2>
+            
+            <div className="form-group">
+              <label htmlFor="fullName" className="form-label">Nom complet *</label>
+              <input
+                id="fullName"
+                type="text"
+                className={`form-input ${errors.fullName ? 'error' : ''}`}
+                value={userInfo.fullName}
+                onChange={(e) => handleInputChange('fullName', e.target.value)}
+                placeholder="Entrez votre nom complet"
+              />
+              {errors.fullName && <div className="error-message">{errors.fullName}</div>}
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="phone" className="form-label">Téléphone *</label>
+              <div className={`phone-input-group ${errors.phone ? 'error' : ''}`}>
+                <div className="country-code-prefix">+225</div>
                 <input
-                  id="fullName"
-                  type="text"
-                  className="form-input"
-                  value={userInfo.fullName}
-                  onChange={(e) => handleUserInfoChange('fullName', e.target.value)}
-                  placeholder="Entrez votre nom complet"
+                  id="phone"
+                  type="tel"
+                  className="form-input phone-input"
+                  value={userInfo.phone}
+                  onChange={(e) => handleInputChange('phone', e.target.value)}
+                  placeholder="XXXXXXXX"
                 />
               </div>
-              <div className="form-group">
-                <label htmlFor="phone" className="form-label">Téléphone *</label>
-                <div className={`phone-input-group ${phoneErrors.phone ? 'error' : ''}`}>
-                  <div className="country-code-prefix">+225</div>
-                  <input
-                    id="phone"
-                    type="tel"
-                    className="form-input phone-input"
-                    value={userInfo.phone}
-                    onChange={(e) => handleUserInfoChange('phone', e.target.value)}
-                    placeholder="XXXXXXXX"
-                  />
-                </div>
-                {phoneErrors.phone && (
-                  <div className="error-message">{phoneErrors.phone}</div>
-                )}
-              </div>
-              <div className="form-group">
-                <label htmlFor="whatsapp" className="form-label">WhatsApp *</label>
-                <div className={`phone-input-group ${phoneErrors.whatsapp ? 'error' : ''}`}>
-                  <div className="country-code-prefix">+225</div>
-                  <input
-                    id="whatsapp"
-                    type="tel"
-                    className="form-input phone-input"
-                    value={userInfo.whatsapp}
-                    onChange={(e) => handleUserInfoChange('whatsapp', e.target.value)}
-                    placeholder="XXXXXXXX"
-                  />
-                </div>
-                {phoneErrors.whatsapp && (
-                  <div className="error-message">{phoneErrors.whatsapp}</div>
-                )}
-              </div>
-              <div className="step-actions">
-                <button 
-                  type="button"
-                  className={`next-btn ${isUserInfoValid() ? 'enabled' : 'disabled'}`}
-                  onClick={handleNextStep}
-                  disabled={!isUserInfoValid()}
-                >
-                  Suivant
-                </button>
-              </div>
-            </>
-          )}
-        </div>
+              {errors.phone && <div className="error-message">{errors.phone}</div>}
+            </div>
 
-        {/* 步骤2: 取货点选择 */}
-        <div className={`section pickup-section ${currentStep !== 2 ? 'collapsed' : ''}`}>
-          <h2 className="section-title">
-            {currentStep !== 2 && selectedLocation ? (
-              <span className="completed-title">
-                ✓ Point de retrait sélectionné
-              </span>
-            ) : (
-              'Sélectionner un point de retrait'
-            )}
-          </h2>
-          {currentStep === 2 && (
-            <>
-              {/* 地图显示 */}
-              <div className="map-container">
-                <img src={mapImage} alt="Carte des points de retrait" className="pickup-map" />
+            <div className="form-group">
+              <label htmlFor="whatsapp" className="form-label">WhatsApp *</label>
+              <div className={`phone-input-group ${errors.whatsapp ? 'error' : ''}`}>
+                <div className="country-code-prefix">+225</div>
+                <input
+                  id="whatsapp"
+                  type="tel"
+                  className="form-input phone-input"
+                  value={userInfo.whatsapp}
+                  onChange={(e) => handleInputChange('whatsapp', e.target.value)}
+                  placeholder="XXXXXXXX"
+                />
               </div>
-              
-              {loading ? (
-                <div className="loading-container">
-                  <div className="loading-spinner"></div>
-                  <p>Chargement des points de retrait...</p>
-                </div>
-              ) : error ? (
-                <div className="error-container">
-                  <p>{error}</p>
-                </div>
-              ) : (
-                <div className="pickup-locations">
-                  {pickupLocations.map((location) => (
-                    <div
-                      key={location.id}
-                      className={`pickup-location ${selectedLocation?.id === location.id ? 'selected' : ''}`}
-                      onClick={() => setSelectedLocation(location)}
-                      onKeyDown={(e) => e.key === 'Enter' && setSelectedLocation(location)}
-                      role="button"
-                      tabIndex={0}
-                    >
-                      <div className="location-header">
-                        <div className="location-name">{location.name}</div>
-                        <div className="location-address">{location.address}</div>
-                      </div>
-                      <div className="location-timetables">
-                        {formatTimetables(location.timetables).map((schedule) => (
-                          <div key={`${schedule.day}-${schedule.time}`} className="timetable">
-                            <span className="day">{schedule.day}</span>
-                            <span className="time">{schedule.time}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-              
-              <div className="step-actions">
-                <button 
-                  type="button"
-                  className="prev-btn"
-                  onClick={() => setCurrentStep(1)}
-                >
-                  Précédent
-                </button>
-                <button 
-                  type="button"
-                  className={`next-btn ${selectedLocation ? 'enabled' : 'disabled'}`}
-                  onClick={handleNextStep}
-                  disabled={!selectedLocation}
-                >
-                  Suivant
-                </button>
-              </div>
-            </>
-          )}
-        </div>
+              {errors.whatsapp && <div className="error-message">{errors.whatsapp}</div>}
+            </div>
 
-        {/* 步骤3: 订单确认 */}
-        <div className={`section order-summary-section ${currentStep !== 3 ? 'collapsed' : ''}`}>
-          <h2 className="section-title">Récapitulatif de la commande</h2>
-          {currentStep === 3 && (
-            <>
+            <div className="form-group">
+              <label htmlFor="addressDescription" className="form-label">Description de l'adresse *</label>
+              <textarea
+                id="addressDescription"
+                className={`form-textarea ${errors.addressDescription ? 'error' : ''}`}
+                value={userInfo.addressDescription}
+                onChange={(e) => handleInputChange('addressDescription', e.target.value)}
+                placeholder="Ex: Près de l'université, à côté du bâtiment rouge"
+                rows={4}
+              />
+              <div className="char-count">{userInfo.addressDescription.length}/200</div>
+              {errors.addressDescription && <div className="error-message">{errors.addressDescription}</div>}
+            </div>
+
+            {/* 订单摘要 */}
+            <div className="order-summary">
+              <h3>Récapitulatif</h3>
               <div className="order-item">
                 <img src={product.image_url?.[0]} alt={product.name_fr} className="order-item-image" />
                 <div className="order-item-details">
                   <div className="order-item-name">{product.name_fr}</div>
-                  <div className="order-item-price">{formatPrice(product.price)} FCFA × {quantity}</div>
+                  <div className="order-item-price">{product.price} FCFA × {quantity}</div>
                 </div>
-                <div className="order-item-total">{formatPrice(totalPrice)} FCFA</div>
-              </div>
-
-              {/* 用户信息摘要 */}
-              <div className="order-summary-info">
-                <div className="summary-section">
-                  <h4>Informations personnelles</h4>
-                  <p>{userInfo.fullName}</p>
-                  <p>Tél: +225 {userInfo.phone}</p>
-                  <p>WhatsApp: +225 {userInfo.whatsapp}</p>
-                </div>
-                <div className="summary-section">
-                  <h4>Point de retrait</h4>
-                  <p><strong>{selectedLocation?.name}</strong></p>
-                  <p>{selectedLocation?.address}</p>
-                </div>
+                <div className="order-item-total">{totalPrice} FCFA</div>
               </div>
               
               <div className="order-totals">
                 <div className="total-row">
                   <span>Sous-total</span>
-                  <span>{formatPrice(totalPrice)} FCFA</span>
+                  <span>{totalPrice} FCFA</span>
                 </div>
                 <div className="total-row shipping">
                   <span>Livraison</span>
@@ -563,39 +487,35 @@ const PaymentPage = () => {
                 </div>
                 <div className="total-row final-total">
                   <span>Total</span>
-                  <span>{formatPrice(totalPrice)} FCFA</span>
+                  <span>{totalPrice} FCFA</span>
                 </div>
               </div>
 
               <div className="payment-method">
-                <h3>Mode de paiement</h3>
-                <div className="payment-option selected">
-                  <span className="payment-icon">💰</span>
-                  <span>Paiement à la livraison</span>
-                </div>
+                <span className="payment-icon">💰</span>
+                <span>Paiement à la livraison</span>
               </div>
+            </div>
 
-              <div className="step-actions">
-                <button 
-                  type="button"
-                  className="prev-btn"
-                  onClick={() => setCurrentStep(2)}
-                >
-                  Précédent
-                </button>
-                <button
-                  type="button"
-                  className={`place-order-btn ${isFormValid() && !isPlacingOrder ? 'enabled' : 'disabled'}`}
-                  onClick={handlePlaceOrder}
-                  disabled={!isFormValid() || isPlacingOrder}
-                >
-                  {isPlacingOrder ? 'Commande en cours...' : 'Passer la commande'}
-                </button>
-              </div>
-            </>
-          )}
-        </div>
+            <div className="step-actions">
+              <button type="button" className="prev-btn" onClick={() => setCurrentStep(2)}>
+                Précédent
+              </button>
+              <button
+                type="button"
+                className={`place-order-btn ${!isPlacingOrder ? 'enabled' : 'disabled'}`}
+                onClick={handlePlaceOrder}
+                disabled={isPlacingOrder}
+              >
+                {isPlacingOrder ? 'Commande en cours...' : 'Passer la commande'}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* 引导动画Modal */}
+      <MapGuideModal visible={showGuideModal} onClose={() => setShowGuideModal(false)} />
     </div>
   )
 }
