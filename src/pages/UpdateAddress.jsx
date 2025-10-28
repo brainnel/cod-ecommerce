@@ -2,9 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import './UpdateAddress.css';
 
-// RIDER使用本地，ADMIN使用生产环境
+// API配置
 const ADMIN_API_URL = 'https://api.brainnel.com/admin';
-const RIDER_API_URL = 'http://localhost:8000';
+const RIDER_API_URL = 'https://api.brainnel.com/rider';
 
 export default function UpdateAddress() {
   const [searchParams] = useSearchParams();
