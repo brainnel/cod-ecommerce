@@ -174,14 +174,14 @@ const PaymentPage = () => {
     
     if (!userInfo.phone.trim()) {
       newErrors.phone = 'Le numéro de téléphone est requis'
-    } else if (userInfo.phone.length !== 8 && userInfo.phone.length !== 10) {
-      newErrors.phone = 'Le numéro doit contenir 8 ou 10 chiffres'
+    } else if (userInfo.phone.length !== 10) {
+      newErrors.phone = 'Le numéro doit contenir 10 chiffres'
     }
     
     if (!userInfo.whatsapp.trim()) {
       newErrors.whatsapp = 'Le numéro WhatsApp est requis'
-    } else if (userInfo.whatsapp.length !== 8 && userInfo.whatsapp.length !== 10) {
-      newErrors.whatsapp = 'Le numéro doit contenir 8 ou 10 chiffres'
+    } else if (userInfo.whatsapp.length !== 10) {
+      newErrors.whatsapp = 'Le numéro doit contenir 10 chiffres'
     }
     
     if (!userInfo.addressDescription.trim()) {
