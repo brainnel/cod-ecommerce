@@ -23,38 +23,40 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // 如果已经有初始产品数据，就不需要再次获取
-    if (initialProduct) {
-      console.log('=== 使用传递的产品数据 ===');
-      console.log('产品信息:', initialProduct);
-      console.log('========================');
-      setLoading(false);
-      return;
-    }
-
-    const fetchProduct = async () => {
+    const fetchData = async () => {
       try {
-        setLoading(true);
-        const data = await productAPI.getProductDetail(productId);
-        setProduct(data);
+        let data;
         
-        // 调试日志 - 显示产品信息
-        console.log('=== 产品页面调试信息 ===');
-        console.log('产品ID参数:', productId);
-        console.log('完整产品信息:', data);
-        console.log('产品名称:', data.name_fr);
-        console.log('产品价格:', data.price);
-        console.log('产品库存:', data.stock);
-        console.log('产品图片:', data.image_url);
-        console.log('真实产品ID (product_id):', data.product_id);
-        console.log('SKU信息:', data.skus);
-        console.log('产品组ID:', data.product_group_id);
-        console.log('变体名称:', data.variant_name);
-        console.log('分类ID:', data.category_id);
-        console.log('=====================');
+        // 如果已经有初始产品数据，就不需要再次获取
+        if (initialProduct) {
+          console.log('=== 使用传递的产品数据 ===');
+          console.log('产品信息:', initialProduct);
+          console.log('========================');
+          data = initialProduct;
+          setLoading(false);
+        } else {
+          setLoading(true);
+          data = await productAPI.getProductDetail(productId);
+          setProduct(data);
+          
+          // 调试日志 - 显示产品信息
+          console.log('=== 产品页面调试信息 ===');
+          console.log('产品ID参数:', productId);
+          console.log('完整产品信息:', data);
+          console.log('产品名称:', data.name_fr);
+          console.log('产品价格:', data.price);
+          console.log('产品库存:', data.stock);
+          console.log('产品图片:', data.image_url);
+          console.log('真实产品ID (product_id):', data.product_id);
+          console.log('SKU信息:', data.skus);
+          console.log('产品组ID:', data.product_group_id);
+          console.log('变体名称:', data.variant_name);
+          console.log('分类ID:', data.category_id);
+          console.log('=====================');
+        }
         
         // 如果产品有product_group_id，获取变体列表
-        if (data.product_group_id) {
+        if (data && data.product_group_id) {
           const variantList = await productAPI.getProductVariants(productId);
           setVariants(variantList);
           console.log('产品变体列表:', variantList);
@@ -67,7 +69,7 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
       }
     };
 
-    fetchProduct();
+    fetchData();
   }, [productId, initialProduct]);
 
   if (loading) {
