@@ -6,6 +6,7 @@ import { productAPI } from '../services/api';
 import Countdown from './Countdown';
 import QuantityModal from './QuantityModal';
 import ServiceInfo from './ServiceInfo';
+import ProductVariants from './ProductVariants';
 import logoImage from '../assets/logo.png';
 
 // Import Swiper styles
@@ -18,6 +19,7 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
   const [loading, setLoading] = useState(!initialProduct);
   const [error, setError] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [variants, setVariants] = useState([]);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -46,8 +48,17 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
         console.log('产品图片:', data.image_url);
         console.log('真实产品ID (product_id):', data.product_id);
         console.log('SKU信息:', data.skus);
+        console.log('产品组ID:', data.product_group_id);
+        console.log('变体名称:', data.variant_name);
         console.log('分类ID:', data.category_id);
         console.log('=====================');
+        
+        // 如果产品有product_group_id，获取变体列表
+        if (data.product_group_id) {
+          const variantList = await productAPI.getProductVariants(productId);
+          setVariants(variantList);
+          console.log('产品变体列表:', variantList);
+        }
       } catch (err) {
         setError('Échec de récupération des informations produit');
         console.error('Error fetching product:', err);
@@ -169,6 +180,16 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
             {product.stock} pièces
           </span>
         </div>
+
+        {/* 产品变体选择器 */}
+        <ProductVariants 
+          variants={variants}
+          currentProductId={product.product_id}
+          onVariantSelect={(selectedProductId) => {
+            // 跳转到选中的变体产品页面
+            navigate(`/product/${selectedProductId}`);
+          }}
+        />
 
       </div>
 

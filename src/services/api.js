@@ -97,6 +97,17 @@ export const productAPI = {
       console.error('获取产品详情失败:', error)
       throw error
     }
+  },
+
+  // 获取产品变体列表
+  getProductVariants: async (productId) => {
+    try {
+      const response = await api.get(`${API_ENDPOINTS.PRODUCTS}/${productId}/variants/`)
+      return response.data
+    } catch (error) {
+      console.error('获取产品变体失败:', error)
+      return []
+    }
   }
 }
 

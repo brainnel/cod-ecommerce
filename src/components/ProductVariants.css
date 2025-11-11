@@ -1,0 +1,57 @@
+.product-variants {
+  margin: 20px 0;
+  padding: 15px;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
+.product-variants h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: #333;
+}
+
+.variant-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.variant-btn {
+  padding: 10px 16px;
+  border: 2px solid #ddd;
+  border-radius: 6px;
+  background: white;
+  cursor: pointer;
+  transition: all 0.3s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 100px;
+}
+
+.variant-btn:hover {
+  border-color: #007bff;
+  background: #f0f7ff;
+}
+
+.variant-btn.active {
+  border-color: #007bff;
+  background: #007bff;
+  color: white;
+}
+
+.variant-name {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.variant-price {
+  font-size: 14px;
+  color: #666;
+}
+
+.variant-btn.active .variant-price {
+  color: white;
+}
