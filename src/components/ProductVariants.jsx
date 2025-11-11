@@ -15,9 +15,6 @@ const ProductVariants = ({ variants, currentProductId, onVariantSelect }) => {
             type="button"
           >
             <span className="variant-name">{variant.variant_name}</span>
-            {variant.price && (
-              <span className="variant-price">{Math.ceil(variant.price)} FCFA</span>
-            )}
           </button>
         ))}
       </div>
