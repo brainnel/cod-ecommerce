@@ -32,13 +32,13 @@
 }
 
 .variant-btn:hover {
-  border-color: #007bff;
-  background: #f0f7ff;
+  border-color: #ff6b35;
+  background: #fff5f2;
 }
 
 .variant-btn.active {
-  border-color: #007bff;
-  background: #007bff;
+  border-color: #ff6b35;
+  background: #ff6b35;
   color: white;
 }
 
