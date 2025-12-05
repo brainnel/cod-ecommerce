@@ -1,16 +1,21 @@
 import { useState, useEffect, useRef } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams, useNavigate, useParams } from 'react-router-dom';
 import './UpdateAddress.css';
 
 // API配置
 const ADMIN_API_URL = 'https://api.brainnel.com/admin';
 const RIDER_API_URL = 'https://api.brainnel.com/rider';
+const BACKEND_API_URL = 'https://api.brainnel.com/backend';
 
 export default function UpdateAddress() {
   const [searchParams] = useSearchParams();
+  const { orderNo } = useParams(); // WhatsApp预订单的order_no路径参数
   const navigate = useNavigate();
   const token = searchParams.get('token');
-  
+
+  // 判断是 WhatsApp 预订单模式还是骑手修改地址模式
+  const isWhatsAppMode = !!orderNo;
+
   const [currentStep, setCurrentStep] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -22,21 +27,70 @@ export default function UpdateAddress() {
   const [addressDescription, setAddressDescription] = useState('');
   const [addressError, setAddressError] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  
+
   const mapRef = useRef(null);
   const googleMapRef = useRef(null);
   const customMarkerRef = useRef(null);
   const userLocationMarkerRef = useRef(null);
 
   useEffect(() => {
+    // WhatsApp预订单模式：通过order_no访问
+    if (isWhatsAppMode) {
+      initializeWhatsAppMode();
+      return;
+    }
+
+    // 骑手修改地址模式：通过token访问
     if (!token) {
       setError('Lien invalide. Veuillez demander un nouveau lien au livreur.');
       setLoading(false);
       return;
     }
-    
+
     initializePage();
-  }, [token]);
+  }, [token, orderNo]);
+
+  // WhatsApp预订单模式初始化
+  const initializeWhatsAppMode = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      // 直接设置订单信息（使用order_no）
+      setOrderInfo({ order_no: orderNo });
+
+      // 从 backend API 加载城市和大区列表
+      const districtsResponse = await fetch(`${BACKEND_API_URL}/api/flash-local/cities-and-districts/`);
+      if (!districtsResponse.ok) {
+        throw new Error('Impossible de charger les districts');
+      }
+
+      const citiesData = await districtsResponse.json();
+
+      // 将城市数据转换为大区列表格式
+      const allDistricts = [];
+      citiesData.forEach(city => {
+        city.districts.forEach(district => {
+          allDistricts.push({
+            id: district.id,
+            name: district.name,
+            city_name: city.name,
+            latitude: district.latitude || 5.3600,
+            longitude: district.longitude || -4.0083
+          });
+        });
+      });
+
+      setDistricts(allDistricts);
+      setCurrentStep(1);
+      setLoading(false);
+
+    } catch (err) {
+      console.error('WhatsApp mode initialization error:', err);
+      setError(err.message);
+      setLoading(false);
+    }
+  };
 
   const initializePage = async () => {
     setLoading(true);
@@ -249,26 +303,28 @@ export default function UpdateAddress() {
       const result = await response.json();
       
       if (result.success) {
-        // 新增: 通知 rider_backend
-        try {
-          await fetch(`${RIDER_API_URL}/api/address-update/notify`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              order_no: orderInfo.order_no,
-              new_address: trimmedAddress,
-              new_latitude: selectedLat,
-              new_longitude: selectedLng
-            })
-          });
-          console.log('骑手通知已发送');
-        } catch (notifyError) {
-          // 静默处理通知失败,不影响主流程
-          console.warn('通知骑手失败:', notifyError);
+        // 骑手模式下通知 rider_backend（WhatsApp预订单模式不需要通知）
+        if (!isWhatsAppMode) {
+          try {
+            await fetch(`${RIDER_API_URL}/api/address-update/notify`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                order_no: orderInfo.order_no,
+                new_address: trimmedAddress,
+                new_latitude: selectedLat,
+                new_longitude: selectedLng
+              })
+            });
+            console.log('骑手通知已发送');
+          } catch (notifyError) {
+            // 静默处理通知失败,不影响主流程
+            console.warn('通知骑手失败:', notifyError);
+          }
         }
-        
+
         // 显示成功页面
         setCurrentStep(4);
       } else {
@@ -283,12 +339,15 @@ export default function UpdateAddress() {
     }
   };
 
+  // 页面标题
+  const pageTitle = isWhatsAppMode ? 'Confirmer l\'adresse' : 'Modifier l\'adresse';
+
   // 加载状态
   if (loading) {
     return (
       <div className="update-address-page">
         <div className="header">
-          <h1 className="title">Modifier l'adresse</h1>
+          <h1 className="title">{pageTitle}</h1>
         </div>
         <div className="content">
           <div className="loading-container">
@@ -305,7 +364,7 @@ export default function UpdateAddress() {
     return (
       <div className="update-address-page">
         <div className="header">
-          <h1 className="title">Modifier l'adresse</h1>
+          <h1 className="title">{pageTitle}</h1>
         </div>
         <div className="content">
           <div className="error-container">
@@ -332,7 +391,7 @@ export default function UpdateAddress() {
         >
           ←
         </button>
-        <h1 className="title">Modifier l'adresse</h1>
+        <h1 className="title">{pageTitle}</h1>
       </div>
 
       <div className="content">
@@ -476,9 +535,13 @@ export default function UpdateAddress() {
         {currentStep === 4 && (
           <div className="section success-section">
             <div className="success-icon">✓</div>
-            <h2 className="success-title">Adresse modifiée avec succès!</h2>
+            <h2 className="success-title">
+              {isWhatsAppMode ? 'Commande confirmée!' : 'Adresse modifiée avec succès!'}
+            </h2>
             <p className="success-message">
-              Votre nouvelle adresse de livraison a été enregistrée.
+              {isWhatsAppMode
+                ? 'Votre commande a été confirmée. Nous vous contacterons bientôt pour organiser la livraison.'
+                : 'Votre nouvelle adresse de livraison a été enregistrée.'}
             </p>
           </div>
         )}

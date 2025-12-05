@@ -18,6 +18,7 @@ function App() {
         <Route path="/order-success" element={<OrderSuccessPage />} />
         <Route path="/download" element={<DownloadPage />} />
         <Route path="/update-address" element={<UpdateAddress />} />
+        <Route path="/address/:orderNo" element={<UpdateAddress />} />
       </Routes>
     </div>
   )
