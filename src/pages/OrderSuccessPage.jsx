@@ -181,6 +181,11 @@ const OrderSuccessPage = () => {
               <div className="info-value">{selectedLocation.name}</div>
             </div>
           )}
+
+          <div className="info-row">
+            <div className="info-label">🕐 Horaires de livraison</div>
+            <div className="info-value">8:00 - 21:00</div>
+          </div>
         </div>
 
         {/* 重要提醒 */}
