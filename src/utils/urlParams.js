@@ -92,10 +92,42 @@ export const isFromFacebookAd = () => {
   const utmSource = getUrlParam('utm_source')
   const utmMedium = getUrlParam('utm_medium')
   const fbclid = getUrlParam('fbclid')
-  
-  return (utmSource === 'fb' || utmSource === 'facebook') && 
+
+  return (utmSource === 'fb' || utmSource === 'facebook') &&
          (utmMedium === 'paid' || utmMedium === 'cpc') ||
          !!fbclid
+}
+
+/**
+ * 检查当前页面是否来自TikTok广告
+ * @returns {boolean} 是否来自TikTok广告
+ */
+export const isFromTikTokAd = () => {
+  const utmSource = getUrlParam('utm_source')
+  return utmSource === 'tiktok' || utmSource === 'tt'
+}
+
+/**
+ * 获取广告来源标识
+ * 优先返回Facebook广告ID（纯数字），其次返回TikTok来源标识
+ * @returns {string|null} 广告来源标识
+ */
+export const getAdSource = () => {
+  // 1. 优先检查是否有Facebook广告ID（utm_content为纯数字）
+  const fbAdId = getAdIdFromUrl()
+  if (fbAdId) {
+    return fbAdId
+  }
+
+  // 2. 检查是否来自TikTok广告
+  if (isFromTikTokAd()) {
+    if (import.meta.env.VITE_ENABLE_CONSOLE_LOGS === 'true') {
+      console.log('✅ 识别为TikTok广告来源')
+    }
+    return 'tiktok'
+  }
+
+  return null
 }
 
 /**
@@ -103,26 +135,29 @@ export const isFromFacebookAd = () => {
  * @returns {object} 包含广告ID和相关追踪信息的对象
  */
 export const getAdTrackingInfo = () => {
-  const adId = getAdIdFromUrl()
+  const adSource = getAdSource()
   const utmParams = getUtmParams()
   const isFromFb = isFromFacebookAd()
-  
+  const isFromTt = isFromTikTokAd()
+
   const trackingInfo = {
-    ad_id: adId,
+    ad_id: adSource,
     utm_params: utmParams,
     is_from_facebook: isFromFb,
+    is_from_tiktok: isFromTt,
     captured_at: new Date().toISOString(),
     url: window.location.href
   }
-  
+
   // 调试日志
   if (import.meta.env.VITE_ENABLE_CONSOLE_LOGS === 'true') {
     console.log('=== 广告追踪信息 ===')
-    console.log('广告ID:', adId)
+    console.log('广告来源:', adSource)
     console.log('是否来自Facebook:', isFromFb)
+    console.log('是否来自TikTok:', isFromTt)
     console.log('完整追踪信息:', trackingInfo)
     console.log('==================')
   }
-  
+
   return trackingInfo
 }

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { getAdIdFromUrl, getAdTrackingInfo } from '../utils/urlParams'
+import { getAdSource, getAdTrackingInfo } from '../utils/urlParams'
 
 // LocalStorage key for ad ID persistence
 const AD_ID_STORAGE_KEY = 'facebook_ad_id'
@@ -123,26 +123,26 @@ export const useAdTracking = () => {
       setIsLoading(true)
       
       try {
-        // 1. 优先从URL提取广告ID
-        const urlAdId = getAdIdFromUrl()
-        
-        if (urlAdId) {
-          // URL中有广告ID，获取完整追踪信息
+        // 1. 优先从URL提取广告来源（Facebook广告ID或tiktok标识）
+        const urlAdSource = getAdSource()
+
+        if (urlAdSource) {
+          // URL中有广告来源，获取完整追踪信息
           const fullTrackingInfo = getAdTrackingInfo()
-          setAdId(urlAdId)
+          setAdId(urlAdSource)
           setTrackingInfo(fullTrackingInfo)
-          saveAdIdToStorage(urlAdId, fullTrackingInfo)
-          
+          saveAdIdToStorage(urlAdSource, fullTrackingInfo)
+
           if (import.meta.env.VITE_ENABLE_CONSOLE_LOGS === 'true') {
-            console.log('🎯 从URL成功获取广告ID:', urlAdId)
+            console.log('🎯 从URL成功获取广告来源:', urlAdSource)
             console.log('📊 完整追踪信息:', fullTrackingInfo)
           }
         } else {
-          // URL中没有广告ID，尝试从localStorage恢复
+          // URL中没有广告来源，尝试从localStorage恢复
           const storedAdId = loadAdIdFromStorage()
-          
+
           if (!storedAdId && import.meta.env.VITE_ENABLE_CONSOLE_LOGS === 'true') {
-            console.log('ℹ️ 未找到广告ID（URL或localStorage中都没有）')
+            console.log('ℹ️ 未找到广告来源（URL或localStorage中都没有）')
           }
         }
       } catch (error) {
