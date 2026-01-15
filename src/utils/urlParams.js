@@ -109,7 +109,7 @@ export const isFromTikTokAd = () => {
 
 /**
  * 获取广告来源标识
- * 优先返回Facebook广告ID（纯数字），其次返回TikTok来源标识
+ * 优先返回Facebook广告ID（纯数字），其次返回utm_source的值
  * @returns {string|null} 广告来源标识
  */
 export const getAdSource = () => {
@@ -119,12 +119,13 @@ export const getAdSource = () => {
     return fbAdId
   }
 
-  // 2. 检查是否来自TikTok广告
-  if (isFromTikTokAd()) {
+  // 2. 返回utm_source的值（不管是什么都保存）
+  const utmSource = getUrlParam('utm_source')
+  if (utmSource) {
     if (import.meta.env.VITE_ENABLE_CONSOLE_LOGS === 'true') {
-      console.log('✅ 识别为TikTok广告来源')
+      console.log('✅ 识别广告来源:', utmSource)
     }
-    return 'tiktok'
+    return utmSource
   }
 
   return null
