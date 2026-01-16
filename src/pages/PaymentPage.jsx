@@ -334,7 +334,7 @@ const PaymentPage = () => {
             <div className="location-hint">
               <div className="hint-content">
                 <span className="hint-text">
-                  Choisissez votre adresse sur la carte ou cliquez sur le bouton pour utiliser votre position actuelle
+                  Si vous serez à cette adresse dans les 24 prochaines heures, cliquez sur le bouton à droite pour utiliser votre position actuelle. Nous vous contacterons pour la livraison dans les 24 heures suivant votre commande.
                 </span>
               </div>
               <button 
