@@ -503,11 +503,18 @@ const PaymentPage = () => {
               </button>
               <button
                 type="button"
-                className={`place-order-btn ${!isPlacingOrder ? 'enabled' : 'disabled'}`}
+                className={`place-order-btn ${!isPlacingOrder ? 'enabled' : 'loading'}`}
                 onClick={handlePlaceOrder}
                 disabled={isPlacingOrder}
               >
-                {isPlacingOrder ? 'Commande en cours...' : 'Passer la commande'}
+                {isPlacingOrder ? (
+                  <>
+                    <span className="btn-spinner"></span>
+                    <span>Commande en cours...</span>
+                  </>
+                ) : (
+                  'Passer la commande'
+                )}
               </button>
             </div>
           </div>
