@@ -34,7 +34,7 @@ const DownloadPage = () => {
       <div className="dl-hero">
         <div className="dl-nav">
           <div className="dl-brand">
-            <img src="/vite-logo.png" alt="Brainnel" className="dl-brand-logo" />
+            <img src="/vite-logo.png?v=2" alt="Brainnel" className="dl-brand-logo" />
             <span className="dl-brand-name">Brainnel Vite</span>
           </div>
           <a href="mailto:support@brainnel.com" className="dl-nav-link">Support</a>
