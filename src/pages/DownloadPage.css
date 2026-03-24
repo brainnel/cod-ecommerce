@@ -1,321 +1,345 @@
-/* 下载页面样式 */
-.download-page {
+/* ========================================
+   Download Page — Sunset Premium Design
+   ======================================== */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+.dl-page {
+  --primary: #E56012;
+  --primary-light: #FFF4ED;
+  --surface: #FFFFFF;
+  --bg: #FAFAF8;
+  --text: #1A1207;
+  --text-muted: #8C8377;
+  --border: #F0ECE6;
+  font-family: 'Inter', sans-serif;
+  background: var(--bg);
+  color: var(--text);
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: #333;
 }
 
-/* 顶部导航 */
-.download-header {
-  display: flex;
-  align-items: center;
-  padding: 1rem;
-  position: relative;
-  background: white;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-}
-
-.back-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  border: none;
-  background: #f8f9fa;
-  border-radius: 50%;
-  color: #333;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.back-btn:hover {
-  background: #e9ecef;
-  transform: translateX(-2px);
-}
-
-.header-title {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: #333;
-  margin: 0;
-}
-
-/* 主要内容 */
-.download-content {
-  max-width: 600px;
-  margin: 0 auto;
-  padding: 2rem 1rem;
-}
-
-/* 应用介绍部分 */
-.app-intro {
+/* ===== Hero Gradient ===== */
+.dl-hero {
+  background: linear-gradient(160deg, #1A1207 0%, #2D1A08 40%, #4A2410 70%, #E56012 100%);
+  padding: 48px 20px 64px;
   text-align: center;
-  margin-bottom: 3rem;
+  position: relative;
+  overflow: hidden;
+}
+.dl-hero::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 32px;
+  background: var(--bg);
+  border-radius: 32px 32px 0 0;
+}
+
+/* Nav */
+.dl-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 36px;
+  max-width: 480px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.dl-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.dl-brand-logo {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+}
+.dl-brand-name {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  color: white;
+}
+.dl-nav-link {
+  color: rgba(255,255,255,0.7);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+  transition: color 0.2s;
+}
+.dl-nav-link:hover {
   color: white;
 }
 
-.app-icon {
-  margin-bottom: 1.5rem;
+/* Hero Content */
+.dl-hero-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 32px;
+  font-weight: 700;
+  color: white;
+  line-height: 1.2;
+  letter-spacing: -1px;
+  margin-bottom: 12px;
 }
-
-.app-icon-image {
-  width: 120px;
-  height: 120px;
-  border-radius: 24px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-}
-
-.app-title {
-  font-size: 2.5rem;
-  font-weight: bold;
-  margin: 1rem 0 0.5rem 0;
-  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-}
-
-.app-subtitle {
-  font-size: 1.25rem;
-  margin-bottom: 1.5rem;
-  opacity: 0.9;
-  font-weight: 300;
-}
-
-.app-description {
-  font-size: 1rem;
+.dl-hero-sub {
+  color: rgba(255,255,255,0.65);
+  font-size: 15px;
   line-height: 1.6;
-  opacity: 0.8;
-  max-width: 500px;
-  margin: 0 auto;
+  max-width: 340px;
+  margin: 0 auto 28px;
+}
+.dl-hero-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--primary);
+  color: white;
+  padding: 14px 28px;
+  border-radius: 12px;
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 15px;
+  box-shadow: 0 8px 24px rgba(229,96,18,0.4);
+  transition: all 0.3s;
+  position: relative;
+  z-index: 1;
+}
+.dl-hero-cta:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px rgba(229,96,18,0.5);
 }
 
-/* 特性列表 */
-.app-features {
+/* ===== Body Content ===== */
+.dl-body {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+/* Section Headers */
+.dl-section-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.dl-section-head h2 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--text);
+}
+.dl-line {
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* ===== Features Grid ===== */
+.dl-feat-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-  margin-bottom: 3rem;
-  padding: 2rem;
-  background: rgba(255, 255, 255, 0.1);
+  gap: 10px;
+  margin-bottom: 28px;
+}
+.dl-feat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 16px;
-  backdrop-filter: blur(10px);
-}
-
-.feature {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  color: white;
-}
-
-.feature-icon {
-  font-size: 1.5rem;
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 12px;
-  flex-shrink: 0;
-}
-
-.feature-text {
-  font-size: 0.9rem;
-  font-weight: 500;
-}
-
-/* 下载按钮区域 */
-.download-buttons {
-  margin-bottom: 3rem;
-}
-
-.download-title {
-  text-align: center;
-  font-size: 1.5rem;
-  font-weight: bold;
-  margin-bottom: 2rem;
-  color: white;
-  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-}
-
-.download-btn {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  padding: 1rem 1.5rem;
-  margin-bottom: 1rem;
-  border: none;
-  border-radius: 16px;
-  background: white;
-  color: #333;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-  text-decoration: none;
-}
-
-.download-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-}
-
-.download-btn:active {
-  transform: translateY(0);
-}
-
-/* 不同平台的按钮颜色 */
-.download-btn.app-store {
-  background: linear-gradient(135deg, #000000 0%, #333333 100%);
-  color: white;
-}
-
-.download-btn.google-play {
-  background: linear-gradient(135deg, #34a853 0%, #0f9d58 100%);
-  color: white;
-}
-
-.download-btn.apk-download {
-  background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%);
-  color: white;
-}
-
-.btn-icon {
-  width: 48px;
-  height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  margin-right: 1rem;
-  flex-shrink: 0;
-}
-
-.btn-content {
+  padding: 20px 16px;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  text-align: left;
-}
-
-.btn-subtitle {
-  font-size: 0.8rem;
-  opacity: 0.8;
-  margin-bottom: 0.25rem;
-}
-
-.btn-title {
-  font-size: 1.1rem;
-  font-weight: bold;
-}
-
-
-/* 支持信息 */
-.support-info {
+  align-items: center;
+  gap: 10px;
   text-align: center;
-  padding: 2rem;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 16px;
-  backdrop-filter: blur(10px);
+  transition: all 0.25s;
+}
+.dl-feat-card:hover {
+  border-color: var(--primary);
+  box-shadow: 0 4px 16px rgba(229,96,18,0.1);
+  transform: translateY(-2px);
+}
+.dl-feat-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--primary-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.dl-feat-icon svg {
+  width: 24px;
+  height: 24px;
+}
+.dl-feat-name {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.dl-feat-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.4;
 }
 
-.support-text {
-  color: white;
-  font-size: 0.9rem;
-  margin: 0;
-  opacity: 0.9;
+/* ===== Download List ===== */
+.dl-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 28px;
 }
-
-.support-link {
-  color: #ffd700;
+.dl-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px 16px;
   text-decoration: none;
-  font-weight: 500;
-  margin-left: 0.25rem;
+  color: var(--text);
+  transition: all 0.25s;
+}
+.dl-item:hover {
+  border-color: var(--primary);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(229,96,18,0.1);
+}
+.dl-icon-circle {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.dl-item.ios .dl-icon-circle {
+  background: #111;
+}
+.dl-item.gplay .dl-icon-circle {
+  background: #1a73e8;
+}
+.dl-item.apk .dl-icon-circle {
+  background: linear-gradient(135deg, #E56012, #FF7D3B);
+}
+.dl-info {
+  flex: 1;
+}
+.dl-name {
+  font-size: 15px;
+  font-weight: 700;
+}
+.dl-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.dl-chevron {
+  color: #ccc;
+  flex-shrink: 0;
 }
 
-.support-link:hover {
-  text-decoration: underline;
+/* ===== Testimonial ===== */
+.dl-testi {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 28px;
+}
+.dl-quote-icon {
+  color: var(--primary);
+  opacity: 0.3;
+  margin-bottom: 8px;
+}
+.dl-testi-text {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #555;
+  margin-bottom: 14px;
+  font-style: italic;
+}
+.dl-author {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.dl-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--primary-light);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+.dl-author-name {
+  font-size: 13px;
+  font-weight: 700;
+}
+.dl-author-loc {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.dl-stars {
+  color: #F59E0B;
+  font-size: 12px;
+  letter-spacing: 1px;
 }
 
-/* 移动端适配 */
-@media (max-width: 768px) {
-  .download-content {
-    padding: 1rem;
-  }
-  
-  .app-title {
-    font-size: 2rem;
-  }
-  
-  .app-features {
-    grid-template-columns: 1fr;
-    padding: 1.5rem;
-  }
-  
-  .download-btn {
-    padding: 0.875rem 1.25rem;
-  }
-  
-  .btn-icon {
-    width: 40px;
-    height: 40px;
-  }
-  
-  .support-info {
-    padding: 1.5rem;
-  }
+/* ===== Footer ===== */
+.dl-footer {
+  text-align: center;
+  padding: 28px 0 40px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.dl-footer a {
+  color: var(--primary);
+  text-decoration: none;
+  font-weight: 600;
+}
+.dl-footer p + p {
+  margin-top: 8px;
 }
 
-@media (max-width: 480px) {
-  .app-icon-image {
-    width: 100px;
-    height: 100px;
-  }
-  
-  .app-title {
-    font-size: 1.75rem;
-  }
-  
-  .download-btn {
-    padding: 0.75rem 1rem;
-  }
-  
-  .btn-content {
-    gap: 0.125rem;
-  }
+/* ===== Animations ===== */
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.dl-hero {
+  animation: slideUp 0.6s ease-out;
+}
+.dl-feat-grid {
+  animation: slideUp 0.6s ease-out 0.15s both;
+}
+.dl-list {
+  animation: slideUp 0.6s ease-out 0.25s both;
+}
+.dl-testi {
+  animation: slideUp 0.6s ease-out 0.35s both;
 }
 
-/* 加载动画 */
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(30px);
+/* ===== Responsive ===== */
+@media (max-width: 400px) {
+  .dl-hero-title {
+    font-size: 28px;
   }
-  to {
-    opacity: 1;
-    transform: translateY(0);
+  .dl-feat-grid {
+    gap: 8px;
   }
-}
-
-.download-page > * {
-  animation: fadeInUp 0.6s ease-out forwards;
-}
-
-.download-content > * {
-  animation: fadeInUp 0.8s ease-out forwards;
-}
-
-.download-content > *:nth-child(2) {
-  animation-delay: 0.1s;
-}
-
-.download-content > *:nth-child(3) {
-  animation-delay: 0.2s;
-}
-
-.download-content > *:nth-child(4) {
-  animation-delay: 0.3s;
+  .dl-feat-card {
+    padding: 16px 12px;
+  }
 }
