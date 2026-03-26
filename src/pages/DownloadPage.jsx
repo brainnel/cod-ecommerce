@@ -47,17 +47,15 @@ const DownloadPage = () => {
         <p className="dl-hero-sub">
           Des milliers de produits a portee de main. Paiement a la livraison. Livraison gratuite partout.
         </p>
-        <a
-          href={links.apk.url}
+        <button
           className="dl-hero-cta"
-          target="_blank"
-          rel="noopener noreferrer"
+          onClick={() => document.getElementById('dl-download-section')?.scrollIntoView({ behavior: 'smooth' })}
         >
           <svg width="18" height="18" fill="white" viewBox="0 0 24 24">
             <path d="M5 20h14v-2H5v2zM19 9h-4V3H9v6H5l7 7 7-7z"/>
           </svg>
           Telecharger maintenant
-        </a>
+        </button>
       </div>
 
       <div className="dl-body">
@@ -112,7 +110,7 @@ const DownloadPage = () => {
         </div>
 
         {/* Download Section */}
-        <div className="dl-section-head">
+        <div id="dl-download-section" className="dl-section-head">
           <div className="dl-line" />
           <h2>Telecharger</h2>
           <div className="dl-line" />

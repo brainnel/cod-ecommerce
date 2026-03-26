@@ -101,6 +101,9 @@
   text-decoration: none;
   font-weight: 700;
   font-size: 15px;
+  font-family: inherit;
+  border: none;
+  cursor: pointer;
   box-shadow: 0 8px 24px rgba(229,96,18,0.4);
   transition: all 0.3s;
   position: relative;
