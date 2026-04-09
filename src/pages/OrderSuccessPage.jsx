@@ -1,7 +1,11 @@
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import AppDownloadModal from '../components/AppDownloadModal'
+import { appDownloadAPI } from '../services/api'
 import './OrderSuccessPage.css'
+
+// 缓存下载链接，避免重复请求
+let cachedDownloadLinks = null
 
 const OrderSuccessPage = () => {
   const location = useLocation()
@@ -51,46 +55,35 @@ const OrderSuccessPage = () => {
     redirectToAppStore()
   }
 
-  const redirectToAppStore = () => {
-    // 检测用户设备类型
+  const redirectToAppStore = async () => {
+    if (!cachedDownloadLinks) {
+      cachedDownloadLinks = await appDownloadAPI.getDownloadLinks()
+    }
+
     const userAgent = navigator.userAgent || navigator.vendor || window.opera;
-    
-    // 调试日志
-    console.log('=== 设备检测调试信息 ===');
-    console.log('User Agent:', userAgent);
-    console.log('是否iOS设备:', /iPad|iPhone|iPod/.test(userAgent) && !window.MSStream);
-    console.log('是否Android设备:', /android/i.test(userAgent));
-    console.log('===================');
-    
-    // iOS设备检测
+    const iosUrl = cachedDownloadLinks?.ios?.url || 'https://apps.apple.com/app/id6760172301'
+    const androidUrl = cachedDownloadLinks?.android?.url || 'https://play.google.com/store/apps/details?id=com.brainnel.vite'
+
     if (/iPad|iPhone|iPod/.test(userAgent) && !window.MSStream) {
-      console.log('跳转到App Store');
-      // 跳转到App Store
-      window.open('https://apps.apple.com/fr/app/brainnel/id1613055347', '_blank');
+      window.open(iosUrl, '_blank');
       return;
     }
-    
-    // Android设备检测
+
     if (/android/i.test(userAgent)) {
-      console.log('跳转到Google Play Store');
-      // 跳转到Google Play Store
-      window.open('https://play.google.com/store/apps/details?id=uni.UNIC87CC93', '_blank');
+      window.open(androidUrl, '_blank');
       return;
     }
-    
-    // 其他设备或桌面端，显示选择对话框
+
     const choice = window.confirm(
       'Choisissez votre plateforme:\n\n' +
       'OK = Android (Google Play)\n' +
       'Annuler = iOS (App Store)'
     );
-    
+
     if (choice) {
-      // Android
-      window.open('https://play.google.com/store/apps/details?id=uni.UNIC87CC93', '_blank');
+      window.open(androidUrl, '_blank');
     } else {
-      // iOS
-      window.open('https://apps.apple.com/fr/app/brainnel/id1613055347', '_blank');
+      window.open(iosUrl, '_blank');
     }
   }
 

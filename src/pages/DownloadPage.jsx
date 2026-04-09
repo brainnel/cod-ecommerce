@@ -1,10 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { appDownloadAPI } from '../services/api'
 import './DownloadPage.css'
 
-const DOWNLOAD_API = 'https://api.brainnel.com/test/api/vite/app/download-links'
-
-// Fallback URLs in case API fails
 const FALLBACK_LINKS = {
   ios: { url: 'https://apps.apple.com/app/id6760172301', version: '' },
   android: { url: 'https://play.google.com/store/apps/details?id=com.brainnel.vite', version: '' },
@@ -16,16 +14,11 @@ const DownloadPage = () => {
   const [links, setLinks] = useState(FALLBACK_LINKS)
 
   useEffect(() => {
-    fetch(DOWNLOAD_API)
-      .then(res => res.json())
-      .then(data => {
-        if (data && data.ios && data.android && data.apk) {
-          setLinks(data)
-        }
-      })
-      .catch(() => {
-        // Use fallback links on error
-      })
+    appDownloadAPI.getDownloadLinks().then(data => {
+      if (data && data.ios && data.android && data.apk) {
+        setLinks(data)
+      }
+    }).catch(() => {})
   }, [])
 
   return (

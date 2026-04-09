@@ -207,6 +207,19 @@ const createFacebookAPIClient = () => {
   })
 }
 
+// APP下载链接接口
+export const appDownloadAPI = {
+  getDownloadLinks: async () => {
+    try {
+      const response = await api.get('/api/vite/app/download-links')
+      return response.data
+    } catch (error) {
+      console.error('获取APP下载链接失败:', error)
+      return null
+    }
+  }
+}
+
 // Facebook 转化 API 相关接口
 export const facebookAPI = {
   // 发送转化事件到你的服务器（服务器再转发到Facebook）
