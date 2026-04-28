@@ -1,7 +1,9 @@
 import { useState, useCallback, useEffect } from 'react'
 import { GoogleMap, Marker } from '@react-google-maps/api'
+import { useGoogleMaps } from '../hooks/useGoogleMaps'
 
 const MapSelector = ({ center, zoom = 13, onMarkerSet, customMarker, userLocation }) => {
+  const { isLoaded, loadError } = useGoogleMaps()
   const [map, setMap] = useState(null)
   const [currentZoom, setCurrentZoom] = useState(zoom)
 
@@ -55,6 +57,14 @@ const MapSelector = ({ center, zoom = 13, onMarkerSet, customMarker, userLocatio
         stylers: [{ visibility: 'off' }]
       }
     ]
+  }
+
+  if (loadError) {
+    return <div style={{ padding: 16, color: '#c00' }}>Erreur de chargement de la carte</div>
+  }
+
+  if (!isLoaded) {
+    return <div style={{ padding: 16, textAlign: 'center' }}>Chargement de la carte...</div>
   }
 
   return (

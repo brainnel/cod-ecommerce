@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate, useParams } from 'react-router-dom';
+import { useGoogleMaps } from '../hooks/useGoogleMaps';
 import './UpdateAddress.css';
 
 // API配置
@@ -15,6 +16,8 @@ export default function UpdateAddress() {
 
   // 判断是 WhatsApp 预订单模式还是骑手修改地址模式
   const isWhatsAppMode = !!orderNo;
+
+  const { isLoaded: mapsLoaded, loadError: mapsLoadError } = useGoogleMaps();
 
   const [currentStep, setCurrentStep] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -131,12 +134,13 @@ export default function UpdateAddress() {
   const selectDistrict = (district) => {
     setSelectedDistrict(district);
     setCurrentStep(2);
-    
-    // 延迟初始化地图
-    setTimeout(() => {
-      initMap(district);
-    }, 100);
   };
+
+  // 仅当 currentStep=2、Google Maps 脚本已加载、容器已挂载时初始化地图
+  useEffect(() => {
+    if (currentStep !== 2 || !mapsLoaded || !selectedDistrict || !mapRef.current) return;
+    initMap(selectedDistrict);
+  }, [currentStep, mapsLoaded, selectedDistrict]);
 
   const initMap = (district) => {
     if (!window.google || !mapRef.current) {
@@ -472,6 +476,16 @@ export default function UpdateAddress() {
 
             <div className="map-container">
               <div ref={mapRef} id="map" style={{ width: '100%', height: '100%' }}></div>
+              {!mapsLoaded && !mapsLoadError && (
+                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.7)' }}>
+                  Chargement de la carte...
+                </div>
+              )}
+              {mapsLoadError && (
+                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#c00' }}>
+                  Erreur de chargement de la carte
+                </div>
+              )}
             </div>
 
             <button className="confirm-marker-btn" onClick={confirmMarker}>
