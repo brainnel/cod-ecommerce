@@ -234,6 +234,30 @@
   color: #ff6b35;
 }
 
+/* SKU 名称（参考 APP 商品详情页 Modèle 区块） */
+.sku-section {
+  margin: 16px 0 20px;
+}
+
+.sku-label {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 8px;
+}
+
+.sku-name {
+  display: inline-block;
+  padding: 12px 16px;
+  border: 1.5px solid #ff6b35;
+  border-radius: 8px;
+  color: #ff6b35;
+  font-size: 14px;
+  line-height: 1.5;
+  background: #fff;
+  max-width: 100%;
+  word-break: break-word;
+}
+
 
 /* 产品描述 */
 .product-description {

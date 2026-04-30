@@ -183,6 +183,14 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
           </span>
         </div>
 
+        {/* SKU 名称（与 APP 商品详情页一致） */}
+        {product.skus && product.skus.length > 0 && product.skus[0].name_fr && (
+          <div className="sku-section">
+            <div className="sku-label">Modèle</div>
+            <div className="sku-name">{product.skus[0].name_fr}</div>
+          </div>
+        )}
+
         {/* 产品变体选择器 */}
         <ProductVariants 
           variants={variants}
