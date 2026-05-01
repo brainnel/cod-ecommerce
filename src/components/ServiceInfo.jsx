@@ -22,7 +22,7 @@ const ServiceInfo = () => {
     {
       id: 3,
       icon: FaTruck,
-      title: 'Livraison en 3 jours'
+      title: 'Livraison en 24 heures'
     },
     {
       id: 4,

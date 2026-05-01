@@ -176,7 +176,7 @@ const DownloadPage = () => {
             </svg>
           </div>
           <p className="dl-testi-text">
-            Tres bonne application ! J'ai commande des vetements et j'ai recu en 2 jours. Le paiement a la livraison c'est top !
+            Tres bonne application ! J'ai commande des vetements et j'ai recu le lendemain. Le paiement a la livraison c'est top !
           </p>
           <div className="dl-author">
             <div className="dl-avatar">A</div>
