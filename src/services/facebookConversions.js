@@ -20,6 +20,21 @@ const FACEBOOK_CONFIG = {
   TEST_EVENT_CODE: import.meta.env.VITE_FACEBOOK_TEST_EVENT_CODE || ''
 }
 
+const isBrowserPixelReady = () => (
+  typeof window !== 'undefined' && typeof window.fbq === 'function'
+)
+
+const trackBrowserPixelEvent = (eventName, customData, eventId) => {
+  if (!isBrowserPixelReady()) return
+
+  try {
+    const options = eventId ? { eventID: eventId } : undefined
+    window.fbq('track', eventName, customData, options)
+  } catch (error) {
+    console.warn(`Facebook Pixel ${eventName} 事件发送失败:`, error)
+  }
+}
+
 /**
  * 生成用户数据哈希
  * Facebook 要求敏感数据必须进行 SHA-256 哈希处理
@@ -180,20 +195,18 @@ export const trackPurchaseEvent = async (orderData, userInfo, clientInfo = {}) =
       customData.order_id = orderData.orderNo
     }
     
+    const eventId = orderData.orderNo ? `purchase_${orderData.orderNo}` : `purchase_${eventTime}`
     const eventData = {
       event_name: 'Purchase',
       event_time: eventTime,
       user_data: userData,
       custom_data: customData,
       event_source_url: window.location.href,
-      action_source: 'website'
+      action_source: 'website',
+      event_id: eventId
     }
-    
-    // 添加事件ID，用于去重
-    if (orderData.orderNo) {
-      eventData.event_id = `purchase_${orderData.orderNo}`
-    }
-    
+
+    trackBrowserPixelEvent('Purchase', customData, eventId)
     return await sendConversionEvent(eventData)
     
   } catch (error) {
@@ -233,16 +246,19 @@ export const trackViewContentEvent = async (productData, clientInfo = {}) => {
     }
 
     const eventTime = Math.floor(Date.now() / 1000)
+    const eventId = `view_content_${productId}_${eventTime}`
+    const customData = buildProductEventCustomData(productData, 1)
     const eventData = {
       event_name: 'ViewContent',
       event_time: eventTime,
-      event_id: `view_content_${productId}_${eventTime}`,
+      event_id: eventId,
       user_data: await buildUserData({}, clientInfo),
-      custom_data: buildProductEventCustomData(productData, 1),
+      custom_data: customData,
       event_source_url: window.location.href,
       action_source: 'website'
     }
 
+    trackBrowserPixelEvent('ViewContent', customData, eventId)
     return await sendConversionEvent(eventData)
   } catch (error) {
     console.error('❌ 跟踪商品浏览事件失败:', error)
@@ -262,16 +278,19 @@ export const trackAddToCartEvent = async (productData, clientInfo = {}) => {
 
     const eventTime = Math.floor(Date.now() / 1000)
     const quantity = parseInt(productData.quantity || 1)
+    const eventId = `add_to_cart_${productId}_${eventTime}`
+    const customData = buildProductEventCustomData(productData, quantity)
     const eventData = {
       event_name: 'AddToCart',
       event_time: eventTime,
-      event_id: `add_to_cart_${productId}_${eventTime}`,
+      event_id: eventId,
       user_data: await buildUserData({}, clientInfo),
-      custom_data: buildProductEventCustomData(productData, quantity),
+      custom_data: customData,
       event_source_url: window.location.href,
       action_source: 'website'
     }
 
+    trackBrowserPixelEvent('AddToCart', customData, eventId)
     return await sendConversionEvent(eventData)
   } catch (error) {
     console.error('❌ 跟踪加购事件失败:', error)
