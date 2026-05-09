@@ -63,6 +63,15 @@ const hashUserData = async (data) => {
   return normalized
 }
 
+const toCatalogContentId = async (productId) => {
+  if (!productId) return null
+  const rawId = productId.toString().trim()
+  if (!rawId) return null
+
+  const normalizedPath = rawId.startsWith('/product/') ? rawId : `/product/${rawId}`
+  return await hashUserData(normalizedPath)
+}
+
 /**
  * 构建用户数据对象
  */
@@ -177,18 +186,7 @@ export const trackPurchaseEvent = async (orderData, userInfo, clientInfo = {}) =
     const eventTime = Math.floor(Date.now() / 1000)
     
     // 构建自定义数据
-    const customData = {
-      currency: 'XAF', // 中非金融合作法郎
-      value: parseFloat(orderData.totalPrice || 0),
-      content_type: 'product',
-      content_ids: [orderData.productId?.toString()],
-      contents: [{
-        id: orderData.productId?.toString(),
-        quantity: parseInt(orderData.quantity || 1),
-        price: parseFloat(orderData.unitPrice || 0)
-      }],
-      num_items: parseInt(orderData.quantity || 1)
-    }
+    const customData = await buildProductEventCustomData(orderData, orderData.quantity || 1)
     
     // 如果有订单号，添加到自定义数据
     if (orderData.orderNo) {
@@ -215,8 +213,9 @@ export const trackPurchaseEvent = async (orderData, userInfo, clientInfo = {}) =
   }
 }
 
-const buildProductEventCustomData = (productData = {}, fallbackQuantity = 1) => {
+const buildProductEventCustomData = async (productData = {}, fallbackQuantity = 1) => {
   const productId = productData.productId || productData.product_id || productData.id
+  const catalogContentId = await toCatalogContentId(productId)
   const quantity = parseInt(productData.quantity || fallbackQuantity || 1)
   const unitPrice = parseFloat(productData.unitPrice || productData.price || 0)
   const totalPrice = parseFloat(productData.totalPrice || unitPrice * quantity || 0)
@@ -225,9 +224,9 @@ const buildProductEventCustomData = (productData = {}, fallbackQuantity = 1) => 
     currency: 'XAF',
     value: totalPrice,
     content_type: 'product',
-    content_ids: productId ? [productId.toString()] : [],
-    contents: productId ? [{
-      id: productId.toString(),
+    content_ids: catalogContentId ? [catalogContentId] : [],
+    contents: catalogContentId ? [{
+      id: catalogContentId,
       quantity,
       price: unitPrice
     }] : [],
@@ -247,7 +246,7 @@ export const trackViewContentEvent = async (productData, clientInfo = {}) => {
 
     const eventTime = Math.floor(Date.now() / 1000)
     const eventId = `view_content_${productId}_${eventTime}`
-    const customData = buildProductEventCustomData(productData, 1)
+    const customData = await buildProductEventCustomData(productData, 1)
     const eventData = {
       event_name: 'ViewContent',
       event_time: eventTime,
@@ -279,7 +278,7 @@ export const trackAddToCartEvent = async (productData, clientInfo = {}) => {
     const eventTime = Math.floor(Date.now() / 1000)
     const quantity = parseInt(productData.quantity || 1)
     const eventId = `add_to_cart_${productId}_${eventTime}`
-    const customData = buildProductEventCustomData(productData, quantity)
+    const customData = await buildProductEventCustomData(productData, quantity)
     const eventData = {
       event_name: 'AddToCart',
       event_time: eventTime,
