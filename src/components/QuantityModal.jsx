@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { trackAddToCartEvent, getClientInfo } from '../services/facebookConversions'
 import './QuantityModal.css'
 
 const QuantityModal = ({ isOpen, onClose, product }) => {
@@ -24,6 +25,19 @@ const QuantityModal = ({ isOpen, onClose, product }) => {
   }
 
   const handleConfirm = () => {
+    const totalPrice = product.price * quantity
+
+    try {
+      trackAddToCartEvent({
+        productId: product.product_id,
+        quantity,
+        totalPrice,
+        unitPrice: product.price
+      }, getClientInfo()).catch(err => console.warn('Facebook AddToCart 事件失败:', err))
+    } catch (fbError) {
+      console.warn('Facebook AddToCart 事件错误:', fbError)
+    }
+
     // 跳转到付款页面，传递产品和数量信息
     navigate('/payment', {
       state: {

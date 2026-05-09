@@ -51,7 +51,7 @@ const hashUserData = async (data) => {
 /**
  * 构建用户数据对象
  */
-const buildUserData = async (userInfo, clientInfo = {}) => {
+const buildUserData = async (userInfo = {}, clientInfo = {}) => {
   const userData = {}
   
   // 用户基本信息（需要哈希处理）
@@ -198,6 +198,83 @@ export const trackPurchaseEvent = async (orderData, userInfo, clientInfo = {}) =
   }
 }
 
+const buildProductEventCustomData = (productData = {}, fallbackQuantity = 1) => {
+  const productId = productData.productId || productData.product_id || productData.id
+  const quantity = parseInt(productData.quantity || fallbackQuantity || 1)
+  const unitPrice = parseFloat(productData.unitPrice || productData.price || 0)
+  const totalPrice = parseFloat(productData.totalPrice || unitPrice * quantity || 0)
+
+  return {
+    currency: 'XAF',
+    value: totalPrice,
+    content_type: 'product',
+    content_ids: productId ? [productId.toString()] : [],
+    contents: productId ? [{
+      id: productId.toString(),
+      quantity,
+      price: unitPrice
+    }] : [],
+    num_items: quantity
+  }
+}
+
+/**
+ * 跟踪商品浏览事件，用于 Meta 目录商品浏览量匹配
+ */
+export const trackViewContentEvent = async (productData, clientInfo = {}) => {
+  try {
+    const productId = productData?.productId || productData?.product_id || productData?.id
+    if (!productId) {
+      return { success: false, error: 'Missing product id' }
+    }
+
+    const eventTime = Math.floor(Date.now() / 1000)
+    const eventData = {
+      event_name: 'ViewContent',
+      event_time: eventTime,
+      event_id: `view_content_${productId}_${eventTime}`,
+      user_data: await buildUserData({}, clientInfo),
+      custom_data: buildProductEventCustomData(productData, 1),
+      event_source_url: window.location.href,
+      action_source: 'website'
+    }
+
+    return await sendConversionEvent(eventData)
+  } catch (error) {
+    console.error('❌ 跟踪商品浏览事件失败:', error)
+    return { success: false, error: error.message }
+  }
+}
+
+/**
+ * 跟踪加入购物车事件。网站没有购物车，这里用“确认数量并进入下单页”作为购买意图事件。
+ */
+export const trackAddToCartEvent = async (productData, clientInfo = {}) => {
+  try {
+    const productId = productData?.productId || productData?.product_id || productData?.id
+    if (!productId) {
+      return { success: false, error: 'Missing product id' }
+    }
+
+    const eventTime = Math.floor(Date.now() / 1000)
+    const quantity = parseInt(productData.quantity || 1)
+    const eventData = {
+      event_name: 'AddToCart',
+      event_time: eventTime,
+      event_id: `add_to_cart_${productId}_${eventTime}`,
+      user_data: await buildUserData({}, clientInfo),
+      custom_data: buildProductEventCustomData(productData, quantity),
+      event_source_url: window.location.href,
+      action_source: 'website'
+    }
+
+    return await sendConversionEvent(eventData)
+  } catch (error) {
+    console.error('❌ 跟踪加购事件失败:', error)
+    return { success: false, error: error.message }
+  }
+}
+
 
 /**
  * 获取客户端信息
@@ -255,6 +332,8 @@ export const setFacebookClickId = (fbclid) => {
 
 export default {
   trackPurchaseEvent,
+  trackViewContentEvent,
+  trackAddToCartEvent,
   getClientInfo,
   setFacebookClickId
 }

@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Pagination, Navigation } from 'swiper/modules';
 import { useNavigate } from 'react-router-dom';
 import { productAPI } from '../services/api';
+import { trackViewContentEvent, getClientInfo } from '../services/facebookConversions';
 import Countdown from './Countdown';
 import QuantityModal from './QuantityModal';
 import ServiceInfo from './ServiceInfo';
@@ -21,6 +22,7 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [variants, setVariants] = useState([]);
   const navigate = useNavigate();
+  const viewTrackedProductRef = useRef(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -71,6 +73,25 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
 
     fetchData();
   }, [productId, initialProduct]);
+
+  useEffect(() => {
+    if (!product?.product_id) return;
+
+    const trackingKey = product.product_id.toString();
+    if (viewTrackedProductRef.current === trackingKey) return;
+    viewTrackedProductRef.current = trackingKey;
+
+    try {
+      trackViewContentEvent({
+        productId: product.product_id,
+        quantity: 1,
+        totalPrice: product.price,
+        unitPrice: product.price
+      }, getClientInfo()).catch(err => console.warn('Facebook ViewContent 事件失败:', err));
+    } catch (fbError) {
+      console.warn('Facebook ViewContent 事件错误:', fbError);
+    }
+  }, [product?.product_id, product?.price]);
 
   if (loading) {
     return (
