@@ -60,22 +60,26 @@ const buildUserData = async (userInfo = {}, clientInfo = {}) => {
   }
   
   if (userInfo.phone) {
-    // 电话号码格式化（去除非数字字符，添加国际区号）
+    // 电话号码格式化（去除非数字字符，添加科特迪瓦国际区号）
     let phone = userInfo.phone.toString().replace(/\D/g, '')
     if (phone.startsWith('0')) {
-      phone = '237' + phone.substring(1) // 喀麦隆国际区号
-    } else if (!phone.startsWith('237')) {
-      phone = '237' + phone
+      phone = '225' + phone.substring(1)
+    } else if (!phone.startsWith('225')) {
+      phone = '225' + phone
     }
     userData.ph = [await hashUserData(phone)]
   }
+
+  const fullNameParts = userInfo.fullName?.trim().split(/\s+/).filter(Boolean) || []
+  const firstName = userInfo.firstName || fullNameParts[0]
+  const lastName = userInfo.lastName || fullNameParts.slice(1).join(' ')
   
-  if (userInfo.firstName) {
-    userData.fn = [await hashUserData(userInfo.firstName)]
+  if (firstName) {
+    userData.fn = [await hashUserData(firstName)]
   }
   
-  if (userInfo.lastName) {
-    userData.ln = [await hashUserData(userInfo.lastName)]
+  if (lastName) {
+    userData.ln = [await hashUserData(lastName)]
   }
   
   if (userInfo.city) {
