@@ -10,6 +10,20 @@ import ServiceInfo from './ServiceInfo';
 import ProductVariants from './ProductVariants';
 import logoImage from '../assets/logo.png';
 
+const PRODUCT_UNAVAILABLE_BACKEND_MESSAGE = '此商品已下架，请查看其它商品';
+const PRODUCT_UNAVAILABLE_MESSAGE_FR = "Ce produit n'est plus disponible. Veuillez consulter d'autres produits.";
+const GENERIC_PRODUCT_FETCH_ERROR_FR = 'Échec de récupération des informations produit';
+
+const getProductFetchErrorMessage = (err) => {
+  const backendMessage = err?.response?.data?.detail;
+
+  if (backendMessage === PRODUCT_UNAVAILABLE_BACKEND_MESSAGE || err?.response?.status === 404) {
+    return PRODUCT_UNAVAILABLE_MESSAGE_FR;
+  }
+
+  return GENERIC_PRODUCT_FETCH_ERROR_FR;
+};
+
 // Import Swiper styles
 import 'swiper/css';
 import 'swiper/css/pagination';
@@ -64,7 +78,7 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
           console.log('产品变体列表:', variantList);
         }
       } catch (err) {
-        setError('Échec de récupération des informations produit');
+        setError(getProductFetchErrorMessage(err));
         console.error('Error fetching product:', err);
       } finally {
         setLoading(false);
