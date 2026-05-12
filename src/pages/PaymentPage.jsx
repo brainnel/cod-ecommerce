@@ -1,8 +1,16 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { districtAPI, orderAPI } from '../services/api'
 import { useAdId } from '../hooks/useAdTrackingHooks.js'
 import { trackPurchaseEvent, getClientInfo } from '../services/facebookConversions'
+import {
+  buildCheckoutProductProperties,
+  getCheckoutSessionId,
+  resumeCheckoutSession,
+  startCheckoutSession,
+  trackCheckoutEvent,
+  updateCheckoutContext
+} from '../services/checkoutFunnelAnalytics'
 import MapSelector from '../components/MapSelector'
 import MapGuideModal from '../components/MapGuideModal'
 import { DISTRICT_CENTERS, DEFAULT_CENTER, DEFAULT_ZOOM } from '../constants/districtCenters'
@@ -11,8 +19,11 @@ import './PaymentPage.css'
 const PaymentPage = () => {
   const location = useLocation()
   const navigate = useNavigate()
-  const { product, quantity } = location.state || {}
+  const { product, quantity, checkoutSessionId: routeCheckoutSessionId } = location.state || {}
   const adId = useAdId()
+  const checkoutSessionIdRef = useRef(routeCheckoutSessionId || null)
+  const infoStepTrackedRef = useRef(false)
+  const completedFieldsRef = useRef(new Set())
 
   // 三步流程：1=选大区, 2=地图标记, 3=填写信息
   const [currentStep, setCurrentStep] = useState(1)
@@ -40,6 +51,63 @@ const PaymentPage = () => {
   const [isPlacingOrder, setIsPlacingOrder] = useState(false)
   const [clientInfo, setClientInfo] = useState({})
 
+  const ensureCheckoutSession = () => {
+    if (checkoutSessionIdRef.current) return checkoutSessionIdRef.current
+
+    const storedSessionId = getCheckoutSessionId()
+    if (storedSessionId) {
+      checkoutSessionIdRef.current = storedSessionId
+      return storedSessionId
+    }
+
+    if (!product) return null
+
+    const totalPrice = product.price * (quantity || 1)
+    checkoutSessionIdRef.current = startCheckoutSession(product, {
+      quantity: quantity || 1,
+      total_price: totalPrice,
+      ad_id: adId
+    })
+    trackCheckoutEvent('checkout_start', buildCheckoutProductProperties(product, {
+      quantity: quantity || 1,
+      total_price: totalPrice,
+      ad_id: adId
+    }), { sessionId: checkoutSessionIdRef.current })
+    return checkoutSessionIdRef.current
+  }
+
+  const getDistrictAnalyticsProps = (district = selectedDistrict) => {
+    if (!district) return {}
+    return {
+      district_id: district.id ? String(district.id) : null,
+      district_name: district.name || null,
+      city_id: district.city_id ? String(district.city_id) : null,
+      city_name: district.city_name || null
+    }
+  }
+
+  const getCheckoutAnalyticsProps = (extra = {}) => {
+    const totalPrice = product ? product.price * (quantity || 1) : 0
+    return {
+      ...buildCheckoutProductProperties(product, {
+        quantity: quantity || 1,
+        total_price: totalPrice,
+        ad_id: adId
+      }),
+      ...getDistrictAnalyticsProps(),
+      ...extra
+    }
+  }
+
+  const trackPaymentEvent = (eventName, properties = {}) => {
+    const checkoutSessionId = ensureCheckoutSession()
+    if (!checkoutSessionId) return
+
+    trackCheckoutEvent(eventName, getCheckoutAnalyticsProps(properties), {
+      sessionId: checkoutSessionId
+    })
+  }
+
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
   }, [])
@@ -52,7 +120,27 @@ const PaymentPage = () => {
     }
     const info = getClientInfo()
     setClientInfo(info)
-  }, [product, quantity, navigate])
+
+    const totalPrice = product.price * quantity
+    if (routeCheckoutSessionId) {
+      checkoutSessionIdRef.current = routeCheckoutSessionId
+      resumeCheckoutSession(routeCheckoutSessionId, product, {
+        quantity,
+        total_price: totalPrice,
+        ad_id: adId
+      })
+    } else {
+      const storedSessionId = getCheckoutSessionId()
+      if (storedSessionId) {
+        checkoutSessionIdRef.current = storedSessionId
+      }
+      updateCheckoutContext(product, {
+        quantity,
+        total_price: totalPrice,
+        ad_id: adId
+      })
+    }
+  }, [product, quantity, navigate, routeCheckoutSessionId, adId])
 
   // 加载大区列表（扁平化）
   useEffect(() => {
@@ -88,7 +176,7 @@ const PaymentPage = () => {
   }, [])
 
   // 获取用户当前位置
-  const getUserLocation = () => {
+  const getUserLocation = ({ selectCurrentLocation = false } = {}) => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -97,10 +185,24 @@ const PaymentPage = () => {
             lng: position.coords.longitude
           }
           setUserLocation(userPos)
+          if (selectCurrentLocation) {
+            setCustomMarker(userPos)
+            setMapCenter(userPos)
+            trackPaymentEvent('location_selected', {
+              ...getDistrictAnalyticsProps(),
+              location_method: 'current_location'
+            })
+          }
           console.log('用户位置:', userPos)
         },
         (error) => {
           console.log('无法获取位置:', error.message)
+          if (selectCurrentLocation) {
+            trackPaymentEvent('location_current_failed', {
+              ...getDistrictAnalyticsProps(),
+              error_code: error.code || null
+            })
+          }
           // 不显示错误，只是不显示用户位置标记
         },
         {
@@ -112,9 +214,30 @@ const PaymentPage = () => {
     }
   }
 
+  const handleUseCurrentLocation = () => {
+    if (userLocation) {
+      setCustomMarker(userLocation)
+      setMapCenter(userLocation)
+      trackPaymentEvent('location_selected', {
+        ...getDistrictAnalyticsProps(),
+        location_method: 'current_location'
+      })
+      return
+    }
+
+    getUserLocation({ selectCurrentLocation: true })
+  }
+
   // 选择大区
   const handleSelectDistrict = (district) => {
     setSelectedDistrict(district)
+    updateCheckoutContext(product, {
+      quantity,
+      total_price: product.price * quantity,
+      ad_id: adId,
+      ...getDistrictAnalyticsProps(district)
+    })
+    trackPaymentEvent('district_selected', getDistrictAnalyticsProps(district))
     
     // 直接使用大区自己的坐标作为地图中心
     const districtCenter = {
@@ -135,6 +258,10 @@ const PaymentPage = () => {
   // 地图标记
   const handleMapClick = (marker) => {
     setCustomMarker(marker)
+    trackPaymentEvent('location_selected', {
+      ...getDistrictAnalyticsProps(),
+      location_method: 'manual_map'
+    })
   }
 
   // 确认标记，进入步骤3
@@ -143,28 +270,37 @@ const PaymentPage = () => {
       alert('Veuillez cliquer sur la carte pour choisir un emplacement')
       return
     }
+    trackPaymentEvent('location_confirmed', getDistrictAnalyticsProps())
     setCurrentStep(3)
   }
 
   // 表单输入处理
   const handleInputChange = (field, value) => {
+    let nextValue = value
+
     if (field === 'phone' || field === 'whatsapp') {
-      const cleanValue = value.replace(/\D/g, '').slice(0, 10)
-      setUserInfo(prev => ({ ...prev, [field]: cleanValue }))
-      if (errors[field]) {
-        setErrors(prev => ({ ...prev, [field]: '' }))
-      }
+      nextValue = value.replace(/\D/g, '').slice(0, 10)
     } else if (field === 'addressDescription') {
-      const limitedValue = value.slice(0, 200)
-      setUserInfo(prev => ({ ...prev, [field]: limitedValue }))
-      if (errors[field]) {
-        setErrors(prev => ({ ...prev, [field]: '' }))
-      }
-    } else {
-      setUserInfo(prev => ({ ...prev, [field]: value }))
-      if (errors[field]) {
-        setErrors(prev => ({ ...prev, [field]: '' }))
-      }
+      nextValue = value.slice(0, 200)
+    }
+
+    setUserInfo(prev => ({ ...prev, [field]: nextValue }))
+    if (errors[field]) {
+      setErrors(prev => ({ ...prev, [field]: '' }))
+    }
+
+    const isFieldComplete = (
+      (field === 'fullName' && nextValue.trim().length > 0) ||
+      ((field === 'phone' || field === 'whatsapp') && nextValue.length === 10) ||
+      (field === 'addressDescription' && nextValue.trim().length >= 5)
+    )
+
+    if (isFieldComplete && !completedFieldsRef.current.has(field)) {
+      completedFieldsRef.current.add(field)
+      trackPaymentEvent('field_completed', {
+        ...getDistrictAnalyticsProps(),
+        field
+      })
     }
   }
 
@@ -198,10 +334,29 @@ const PaymentPage = () => {
     return Object.keys(newErrors).length === 0
   }
 
+  useEffect(() => {
+    if (currentStep !== 3 || infoStepTrackedRef.current) return
+
+    infoStepTrackedRef.current = true
+    trackPaymentEvent('info_step_view', getDistrictAnalyticsProps())
+  }, [currentStep])
+
   // 提交订单
   const handlePlaceOrder = async () => {
-    if (!validateForm()) return
+    if (!validateForm()) {
+      const missingFields = []
+      if (!userInfo.fullName.trim()) missingFields.push('fullName')
+      if (userInfo.phone.length !== 10) missingFields.push('phone')
+      if (userInfo.whatsapp.length !== 10) missingFields.push('whatsapp')
+      if (userInfo.addressDescription.trim().length < 5) missingFields.push('addressDescription')
+      trackPaymentEvent('submit_validation_failed', {
+        ...getDistrictAnalyticsProps(),
+        missing_fields: missingFields
+      })
+      return
+    }
     
+    trackPaymentEvent('submit_order_click', getDistrictAnalyticsProps())
     setIsPlacingOrder(true)
     
     try {
@@ -235,6 +390,12 @@ const PaymentPage = () => {
 
       // 发送Facebook购买事件
       if (response?.data && response.status >= 200 && response.status < 300) {
+        trackPaymentEvent('order_create_success', {
+          ...getDistrictAnalyticsProps(),
+          order_no: response.data.order_no || response.data.order_id || null,
+          order_status: response.status
+        })
+
         try {
           trackPurchaseEvent({
             productId: product.product_id,
@@ -262,6 +423,11 @@ const PaymentPage = () => {
 
     } catch (err) {
       console.error('订单失败:', err)
+      trackPaymentEvent('order_create_failed', {
+        ...getDistrictAnalyticsProps(),
+        error_status: err.response?.status || null,
+        error_type: err.code || 'order_api_error'
+      })
       alert(err.response?.data?.message || 'Une erreur est survenue')
     } finally {
       setIsPlacingOrder(false)
@@ -343,14 +509,7 @@ const PaymentPage = () => {
               </div>
               <button 
                 className="use-location-btn"
-                onClick={() => {
-                  if (userLocation) {
-                    setCustomMarker(userLocation)
-                    setMapCenter(userLocation)
-                  } else {
-                    getUserLocation()
-                  }
-                }}
+                onClick={handleUseCurrentLocation}
                 type="button"
                 title="Utiliser ma position actuelle"
               >

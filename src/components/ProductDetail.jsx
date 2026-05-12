@@ -4,6 +4,8 @@ import { Pagination, Navigation } from 'swiper/modules';
 import { useNavigate } from 'react-router-dom';
 import { productAPI } from '../services/api';
 import { trackViewContentEvent, getClientInfo } from '../services/facebookConversions';
+import { beginCheckoutFunnel } from '../services/checkoutFunnelAnalytics';
+import { useAdId } from '../hooks/useAdTrackingHooks.js';
 import Countdown from './Countdown';
 import QuantityModal from './QuantityModal';
 import ServiceInfo from './ServiceInfo';
@@ -36,6 +38,7 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [variants, setVariants] = useState([]);
   const navigate = useNavigate();
+  const adId = useAdId();
   const viewTrackedProductRef = useRef(null);
 
   useLayoutEffect(() => {
@@ -155,6 +158,15 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
     alert(`订单确认！\n产品: ${product.name_fr}\n数量: ${quantity}\n总价: ${product.price * quantity} FCFA`);
   };
 
+  const handleBuyNowClick = () => {
+    try {
+      beginCheckoutFunnel(product, { ad_id: adId });
+    } catch (error) {
+      console.warn('checkout_start 埋点失败:', error);
+    }
+    setIsModalOpen(true);
+  };
+
   // 设置倒计时目标时间（7天后）
   const targetDate = new Date()
   targetDate.setDate(targetDate.getDate() + 7)
@@ -258,7 +270,7 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
             <button
               type="button"
               className="buy-now-btn"
-              onClick={() => setIsModalOpen(true)}
+              onClick={handleBuyNowClick}
             >
               Commander maintenant - Paiement à la livraison
             </button>

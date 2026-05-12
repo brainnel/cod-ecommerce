@@ -1,6 +1,13 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { trackAddToCartEvent, getClientInfo } from '../services/facebookConversions'
+import {
+  buildCheckoutProductProperties,
+  getCheckoutSessionId,
+  startCheckoutSession,
+  trackCheckoutEvent,
+  updateCheckoutContext
+} from '../services/checkoutFunnelAnalytics'
 import './QuantityModal.css'
 
 const QuantityModal = ({ isOpen, onClose, product }) => {
@@ -26,6 +33,21 @@ const QuantityModal = ({ isOpen, onClose, product }) => {
 
   const handleConfirm = () => {
     const totalPrice = product.price * quantity
+    let checkoutSessionId = getCheckoutSessionId()
+
+    if (!checkoutSessionId) {
+      checkoutSessionId = startCheckoutSession(product, { quantity, total_price: totalPrice })
+      trackCheckoutEvent('checkout_start', buildCheckoutProductProperties(product, {
+        quantity,
+        total_price: totalPrice
+      }), { sessionId: checkoutSessionId })
+    }
+
+    updateCheckoutContext(product, { quantity, total_price: totalPrice })
+    trackCheckoutEvent('quantity_confirmed', buildCheckoutProductProperties(product, {
+      quantity,
+      total_price: totalPrice
+    }), { sessionId: checkoutSessionId })
 
     try {
       trackAddToCartEvent({
@@ -42,7 +64,8 @@ const QuantityModal = ({ isOpen, onClose, product }) => {
     navigate('/payment', {
       state: {
         product,
-        quantity
+        quantity,
+        checkoutSessionId
       }
     })
     handleClose()
