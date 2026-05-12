@@ -44,6 +44,7 @@ const MapSelector = ({ center, zoom = 13, onMarkerSet, customMarker, userLocatio
   }, [onMarkerSet])
 
   const defaultOptions = {
+    gestureHandling: 'greedy',
     zoomControl: true,
     mapTypeControl: false,
     scaleControl: false,
