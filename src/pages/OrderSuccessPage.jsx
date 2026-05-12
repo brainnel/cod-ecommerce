@@ -10,8 +10,12 @@ let cachedDownloadLinks = null
 const OrderSuccessPage = () => {
   const location = useLocation()
   const navigate = useNavigate()
-  const { product, quantity, userInfo, selectedLocation, totalPrice, orderResponse } = location.state || {}
+  const { product, quantity, userInfo, selectedLocation, totalPrice } = location.state || {}
   const [isModalOpen, setIsModalOpen] = useState(false)
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+  }, [])
 
   // 如果没有订单信息，重定向回首页
   useEffect(() => {
@@ -92,9 +96,6 @@ const OrderSuccessPage = () => {
     const whatsappUrl = `https://wa.me/${phoneNumber}`
     window.open(whatsappUrl, '_blank')
   }
-
-  // 从后端返回的数据中获取取件码
-  const pickupCode = location.state?.orderResponse?.verification_code || '000000'
 
   if (!product || !quantity || !userInfo || !selectedLocation) {
     return null

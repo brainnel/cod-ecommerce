@@ -87,6 +87,13 @@
   margin-bottom: 4px;
 }
 
+.product-card .price-section {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+
 .current-price {
   font-size: 14px;
   font-weight: 700;
@@ -98,6 +105,11 @@
   font-size: 10px;
   color: #6c757d;
   text-decoration: line-through;
+}
+
+.product-card .current-price,
+.product-card .original-price {
+  white-space: nowrap;
 }
 
 /* 骨架屏加载 */
@@ -310,5 +322,67 @@
     left: 6px;
     padding: 3px 6px;
     font-size: 11px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .product-list-container {
+    padding: 24px 40px 56px;
+    min-height: calc(100vh - 150px);
+  }
+
+  .product-grid {
+    width: min(1200px, 100%);
+    margin: 0 auto 28px;
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+    gap: 20px;
+  }
+
+  .product-card {
+    border-radius: 10px;
+  }
+
+  .product-card:hover {
+    transform: translateY(-4px);
+  }
+
+  .product-info {
+    padding: 14px;
+  }
+
+  .product-name {
+    font-size: 15px;
+    min-height: 40px;
+  }
+
+  .current-price {
+    font-size: 18px;
+  }
+
+  .original-price {
+    font-size: 12px;
+  }
+
+  .loading-more,
+  .no-more-data,
+  .error-state,
+  .empty-state {
+    width: min(1200px, 100%);
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+
+@media (min-width: 1440px) {
+  .product-grid,
+  .loading-more,
+  .no-more-data,
+  .error-state,
+  .empty-state {
+    width: min(1320px, 100%);
+  }
+
+  .product-grid {
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
   }
 }

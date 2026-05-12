@@ -40,6 +40,10 @@ const PaymentPage = () => {
   const [isPlacingOrder, setIsPlacingOrder] = useState(false)
   const [clientInfo, setClientInfo] = useState({})
 
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+  }, [])
+
   // 重定向检查
   useEffect(() => {
     if (!product || !quantity) {

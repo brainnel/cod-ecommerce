@@ -179,73 +179,88 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
       {/* 倒计时组件 */}
       <Countdown targetDate={targetDate} />
 
-      {/* 产品图片轮播 */}
-      <div className="product-gallery">
-        <Swiper
-          modules={[Pagination, Navigation]}
-          spaceBetween={0}
-          slidesPerView={1}
-          pagination={{ clickable: true }}
-          navigation={true}
-          className="main-swiper"
-        >
-          {product.image_url?.map((image, index) => (
-            <SwiperSlide key={`${product.product_id}-main-${index}`}>
-              <div className="image-container">
-                <img src={image} alt={`Image produit ${index + 1}`} />
-                {index === 0 && product.off > 0 && (
-                  <div className="discount-badge">
-                    -{formatDiscount(product.off)}%
-                  </div>
-                )}
+      <div className="product-detail-main">
+        {/* 产品图片轮播 */}
+        <div className="product-gallery">
+          <Swiper
+            modules={[Pagination, Navigation]}
+            spaceBetween={0}
+            slidesPerView={1}
+            pagination={{ clickable: true }}
+            navigation={true}
+            className="main-swiper"
+          >
+            {product.image_url?.map((image, index) => (
+              <SwiperSlide key={`${product.product_id}-main-${index}`}>
+                <div className="image-container">
+                  <img src={image} alt={`Image produit ${index + 1}`} />
+                  {index === 0 && product.off > 0 && (
+                    <div className="discount-badge">
+                      -{formatDiscount(product.off)}%
+                    </div>
+                  )}
+                </div>
+              </SwiperSlide>
+            ))}
+          </Swiper>
+        </div>
+
+        <div className="product-purchase-panel">
+          {/* 产品信息 */}
+          <div className="product-info">
+            <h1 className="product-title">{product.name_fr}</h1>
+
+            {/* 价格信息 */}
+            <div className="price-section">
+              <div className="current-price">{formatPrice(product.price)} FCFA</div>
+              {product.original_price && product.original_price > product.price && (
+                <div className="original-price">{formatPrice(product.original_price)} FCFA</div>
+              )}
+            </div>
+
+            {/* 库存信息 */}
+            <div className="stock-info">
+              <span className="stock-label">Stock : </span>
+              <span className={`stock-count ${product.stock < 10 ? 'low-stock' : ''}`}>
+                {product.stock} pièces
+              </span>
+            </div>
+
+            {/* SKU 名称（与 APP 商品详情页一致） */}
+            {product.skus && product.skus.length > 0 && product.skus[0].name_fr && (
+              <div className="sku-section">
+                <div className="sku-label">Modèle</div>
+                <div className="sku-name">{product.skus[0].name_fr}</div>
               </div>
-            </SwiperSlide>
-          ))}
-        </Swiper>
-      </div>
+            )}
 
-      {/* 产品信息 */}
-      <div className="product-info">
-        <h1 className="product-title">{product.name_fr}</h1>
-        
-        {/* 价格信息 */}
-        <div className="price-section">
-          <div className="current-price">{formatPrice(product.price)} FCFA</div>
-          {product.original_price && product.original_price > product.price && (
-            <div className="original-price">{formatPrice(product.original_price)} FCFA</div>
-          )}
-        </div>
+            {/* 产品变体选择器 */}
+            <ProductVariants
+              variants={variants}
+              currentProductId={product.product_id}
+              onVariantSelect={(selectedProductId) => {
+                // 跳转到选中的变体产品页面
+                navigate(`/product/${selectedProductId}`);
+              }}
+            />
 
-        {/* 库存信息 */}
-        <div className="stock-info">
-          <span className="stock-label">Stock : </span>
-          <span className={`stock-count ${product.stock < 10 ? 'low-stock' : ''}`}>
-            {product.stock} pièces
-          </span>
-        </div>
-
-        {/* SKU 名称（与 APP 商品详情页一致） */}
-        {product.skus && product.skus.length > 0 && product.skus[0].name_fr && (
-          <div className="sku-section">
-            <div className="sku-label">Modèle</div>
-            <div className="sku-name">{product.skus[0].name_fr}</div>
           </div>
-        )}
 
-        {/* 产品变体选择器 */}
-        <ProductVariants 
-          variants={variants}
-          currentProductId={product.product_id}
-          onVariantSelect={(selectedProductId) => {
-            // 跳转到选中的变体产品页面
-            navigate(`/product/${selectedProductId}`);
-          }}
-        />
+          {/* 服务信息 */}
+          <ServiceInfo />
 
+          {/* 底部操作按钮 */}
+          <div className="bottom-actions">
+            <button
+              type="button"
+              className="buy-now-btn"
+              onClick={() => setIsModalOpen(true)}
+            >
+              Commander maintenant - Paiement à la livraison
+            </button>
+          </div>
+        </div>
       </div>
-
-      {/* 服务信息 */}
-      <ServiceInfo />
 
       {/* 产品描述 */}
       <div className="product-description">
@@ -266,17 +281,6 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
             ))}
           </div>
         )}
-      </div>
-
-      {/* 底部操作按钮 */}
-      <div className="bottom-actions">
-        <button 
-          type="button" 
-          className="buy-now-btn"
-          onClick={() => setIsModalOpen(true)}
-        >
-          Commander maintenant - Paiement à la livraison
-        </button>
       </div>
 
       {/* 数量选择弹窗 */}

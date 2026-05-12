@@ -63,3 +63,23 @@
     font-size: 12px;
   }
 }
+
+@media (min-width: 1024px) {
+  .homepage {
+    background: #f3f5f7;
+  }
+
+  .homepage-header {
+    padding: 18px 40px;
+  }
+
+  .homepage-header .logo {
+    width: min(1200px, 100%);
+    margin: 0 auto;
+    justify-content: flex-start;
+  }
+
+  .homepage-header .logo-image {
+    height: 46px;
+  }
+}

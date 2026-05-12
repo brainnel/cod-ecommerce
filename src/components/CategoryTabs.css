@@ -117,3 +117,21 @@
     border-radius: 14px;
   }
 }
+
+@media (min-width: 1024px) {
+  .category-tabs-container {
+    top: 82px;
+  }
+
+  .category-tabs {
+    width: min(1200px, 100%);
+    margin: 0 auto;
+    padding: 18px 40px;
+    flex-wrap: wrap;
+    overflow: visible;
+  }
+
+  .category-tab {
+    border-radius: 999px;
+  }
+}

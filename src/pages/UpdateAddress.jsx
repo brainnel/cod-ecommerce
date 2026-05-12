@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useSearchParams, useNavigate, useParams } from 'react-router-dom';
+import { useSearchParams, useParams } from 'react-router-dom';
 import { useGoogleMaps } from '../hooks/useGoogleMaps';
 import './UpdateAddress.css';
 
@@ -11,7 +11,6 @@ const BACKEND_API_URL = 'https://api.brainnel.com/backend';
 export default function UpdateAddress() {
   const [searchParams] = useSearchParams();
   const { orderNo } = useParams(); // WhatsApp预订单的order_no路径参数
-  const navigate = useNavigate();
   const token = searchParams.get('token');
 
   // 判断是 WhatsApp 预订单模式还是骑手修改地址模式

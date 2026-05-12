@@ -925,3 +925,96 @@
     justify-content: space-between;
   }
 }
+
+@media (min-width: 1024px) {
+  .payment-page {
+    background: #f3f5f7;
+  }
+
+  .payment-header {
+    padding: 18px 40px;
+  }
+
+  .payment-content {
+    max-width: 1120px;
+    padding: 28px 32px 56px;
+  }
+
+  .steps-indicator {
+    border-radius: 14px;
+    margin-bottom: 24px;
+  }
+
+  .section {
+    border-radius: 14px;
+    padding: 28px;
+    box-shadow: 0 12px 36px rgba(25, 32, 45, 0.08);
+  }
+
+  .district-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .district-card {
+    min-height: 92px;
+  }
+
+  .location-hint {
+    align-items: flex-start;
+  }
+
+  .map-container {
+    min-height: 480px;
+    height: min(62vh, 560px);
+    max-height: none;
+  }
+
+  .info-section {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 380px);
+    column-gap: 28px;
+    align-items: start;
+  }
+
+  .info-section > .section-title {
+    grid-column: 1 / -1;
+  }
+
+  .info-section > .form-group {
+    grid-column: 1;
+  }
+
+  .info-section > .order-summary {
+    grid-column: 2;
+    grid-row: 2 / span 5;
+    align-self: start;
+    position: sticky;
+    top: 108px;
+    margin-bottom: 0;
+  }
+
+  .info-section > .step-actions {
+    grid-column: 1 / -1;
+    justify-content: space-between;
+  }
+
+  .payment-page .order-item {
+    align-items: flex-start;
+  }
+
+  .step-actions {
+    flex-direction: row;
+  }
+
+  .next-btn,
+  .prev-btn,
+  .place-order-btn {
+    width: auto;
+  }
+
+  .place-order-btn {
+    min-width: 230px;
+  }
+}

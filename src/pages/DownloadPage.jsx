@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { appDownloadAPI } from '../services/api'
 import './DownloadPage.css'
 
@@ -10,7 +9,6 @@ const FALLBACK_LINKS = {
 }
 
 const DownloadPage = () => {
-  const navigate = useNavigate()
   const [links, setLinks] = useState(FALLBACK_LINKS)
 
   useEffect(() => {

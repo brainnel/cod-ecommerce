@@ -346,3 +346,81 @@
     padding: 16px 12px;
   }
 }
+
+@media (min-width: 1024px) {
+  .dl-hero {
+    padding: 56px 40px 76px;
+  }
+
+  .dl-nav {
+    max-width: 1120px;
+    margin-bottom: 48px;
+  }
+
+  .dl-brand-logo {
+    width: 44px;
+    height: 44px;
+  }
+
+  .dl-brand-name {
+    font-size: 18px;
+  }
+
+  .dl-hero-title {
+    font-size: 56px;
+    line-height: 1.08;
+    margin-bottom: 18px;
+  }
+
+  .dl-hero-sub {
+    max-width: 620px;
+    font-size: 18px;
+    margin-bottom: 32px;
+  }
+
+  .dl-body {
+    max-width: 1120px;
+    padding: 0 40px;
+  }
+
+  .dl-section-head {
+    margin-bottom: 20px;
+  }
+
+  .dl-section-head h2 {
+    font-size: 22px;
+  }
+
+  .dl-feat-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 16px;
+    margin-bottom: 36px;
+  }
+
+  .dl-feat-card {
+    min-height: 176px;
+    justify-content: center;
+  }
+
+  .dl-list {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+    margin-bottom: 36px;
+  }
+
+  .dl-item {
+    align-items: flex-start;
+    min-height: 116px;
+  }
+
+  .dl-chevron {
+    margin-top: 13px;
+  }
+
+  .dl-testi {
+    max-width: 760px;
+    margin: 0 auto 36px;
+    padding: 28px;
+  }
+}

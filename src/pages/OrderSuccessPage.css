@@ -491,3 +491,66 @@
     padding-left: 0;
   }
 }
+
+@media (min-width: 1024px) {
+  .order-success-page {
+    background: #f3f5f7;
+  }
+
+  .order-success-header {
+    padding: 18px 40px;
+  }
+
+  .success-content {
+    max-width: 1040px;
+    padding: 32px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 380px);
+    gap: 20px 24px;
+    align-items: start;
+  }
+
+  .success-header {
+    grid-column: 1 / -1;
+    margin-bottom: 0;
+    padding: 34px 40px;
+    background: #fff;
+    border-radius: 14px;
+    box-shadow: 0 12px 36px rgba(25, 32, 45, 0.08);
+  }
+
+  .success-subtitle {
+    max-width: 620px;
+  }
+
+  .order-success-page .order-summary {
+    grid-column: 2;
+    grid-row: 2;
+    margin-bottom: 0;
+  }
+
+  .order-info-section {
+    grid-column: 1;
+    grid-row: 2 / span 2;
+    margin-bottom: 0;
+  }
+
+  .phone-notice {
+    grid-column: 1;
+    margin-bottom: 0;
+  }
+
+  .success-actions {
+    grid-column: 2;
+    grid-row: 3;
+  }
+
+  .info-label {
+    min-width: 170px;
+  }
+
+  .download-btn,
+  .whatsapp-btn {
+    min-height: 56px;
+  }
+}
