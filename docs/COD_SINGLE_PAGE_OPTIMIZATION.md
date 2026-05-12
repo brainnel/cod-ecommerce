@@ -1,6 +1,6 @@
 # COD 单页优化维护记录
 
-更新时间：2026-05-12 23:34 CST
+更新时间：2026-05-13 00:08 CST
 
 这个文档用于维护 COD ecommerce 单页优化的历史轨迹。后续如果对下单页、商品详情页、地图定位、埋点、后台漏斗分析、大区排序等做了重要调整，先把关键结论追加到这里。上下文压缩后，优先读这个文件恢复背景。
 
@@ -88,6 +88,13 @@
 - “表单校验失败”更适合作为辅助诊断指标，说明有多少用户在提交前遇到过信息不完整或格式不对。
 - 如果要看真正因为表单校验卡住的人，应看 `submit_validation_failed` 且没有后续 `submit_order_click/order_create_success` 的 session。
 
+后台已拆分成：
+
+- 已修正下单：同一个 checkout session 先触发 `submit_validation_failed`，之后又触发 `submit_order_click`。
+- 未修正流失：同一个 checkout session 触发过 `submit_validation_failed`，但之后没有触发 `submit_order_click`。
+
+2026-05-13 00:08 CST 查询近 7 天时，信息不完整拦截 47 个 session，其中已修正下单 42，未修正流失 5。
+
 ## 已完成改动
 
 ### 2026-05-12
@@ -118,6 +125,9 @@
   - `src/components/MapSelector.jsx` 增加 `gestureHandling: 'greedy'`。
   - `cod-ecommerce` commit `9d050ea` 已推送 `main`。
 - 大区卡片排序按历史 COD 网页订单量固定写入 `local_pallet.districts.sort_order`，无需代码部署。
+- 后台“表单校验失败”拆成“已修正下单 / 未修正流失”：
+  - 后端 checkout funnel summary 新增 `validation_fixed_submit_sessions`、`validation_fixed_success_sessions`、`validation_unresolved_sessions` 以及对应比例。
+  - 管理端顶部卡片用“已修正下单”和“未修正流失”替换原先单个“表单校验失败”卡片。
 
 ## 验证方式
 
