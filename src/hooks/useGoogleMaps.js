@@ -8,5 +8,7 @@ export function useGoogleMaps() {
     id: 'google-map-script',
     googleMapsApiKey: GOOGLE_MAPS_API_KEY,
     libraries: LIBRARIES,
+    language: 'fr',
+    region: 'CI',
   })
 }
