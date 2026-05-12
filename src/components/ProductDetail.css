@@ -88,6 +88,37 @@
   justify-content: center;
   height: 50vh;
   padding: 20px;
+  text-align: center;
+}
+
+.error-container p {
+  color: #555;
+  font-size: 16px;
+  line-height: 1.5;
+  margin: 0 0 18px;
+}
+
+.error-home-btn {
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #ff6b35, #f7931e);
+  color: #fff;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 700;
+  min-width: 190px;
+  padding: 12px 22px;
+  box-shadow: 0 10px 24px rgba(255, 107, 53, 0.24);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.error-home-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 28px rgba(255, 107, 53, 0.3);
+}
+
+.error-home-btn:active {
+  transform: translateY(0);
 }
 
 .loading-spinner {

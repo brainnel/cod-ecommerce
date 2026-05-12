@@ -120,6 +120,9 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
     return (
       <div className="error-container">
         <p>{error}</p>
+        <button type="button" className="error-home-btn" onClick={() => navigate('/')}>
+          Voir d'autres produits
+        </button>
       </div>
     );
   }
@@ -128,6 +131,9 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
     return (
       <div className="error-container">
         <p>Les informations produit n'existent pas</p>
+        <button type="button" className="error-home-btn" onClick={() => navigate('/')}>
+          Voir d'autres produits
+        </button>
       </div>
     );
   }
