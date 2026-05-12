@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Pagination, Navigation } from 'swiper/modules';
 import { useNavigate } from 'react-router-dom';
@@ -37,6 +37,10 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
   const [variants, setVariants] = useState([]);
   const navigate = useNavigate();
   const viewTrackedProductRef = useRef(null);
+
+  useLayoutEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }, [productId]);
 
   useEffect(() => {
     const fetchData = async () => {

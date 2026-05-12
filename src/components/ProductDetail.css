@@ -141,7 +141,7 @@
   position: relative;
   width: 100%;
   height: 375px;
-  background: #f8f8f8;
+  background: #fff;
 }
 
 .product-detail-main,
@@ -166,7 +166,8 @@
 .image-container img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  background: #fff;
 }
 
 /* 折扣标签 */
