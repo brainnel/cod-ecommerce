@@ -446,7 +446,7 @@ export default function UpdateAddress() {
             <div className="location-hint">
               <div className="hint-content">
                 <span className="hint-text">
-                  Cliquez sur la carte pour marquer votre adresse de livraison
+                  Si votre position actuelle est votre adresse de livraison, cliquez sur « Utiliser ma position actuelle ». Sinon, veuillez sélectionner votre position manuellement.
                 </span>
               </div>
               <button 
@@ -463,6 +463,7 @@ export default function UpdateAddress() {
                   <line x1="2" y1="12" x2="4" y2="12"/>
                   <line x1="20" y1="12" x2="22" y2="12"/>
                 </svg>
+                <span>Utiliser ma position actuelle</span>
               </button>
             </div>
             

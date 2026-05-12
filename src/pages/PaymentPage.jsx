@@ -338,7 +338,7 @@ const PaymentPage = () => {
             <div className="location-hint">
               <div className="hint-content">
                 <span className="hint-text">
-                  Si vous serez à cette adresse dans les 24 prochaines heures, cliquez sur le bouton à droite pour utiliser votre position actuelle. Nous vous contacterons pour la livraison dans les 24 heures suivant votre commande.
+                  Si votre position actuelle est votre adresse de livraison, cliquez sur « Utiliser ma position actuelle ». Sinon, veuillez sélectionner votre position manuellement.
                 </span>
               </div>
               <button 
@@ -352,6 +352,7 @@ const PaymentPage = () => {
                   }
                 }}
                 type="button"
+                title="Utiliser ma position actuelle"
               >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <circle cx="12" cy="12" r="10"/>
@@ -361,6 +362,7 @@ const PaymentPage = () => {
                   <line x1="2" y1="12" x2="4" y2="12"/>
                   <line x1="20" y1="12" x2="22" y2="12"/>
                 </svg>
+                <span>Utiliser ma position actuelle</span>
               </button>
             </div>
             

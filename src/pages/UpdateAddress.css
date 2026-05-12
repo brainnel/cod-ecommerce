@@ -298,19 +298,24 @@
   background: #FF6B35;
   color: white;
   border: none;
-  padding: 0.75rem;
-  border-radius: 50%;
+  min-height: 44px;
+  padding: 0.75rem 1rem;
+  border-radius: 999px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 0.5rem;
   transition: all 0.3s;
   flex-shrink: 0;
+  font-size: 0.875rem;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .update-address-page .use-location-btn:hover {
   background: #e55a28;
-  transform: scale(1.1);
+  transform: translateY(-1px);
 }
 
 .update-address-page .use-location-btn:disabled {
@@ -574,7 +579,9 @@
   }
 
   .update-address-page .use-location-btn {
-    align-self: center;
+    align-self: stretch;
+    white-space: normal;
+    width: 100%;
   }
 }
 
