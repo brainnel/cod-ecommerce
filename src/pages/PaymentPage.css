@@ -889,6 +889,39 @@
     grid-template-columns: 1fr;
     gap: 16px;
   }
+
+  .district-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .district-card {
+    min-width: 0;
+    min-height: 78px;
+    padding: 12px;
+  }
+
+  .district-icon {
+    width: 38px;
+    height: 38px;
+    margin-right: 8px;
+    font-size: 18px;
+  }
+
+  .district-name {
+    font-size: 14px;
+    line-height: 1.25;
+  }
+
+  .district-city {
+    font-size: 12px;
+  }
+
+  .district-arrow {
+    margin-left: 4px;
+    font-size: 18px;
+  }
   
   .step-actions {
     flex-direction: column;
@@ -910,6 +943,35 @@
   
   .section {
     padding: 12px;
+  }
+
+  .district-list {
+    gap: 8px;
+  }
+
+  .district-card {
+    min-height: 72px;
+    padding: 10px;
+    border-radius: 10px;
+  }
+
+  .district-icon {
+    width: 32px;
+    height: 32px;
+    margin-right: 7px;
+    font-size: 16px;
+  }
+
+  .district-name {
+    font-size: 13px;
+  }
+
+  .district-city {
+    font-size: 11px;
+  }
+
+  .district-arrow {
+    font-size: 16px;
   }
   
   .pickup-location {
