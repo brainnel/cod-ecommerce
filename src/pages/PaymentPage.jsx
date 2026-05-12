@@ -16,6 +16,10 @@ import MapGuideModal from '../components/MapGuideModal'
 import { DISTRICT_CENTERS, DEFAULT_CENTER, DEFAULT_ZOOM } from '../constants/districtCenters'
 import './PaymentPage.css'
 
+const GEOLOCATION_CACHE_MAX_AGE_MS = 5 * 60 * 1000
+const GEOLOCATION_FAST_TIMEOUT_MS = 4000
+const GEOLOCATION_HIGH_TIMEOUT_MS = 8000
+
 const PaymentPage = () => {
   const location = useLocation()
   const navigate = useNavigate()
@@ -24,6 +28,9 @@ const PaymentPage = () => {
   const checkoutSessionIdRef = useRef(routeCheckoutSessionId || null)
   const infoStepTrackedRef = useRef(false)
   const completedFieldsRef = useRef(new Set())
+  const currentLocationRequestRef = useRef(0)
+  const currentLocationTrackedRequestRef = useRef(null)
+  const markerSelectionSourceRef = useRef('none')
 
   // 三步流程：1=选大区, 2=地图标记, 3=填写信息
   const [currentStep, setCurrentStep] = useState(1)
@@ -38,6 +45,8 @@ const PaymentPage = () => {
   const [mapZoom, setMapZoom] = useState(DEFAULT_ZOOM)
   const [customMarker, setCustomMarker] = useState(null)
   const [userLocation, setUserLocation] = useState(null)  // 用户当前位置
+  const [locationRequestStatus, setLocationRequestStatus] = useState('idle')
+  const [locationRequestMessage, setLocationRequestMessage] = useState('')
   const [showGuideModal, setShowGuideModal] = useState(false)
 
   // 步骤3：用户信息
@@ -175,57 +184,118 @@ const PaymentPage = () => {
     fetchDistricts()
   }, [])
 
-  // 获取用户当前位置
-  const getUserLocation = ({ selectCurrentLocation = false } = {}) => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const userPos = {
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          }
-          setUserLocation(userPos)
-          if (selectCurrentLocation) {
-            setCustomMarker(userPos)
-            setMapCenter(userPos)
-            trackPaymentEvent('location_selected', {
-              ...getDistrictAnalyticsProps(),
-              location_method: 'current_location'
-            })
-          }
-          console.log('用户位置:', userPos)
-        },
-        (error) => {
-          console.log('无法获取位置:', error.message)
-          if (selectCurrentLocation) {
-            trackPaymentEvent('location_current_failed', {
-              ...getDistrictAnalyticsProps(),
-              error_code: error.code || null
-            })
-          }
-          // 不显示错误，只是不显示用户位置标记
-        },
-        {
-          enableHighAccuracy: true,
-          timeout: 5000,
-          maximumAge: 0
-        }
-      )
+  const requestBrowserLocation = (options) => (
+    new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject({ code: 2, message: 'Geolocation is not supported' })
+        return
+      }
+
+      navigator.geolocation.getCurrentPosition(resolve, reject, options)
+    })
+  )
+
+  const positionToMarker = (position) => ({
+    lat: position.coords.latitude,
+    lng: position.coords.longitude
+  })
+
+  const applyCurrentLocation = (position, requestId, stage) => {
+    if (requestId !== currentLocationRequestRef.current) return false
+
+    const userPos = positionToMarker(position)
+    setUserLocation(userPos)
+
+    if (markerSelectionSourceRef.current === 'manual') {
+      console.log('用户已手动选择位置，跳过自动覆盖:', userPos)
+      return false
     }
+
+    markerSelectionSourceRef.current = 'current'
+    setCustomMarker(userPos)
+    setMapCenter(userPos)
+    setLocationRequestStatus('success')
+    setLocationRequestMessage('Position trouvée. Vous pouvez ajuster sur la carte si nécessaire.')
+
+    if (currentLocationTrackedRequestRef.current !== requestId) {
+      currentLocationTrackedRequestRef.current = requestId
+      trackPaymentEvent('location_selected', {
+        ...getDistrictAnalyticsProps(),
+        location_method: 'current_location',
+        geolocation_stage: stage
+      })
+    }
+
+    console.log('用户位置:', userPos)
+    return true
+  }
+
+  const trackCurrentLocationFailure = (error, requestId, stage) => {
+    if (requestId !== currentLocationRequestRef.current) return
+    if (currentLocationTrackedRequestRef.current === requestId) return
+
+    trackPaymentEvent('location_current_failed', {
+      ...getDistrictAnalyticsProps(),
+      error_code: error?.code || 2,
+      geolocation_stage: stage
+    })
+  }
+
+  const runHighAccuracyLocation = (requestId) => {
+    requestBrowserLocation({
+      enableHighAccuracy: true,
+      timeout: GEOLOCATION_HIGH_TIMEOUT_MS,
+      maximumAge: GEOLOCATION_CACHE_MAX_AGE_MS
+    })
+      .then((position) => {
+        applyCurrentLocation(position, requestId, 'high_accuracy')
+      })
+      .catch((error) => {
+        console.log('高精度定位失败:', error.message)
+        trackCurrentLocationFailure(error, requestId, 'high_accuracy')
+        if (
+          requestId === currentLocationRequestRef.current &&
+          currentLocationTrackedRequestRef.current !== requestId &&
+          markerSelectionSourceRef.current !== 'manual'
+        ) {
+          setLocationRequestStatus('failed')
+          setLocationRequestMessage('Impossible d’obtenir votre position. Veuillez sélectionner votre position sur la carte.')
+        }
+      })
   }
 
   const handleUseCurrentLocation = () => {
+    const requestId = currentLocationRequestRef.current + 1
+    currentLocationRequestRef.current = requestId
+    currentLocationTrackedRequestRef.current = null
+    markerSelectionSourceRef.current = 'current_pending'
+    setLocationRequestStatus('locating')
+    setLocationRequestMessage('Recherche de votre position...')
+    trackPaymentEvent('location_current_attempt', getDistrictAnalyticsProps())
+
     if (userLocation) {
-      setCustomMarker(userLocation)
-      setMapCenter(userLocation)
-      trackPaymentEvent('location_selected', {
-        ...getDistrictAnalyticsProps(),
-        location_method: 'current_location'
-      })
+      applyCurrentLocation({ coords: { latitude: userLocation.lat, longitude: userLocation.lng } }, requestId, 'cached')
+      runHighAccuracyLocation(requestId)
       return
     }
 
-    getUserLocation({ selectCurrentLocation: true })
+    requestBrowserLocation({
+      enableHighAccuracy: false,
+      timeout: GEOLOCATION_FAST_TIMEOUT_MS,
+      maximumAge: GEOLOCATION_CACHE_MAX_AGE_MS
+    })
+      .then((position) => {
+        applyCurrentLocation(position, requestId, 'fast')
+        runHighAccuracyLocation(requestId)
+      })
+      .catch((error) => {
+        console.log('快速定位失败:', error.message)
+        if (requestId === currentLocationRequestRef.current) {
+          setLocationRequestStatus('slow')
+          setLocationRequestMessage('La localisation prend plus de temps. Vous pouvez sélectionner votre position sur la carte.')
+        }
+        runHighAccuracyLocation(requestId)
+      })
   }
 
   // 选择大区
@@ -247,9 +317,6 @@ const PaymentPage = () => {
     setMapCenter(districtCenter)
     setMapZoom(14)  // 大区级别，用更高的缩放
     
-    // 获取用户当前位置
-    getUserLocation()
-    
     setCurrentStep(2)
     // 显示引导动画
     setTimeout(() => setShowGuideModal(true), 500)
@@ -257,6 +324,9 @@ const PaymentPage = () => {
 
   // 地图标记
   const handleMapClick = (marker) => {
+    markerSelectionSourceRef.current = 'manual'
+    setLocationRequestStatus('idle')
+    setLocationRequestMessage('')
     setCustomMarker(marker)
     trackPaymentEvent('location_selected', {
       ...getDistrictAnalyticsProps(),
@@ -508,8 +578,9 @@ const PaymentPage = () => {
                 </span>
               </div>
               <button 
-                className="use-location-btn"
+                className={`use-location-btn ${locationRequestStatus === 'locating' || locationRequestStatus === 'slow' ? 'loading' : ''}`}
                 onClick={handleUseCurrentLocation}
+                disabled={locationRequestStatus === 'locating' || locationRequestStatus === 'slow'}
                 type="button"
                 title="Utiliser ma position actuelle"
               >
@@ -521,9 +592,19 @@ const PaymentPage = () => {
                   <line x1="2" y1="12" x2="4" y2="12"/>
                   <line x1="20" y1="12" x2="22" y2="12"/>
                 </svg>
-                <span>Utiliser ma position actuelle</span>
+                <span>
+                  {locationRequestStatus === 'locating' || locationRequestStatus === 'slow'
+                    ? 'Recherche de position...'
+                    : 'Utiliser ma position actuelle'}
+                </span>
               </button>
             </div>
+
+            {locationRequestMessage && (
+              <div className={`location-status ${locationRequestStatus}`}>
+                {locationRequestMessage}
+              </div>
+            )}
             
             {selectedDistrict && (
               <div className="district-info-badge">

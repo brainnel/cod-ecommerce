@@ -200,6 +200,16 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
+.use-location-btn:disabled {
+  cursor: wait;
+  opacity: 0.85;
+  transform: none;
+}
+
+.use-location-btn.loading svg {
+  animation: spin 1s linear infinite;
+}
+
 .use-location-btn:active {
   transform: translateY(0);
 }
@@ -214,6 +224,37 @@
   }
   50% {
     opacity: 0.6;
+  }
+}
+
+.location-status {
+  border-radius: 8px;
+  margin: -8px 0 16px 0;
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.4;
+  font-weight: 600;
+}
+
+.location-status.locating,
+.location-status.slow {
+  background: #fff7ed;
+  color: #9a3412;
+}
+
+.location-status.success {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.location-status.failed {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
   }
 }
 
