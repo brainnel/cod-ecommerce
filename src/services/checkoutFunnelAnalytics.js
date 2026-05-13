@@ -7,6 +7,7 @@ const SESSION_ID_STORAGE_KEY = 'cod_checkout_session_id'
 const SESSION_CONTEXT_STORAGE_KEY = 'cod_checkout_context'
 const AD_ID_STORAGE_KEY = 'facebook_ad_id'
 const CHECKOUT_FLOW = 'cod_checkout'
+const PENDING_CHECKOUT_REUSE_MS = 10 * 60 * 1000
 
 const safeGetStorage = (storage, key) => {
   try {
@@ -77,6 +78,26 @@ const saveCheckoutContext = (context) => {
   safeSetStorage(window.sessionStorage, SESSION_CONTEXT_STORAGE_KEY, JSON.stringify(context))
 }
 
+const parseStoredTimestamp = (value) => {
+  if (!value) return null
+  const timestamp = Date.parse(value)
+  return Number.isNaN(timestamp) ? null : timestamp
+}
+
+const sameValue = (left, right) => String(left || '') === String(right || '')
+
+const canReusePendingCheckoutSession = (existingContext, nextContext) => {
+  if (!existingContext?.checkout_started_at) return false
+  if (existingContext.quantity_confirmed_at) return false
+  if (!sameValue(existingContext.product_id, nextContext.product_id)) return false
+  if (!sameValue(existingContext.ad_id, nextContext.ad_id)) return false
+  if (!sameValue(existingContext.product_type, nextContext.product_type)) return false
+
+  const startedAt = parseStoredTimestamp(existingContext.checkout_started_at)
+  if (!startedAt) return false
+  return Date.now() - startedAt <= PENDING_CHECKOUT_REUSE_MS
+}
+
 const getSku = (product) => {
   if (!product?.skus || product.skus.length === 0) return null
   return product.skus[0]
@@ -117,7 +138,10 @@ export const startLandingSession = (product, extra = {}) => {
 
 export const startCheckoutSession = (product, extra = {}) => {
   const checkoutSessionId = createId('checkout')
-  const context = buildCheckoutProductProperties(product, extra)
+  const context = {
+    ...buildCheckoutProductProperties(product, extra),
+    checkout_started_at: extra.checkout_started_at || new Date().toISOString()
+  }
 
   if (typeof window !== 'undefined') {
     safeSetStorage(window.sessionStorage, SESSION_ID_STORAGE_KEY, checkoutSessionId)
@@ -186,12 +210,20 @@ export const trackCheckoutEvent = (eventName, properties = {}, options = {}) => 
   if (!sessionId) return null
 
   const context = getCheckoutContext()
+  const trackedAt = new Date().toISOString()
   const eventProperties = {
     ...context,
     ...properties,
     checkout_flow: CHECKOUT_FLOW,
     event_id: createId('event'),
     ...getPageProperties()
+  }
+
+  if (eventName === 'quantity_confirmed') {
+    saveCheckoutContext({
+      ...eventProperties,
+      quantity_confirmed_at: trackedAt
+    })
   }
 
   sendAnalyticsPayload({
@@ -241,6 +273,19 @@ export const trackProductLandingView = (product, extra = {}) => {
 }
 
 export const beginCheckoutFunnel = (product, extra = {}) => {
+  const nextContext = buildCheckoutProductProperties(product, extra)
+  const existingSessionId = getCheckoutSessionId()
+  const existingContext = getCheckoutContext()
+
+  if (existingSessionId && canReusePendingCheckoutSession(existingContext, nextContext)) {
+    saveCheckoutContext({
+      ...existingContext,
+      ...nextContext,
+      checkout_started_at: existingContext.checkout_started_at
+    })
+    return existingSessionId
+  }
+
   const sessionId = startCheckoutSession(product, extra)
   trackCheckoutEvent('checkout_start', buildCheckoutProductProperties(product, extra), { sessionId })
   return sessionId
