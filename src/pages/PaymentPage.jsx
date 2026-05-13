@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { districtAPI, orderAPI } from '../services/api'
+import { districtAPI, orderAPI, bundleAPI } from '../services/api'
 import { useAdId } from '../hooks/useAdTrackingHooks.js'
 import { trackPurchaseEvent, getClientInfo } from '../services/facebookConversions'
 import {
@@ -23,7 +23,35 @@ const GEOLOCATION_FAST_TIMEOUT_MS = 6000
 const PaymentPage = () => {
   const location = useLocation()
   const navigate = useNavigate()
-  const { product, quantity, checkoutSessionId: routeCheckoutSessionId } = location.state || {}
+  const {
+    product: productFromState,
+    bundle: bundleFromState,
+    quantity,
+    productType: productTypeFromState,
+    checkoutSessionId: routeCheckoutSessionId
+  } = location.state || {}
+
+  // Detect flow: 'bundle' or 'product' (default).
+  const productType = productTypeFromState || (bundleFromState ? 'bundle' : 'product')
+  const isBundleFlow = productType === 'bundle'
+
+  // In bundle flow, build a synthetic product-like object so the rest of the page
+  // (analytics, price calculations, summary rendering) can stay product-shaped.
+  const product = useMemo(() => {
+    if (isBundleFlow && bundleFromState) {
+      return {
+        product_id: `bundle:${bundleFromState.id}`,
+        name_fr: bundleFromState.title_fr,
+        price: bundleFromState.cfa_price,
+        image_url: bundleFromState.cover_image_url ? [bundleFromState.cover_image_url] : [],
+        stock: 99,
+        skus: []
+      }
+    }
+    return productFromState
+  }, [isBundleFlow, bundleFromState, productFromState])
+
+  const bundle = isBundleFlow ? bundleFromState : null
   const adId = useAdId()
   const checkoutSessionIdRef = useRef(routeCheckoutSessionId || null)
   const infoStepTrackedRef = useRef(false)
@@ -474,34 +502,55 @@ const PaymentPage = () => {
     
     trackPaymentEvent('submit_order_click', getDistrictAnalyticsProps())
     setIsPlacingOrder(true)
-    
-    try {
-      const orderData = {
-        items: [{
-          product_id: product.product_id.toString(),
-          sku_id: product.skus && product.skus.length > 0 ? product.skus[0].sku_id : product.product_id.toString(),
-          quantity: quantity,
-          unit_price: product.price,
-          total_price: product.price * quantity
-        }],
-        district_id: selectedDistrict.id,
-        full_name: userInfo.fullName,
-        phone: `225${userInfo.phone}`,
-        whatsapp: `225${userInfo.whatsapp}`,
-        receiver_address: userInfo.addressDescription,
-        latitude: customMarker.lat,
-        longitude: customMarker.lng,
-        payment_method: "cod",
-        total_amount: product.price * quantity,
-        actual_amount: product.price * quantity,
-        discount_amount: 0,
-        currency: "FCFA",
-        is_web: 1,
-        ad_id: adId
-      }
 
-      console.log('提交订单:', orderData)
-      const response = await orderAPI.createOrder(orderData)
+    try {
+      let response
+      if (isBundleFlow && bundle) {
+        // Bundle flow: backend builds child SKU items from bundle definition.
+        const bundleOrderData = {
+          district_id: selectedDistrict.id,
+          full_name: userInfo.fullName,
+          phone: `225${userInfo.phone}`,
+          whatsapp: `225${userInfo.whatsapp}`,
+          receiver_address: userInfo.addressDescription,
+          latitude: customMarker.lat,
+          longitude: customMarker.lng,
+          payment_method: "cod",
+          currency: "FCFA",
+          is_web: 1,
+          quantity,
+          ad_id: adId
+        }
+        console.log('提交组合产品订单:', bundleOrderData)
+        response = await bundleAPI.createBundleOrder(bundle.id, bundleOrderData)
+      } else {
+        const orderData = {
+          items: [{
+            product_id: product.product_id.toString(),
+            sku_id: product.skus && product.skus.length > 0 ? product.skus[0].sku_id : product.product_id.toString(),
+            quantity: quantity,
+            unit_price: product.price,
+            total_price: product.price * quantity
+          }],
+          district_id: selectedDistrict.id,
+          full_name: userInfo.fullName,
+          phone: `225${userInfo.phone}`,
+          whatsapp: `225${userInfo.whatsapp}`,
+          receiver_address: userInfo.addressDescription,
+          latitude: customMarker.lat,
+          longitude: customMarker.lng,
+          payment_method: "cod",
+          total_amount: product.price * quantity,
+          actual_amount: product.price * quantity,
+          discount_amount: 0,
+          currency: "FCFA",
+          is_web: 1,
+          ad_id: adId
+        }
+
+        console.log('提交订单:', orderData)
+        response = await orderAPI.createOrder(orderData)
+      }
       console.log('订单响应:', response)
 
       // 发送Facebook购买事件

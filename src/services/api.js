@@ -165,6 +165,43 @@ export const districtAPI = {
   }
 }
 
+// 组合产品相关接口
+export const bundleAPI = {
+  // 获取组合产品详情
+  getBundleDetail: async (bundleId) => {
+    try {
+      const response = await api.get(`/api/flash-local/bundles/${bundleId}`)
+      return response.data
+    } catch (error) {
+      console.error('获取组合产品详情失败:', error)
+      throw error
+    }
+  },
+
+  // 创建组合产品订单
+  createBundleOrder: async (bundleId, orderData) => {
+    try {
+      const requestData = {
+        ...orderData,
+        ad_id: orderData.ad_id || null
+      }
+
+      if (import.meta.env.VITE_ENABLE_CONSOLE_LOGS === 'true') {
+        console.log('=== 创建组合产品订单请求数据 ===')
+        console.log('Bundle ID:', bundleId)
+        console.log('请求数据:', JSON.stringify(requestData, null, 2))
+        console.log('================================')
+      }
+
+      const response = await api.post(`/api/flash-local/bundles/${bundleId}/create-order`, requestData)
+      return response
+    } catch (error) {
+      console.error('创建组合产品订单失败:', error)
+      throw error
+    }
+  }
+}
+
 // 订单相关接口
 export const orderAPI = {
   // 创建订单
