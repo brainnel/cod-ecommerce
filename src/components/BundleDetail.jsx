@@ -1,8 +1,10 @@
-import { useState, useEffect, useLayoutEffect } from 'react'
+import { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Swiper, SwiperSlide } from 'swiper/react'
 import { Pagination, Navigation } from 'swiper/modules'
 import { bundleAPI } from '../services/api'
+import { beginCheckoutFunnel, trackProductLandingView } from '../services/checkoutFunnelAnalytics'
+import { useAdTrackingContext } from '../hooks/useAdTrackingHooks.js'
 import ServiceInfo from './ServiceInfo'
 import logoImage from '../assets/logo.png'
 
@@ -28,10 +30,25 @@ const formatFcfa = (value) => {
 
 const BundleDetail = ({ bundleId, initialBundle = null }) => {
   const navigate = useNavigate()
+  const { adId, isLoading: adTrackingLoading } = useAdTrackingContext()
   const [bundle, setBundle] = useState(initialBundle)
   const [loading, setLoading] = useState(!initialBundle)
   const [error, setError] = useState(null)
   const [quantity, setQuantity] = useState(1)
+  const viewTrackedBundleRef = useRef(null)
+
+  const bundleProduct = useMemo(() => {
+    if (!bundle) return null
+    return {
+      product_id: `bundle:${bundle.id}`,
+      name_fr: bundle.title_fr,
+      price: bundle.cfa_price,
+      image_url: bundle.cover_image_url ? [bundle.cover_image_url] : [],
+      stock: 99,
+      skus: [],
+      product_type: 'bundle'
+    }
+  }, [bundle])
 
   useLayoutEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
@@ -67,6 +84,25 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
       cancelled = true
     }
   }, [bundleId, initialBundle])
+
+  useEffect(() => {
+    if (!bundleProduct || !bundle?.id) return
+    if (adTrackingLoading) return
+
+    const trackingKey = String(bundle.id)
+    if (viewTrackedBundleRef.current === trackingKey) return
+    viewTrackedBundleRef.current = trackingKey
+
+    try {
+      trackProductLandingView(bundleProduct, {
+        ad_id: adId,
+        product_type: 'bundle',
+        bundle_id: String(bundle.id)
+      })
+    } catch (landingError) {
+      console.warn('bundle product_landing_view 埋点失败:', landingError)
+    }
+  }, [adId, adTrackingLoading, bundle?.id, bundleProduct])
 
   if (loading) {
     return (
@@ -106,11 +142,25 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
   }
 
   const handleBuyNow = () => {
+    let checkoutSessionId = null
+    try {
+      checkoutSessionId = beginCheckoutFunnel(bundleProduct, {
+        quantity,
+        total_price: totalPrice,
+        ad_id: adId,
+        product_type: 'bundle',
+        bundle_id: String(bundle.id)
+      })
+    } catch (error) {
+      console.warn('bundle checkout_start 埋点失败:', error)
+    }
+
     navigate('/payment', {
       state: {
         bundle,
         quantity,
-        productType: 'bundle'
+        productType: 'bundle',
+        checkoutSessionId
       }
     })
   }

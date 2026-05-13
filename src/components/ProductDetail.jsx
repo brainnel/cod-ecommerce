@@ -4,8 +4,8 @@ import { Pagination, Navigation } from 'swiper/modules';
 import { useNavigate } from 'react-router-dom';
 import { productAPI } from '../services/api';
 import { trackViewContentEvent, getClientInfo } from '../services/facebookConversions';
-import { beginCheckoutFunnel } from '../services/checkoutFunnelAnalytics';
-import { useAdId } from '../hooks/useAdTrackingHooks.js';
+import { beginCheckoutFunnel, trackProductLandingView } from '../services/checkoutFunnelAnalytics';
+import { useAdTrackingContext } from '../hooks/useAdTrackingHooks.js';
 import Countdown from './Countdown';
 import QuantityModal from './QuantityModal';
 import ServiceInfo from './ServiceInfo';
@@ -61,7 +61,7 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [variants, setVariants] = useState([]);
   const navigate = useNavigate();
-  const adId = useAdId();
+  const { adId, isLoading: adTrackingLoading } = useAdTrackingContext();
   const viewTrackedProductRef = useRef(null);
 
   useLayoutEffect(() => {
@@ -146,10 +146,21 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
 
   useEffect(() => {
     if (!product?.product_id) return;
+    if (adTrackingLoading) return;
 
     const trackingKey = product.product_id.toString();
     if (viewTrackedProductRef.current === trackingKey) return;
     viewTrackedProductRef.current = trackingKey;
+
+    try {
+      trackProductLandingView(product, {
+        ad_id: adId,
+        category_id: product.category_id,
+        product_type: 'product'
+      });
+    } catch (landingError) {
+      console.warn('product_landing_view 埋点失败:', landingError);
+    }
 
     try {
       trackViewContentEvent({
@@ -161,7 +172,7 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
     } catch (fbError) {
       console.warn('Facebook ViewContent 事件错误:', fbError);
     }
-  }, [product?.product_id, product?.price]);
+  }, [adId, adTrackingLoading, product, product?.product_id, product?.price]);
 
   if (loading) {
     return (

@@ -45,7 +45,8 @@ const PaymentPage = () => {
         price: bundleFromState.cfa_price,
         image_url: bundleFromState.cover_image_url ? [bundleFromState.cover_image_url] : [],
         stock: 99,
-        skus: []
+        skus: [],
+        product_type: 'bundle'
       }
     }
     return productFromState

@@ -192,6 +192,11 @@
   - 如果后续出现 `order_create_success`，计入“重试后成功”。
   - 如果后续没有成功事件，计入“未成功”。
   - 管理端顶部卡片展示异常总人数、占最终点下单比例、重试后成功人数和未成功人数，避免把短暂接口异常误读成最终失败订单。
+- 新增“落地页转下单”独立模块：
+  - 前端商品落地页加载成功后发 `product_landing_view`，下架 404 页不计入。
+  - 每次落地页访问生成 `landing_session_id`；后续 `checkout_start` 继续用 `checkout_session_id`，但属性里带同一个 `landing_session_id`。
+  - 后端按 `landing_session_id` 去重统计落地页访问、点击下单和落地页到下单率。
+  - 管理端把该模块放在主漏斗上方，商品/广告维度展示落地页访问、点击下单和下单率；该模块不参与 checkout 主漏斗，也不受 District ID 筛选影响。
 
 ## 验证方式
 

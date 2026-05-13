@@ -2,6 +2,7 @@ import { buildApiUrl } from '../config/api.config.js'
 
 const ANALYTICS_ENDPOINT = '/api/vite/analytics/events'
 const DEVICE_ID_STORAGE_KEY = 'cod_checkout_device_id'
+const LANDING_SESSION_ID_STORAGE_KEY = 'cod_landing_session_id'
 const SESSION_ID_STORAGE_KEY = 'cod_checkout_session_id'
 const SESSION_CONTEXT_STORAGE_KEY = 'cod_checkout_context'
 const AD_ID_STORAGE_KEY = 'facebook_ad_id'
@@ -47,6 +48,11 @@ export const getCheckoutSessionId = () => {
   return safeGetStorage(window.sessionStorage, SESSION_ID_STORAGE_KEY)
 }
 
+export const getLandingSessionId = () => {
+  if (typeof window === 'undefined') return null
+  return safeGetStorage(window.sessionStorage, LANDING_SESSION_ID_STORAGE_KEY)
+}
+
 const getStoredAdId = () => {
   if (typeof window === 'undefined') return null
   return safeGetStorage(window.localStorage, AD_ID_STORAGE_KEY)
@@ -86,6 +92,9 @@ export const buildCheckoutProductProperties = (product, extra = {}) => {
     product_id: product?.product_id ? String(product.product_id) : extra.product_id || null,
     product_name: product?.name_fr || extra.product_name || null,
     internal_no: product?.internal_no || extra.internal_no || null,
+    category_id: product?.category_id ? String(product.category_id) : extra.category_id || null,
+    product_type: extra.product_type || product?.product_type || 'product',
+    landing_session_id: extra.landing_session_id || getLandingSessionId() || null,
     sku_id: sku?.sku_id ? String(sku.sku_id) : extra.sku_id || (product?.product_id ? String(product.product_id) : null),
     sku_name: sku?.name_fr || extra.sku_name || null,
     quantity,
@@ -94,6 +103,16 @@ export const buildCheckoutProductProperties = (product, extra = {}) => {
     currency: extra.currency || 'FCFA',
     ad_id: extra.ad_id || getStoredAdId() || null
   }
+}
+
+export const startLandingSession = (product, extra = {}) => {
+  const landingSessionId = createId('landing')
+
+  if (typeof window !== 'undefined') {
+    safeSetStorage(window.sessionStorage, LANDING_SESSION_ID_STORAGE_KEY, landingSessionId)
+  }
+
+  return landingSessionId
 }
 
 export const startCheckoutSession = (product, extra = {}) => {
@@ -190,6 +209,35 @@ export const trackCheckoutEvent = (eventName, properties = {}, options = {}) => 
   })
 
   return sessionId
+}
+
+export const trackProductLandingView = (product, extra = {}) => {
+  const landingSessionId = startLandingSession(product, extra)
+  const eventProperties = {
+    ...buildCheckoutProductProperties(product, {
+      ...extra,
+      landing_session_id: landingSessionId
+    }),
+    checkout_flow: CHECKOUT_FLOW,
+    event_id: createId('event'),
+    ...getPageProperties()
+  }
+
+  sendAnalyticsPayload({
+    device_id: getCheckoutDeviceId(),
+    platform: 'web',
+    app_version: 'cod-ecommerce-web',
+    events: [
+      {
+        event_name: 'product_landing_view',
+        session_id: landingSessionId,
+        timestamp: new Date().toISOString(),
+        properties: eventProperties
+      }
+    ]
+  })
+
+  return landingSessionId
 }
 
 export const beginCheckoutFunnel = (product, extra = {}) => {
