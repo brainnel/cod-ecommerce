@@ -574,7 +574,7 @@ const PaymentPage = () => {
             <div className="location-hint">
               <div className="hint-content">
                 <span className="hint-text">
-                  Adresse actuelle ? Appuyez sur « Utiliser ma position ». Sinon, touchez la carte.
+                  Si vous êtes à l’adresse de livraison, appuyez sur « Utiliser ma position ». Sinon, choisissez l’adresse sur la carte.
                 </span>
               </div>
               <button 
