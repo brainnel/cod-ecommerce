@@ -187,6 +187,11 @@
   - 404 JSON 额外返回 `category_id` 和 `product_id`，前端用 `category_id` 判断对应类目。
   - 下架页“Voir d'autres produits”按钮旁显示 3 秒倒计时；用户不操作时自动跳到 `/?category_id=...`，如果拿不到类目则回首页。
   - 首页支持读取 `category_id` URL 参数并自动选中对应类目 tab。
+- 管理端“接口失败”展示改为“接口异常”：
+  - 后端按同一个 checkout session 内的事件顺序拆分 `order_create_failed`。
+  - 如果后续出现 `order_create_success`，计入“重试后成功”。
+  - 如果后续没有成功事件，计入“未成功”。
+  - 管理端顶部卡片展示异常总人数、占最终点下单比例、重试后成功人数和未成功人数，避免把短暂接口异常误读成最终失败订单。
 
 ## 验证方式
 
