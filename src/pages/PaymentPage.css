@@ -272,23 +272,14 @@
   font-weight: 500;
 }
 
-.map-district-pill {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  z-index: 5;
-  display: inline-flex;
+.map-district-note {
+  display: flex;
   align-items: center;
   gap: 6px;
-  max-width: calc(100% - 20px);
-  padding: 7px 10px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.94);
-  color: #2f3742;
+  margin: 8px 2px 16px;
+  color: #5f6875;
   font-size: 13px;
-  font-weight: 700;
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.16);
-  backdrop-filter: blur(8px);
+  font-weight: 600;
 }
 
 .badge-icon {
@@ -996,17 +987,15 @@
     border-radius: 10px;
   }
 
-  .map-district-pill {
-    top: 8px;
-    left: 8px;
-    padding: 6px 9px;
-    font-size: 12px;
-  }
-
   .map-container {
     height: 360px;
     max-height: none;
-    margin-bottom: 86px;
+    margin-bottom: 0;
+  }
+
+  .map-district-note {
+    margin: 7px 2px 86px;
+    font-size: 12px;
   }
 
   .map-section .marker-info {
@@ -1188,6 +1177,10 @@
 
   .map-container {
     height: 280px;
+    margin-bottom: 0;
+  }
+
+  .map-district-note {
     margin-bottom: 78px;
   }
 

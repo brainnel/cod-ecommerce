@@ -607,12 +607,6 @@ const PaymentPage = () => {
             )}
             
             <div className="map-container">
-              {selectedDistrict && (
-                <div className="map-district-pill">
-                  <span className="badge-icon">📍</span>
-                  <span>{selectedDistrict.name} - {selectedDistrict.city_name}</span>
-                </div>
-              )}
               <MapSelector
                 center={mapCenter}
                 zoom={mapZoom}
@@ -621,6 +615,13 @@ const PaymentPage = () => {
                 userLocation={userLocation}
               />
             </div>
+
+            {selectedDistrict && (
+              <div className="map-district-note">
+                <span className="badge-icon">📍</span>
+                <span>{selectedDistrict.name} - {selectedDistrict.city_name}</span>
+              </div>
+            )}
 
             {customMarker && (
               <div className="marker-info">
