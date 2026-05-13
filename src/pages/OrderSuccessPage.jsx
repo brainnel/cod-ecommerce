@@ -2,6 +2,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import AppDownloadModal from '../components/AppDownloadModal'
 import { appDownloadAPI } from '../services/api'
+import { trackCheckoutEvent } from '../services/checkoutFunnelAnalytics'
 import './OrderSuccessPage.css'
 
 // 缓存下载链接，避免重复请求
@@ -10,7 +11,7 @@ let cachedDownloadLinks = null
 const OrderSuccessPage = () => {
   const location = useLocation()
   const navigate = useNavigate()
-  const { product, quantity, userInfo, selectedLocation, totalPrice } = location.state || {}
+  const { product, quantity, userInfo, selectedLocation, totalPrice, orderResponse } = location.state || {}
   const [isModalOpen, setIsModalOpen] = useState(false)
 
   useEffect(() => {
@@ -25,24 +26,33 @@ const OrderSuccessPage = () => {
     }
     
     // 打印后端返回的订单数据
-    if (location.state?.orderResponse) {
+    if (orderResponse) {
       console.log('=== 订单成功页面 - 后端返回数据 ===')
-      console.log('完整订单响应:', location.state.orderResponse)
-      console.log('订单号:', location.state.orderResponse.order_no)
-      console.log('订单ID:', location.state.orderResponse.order_id)
-      console.log('取件码:', location.state.orderResponse.verification_code)
-      console.log('用户ID:', location.state.orderResponse.user_id)
-      console.log('格式化订单数据:', JSON.stringify(location.state.orderResponse, null, 2))
+      console.log('完整订单响应:', orderResponse)
+      console.log('订单号:', orderResponse.order_no)
+      console.log('订单ID:', orderResponse.order_id)
+      console.log('取件码:', orderResponse.verification_code)
+      console.log('用户ID:', orderResponse.user_id)
+      console.log('格式化订单数据:', JSON.stringify(orderResponse, null, 2))
       console.log('=====================================')
     }
-  }, [product, quantity, userInfo, selectedLocation, navigate, location.state])
+  }, [product, quantity, userInfo, selectedLocation, navigate, orderResponse])
 
   const formatPrice = (price) => {
     return price.toString()
   }
 
 
+  const trackSuccessPageAction = (eventName) => {
+    trackCheckoutEvent(eventName, {
+      page_name: 'order_success',
+      order_id: orderResponse?.order_id ? String(orderResponse.order_id) : null,
+      order_no: orderResponse?.order_no || null
+    })
+  }
+
   const handleDownloadApp = () => {
+    trackSuccessPageAction('order_success_app_download_click')
     // 打开自定义弹窗
     setIsModalOpen(true)
   }
@@ -92,6 +102,7 @@ const OrderSuccessPage = () => {
   }
 
   const handleWhatsAppContact = () => {
+    trackSuccessPageAction('order_success_whatsapp_contact_click')
     const phoneNumber = '8615167909497'
     const whatsappUrl = `https://wa.me/${phoneNumber}`
     window.open(whatsappUrl, '_blank')

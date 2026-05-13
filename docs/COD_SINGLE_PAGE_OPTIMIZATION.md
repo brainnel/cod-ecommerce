@@ -1,6 +1,6 @@
 # COD 单页优化维护记录
 
-更新时间：2026-05-13 11:55 CST
+更新时间：2026-05-13 12:00 CST
 
 这个文档用于维护 COD ecommerce 单页优化的历史轨迹。后续如果对下单页、商品详情页、地图定位、埋点、后台漏斗分析、大区排序等做了重要调整，先把关键结论追加到这里。上下文压缩后，优先读这个文件恢复背景。
 
@@ -37,6 +37,7 @@
 - 管理端版本筛选使用北京时间展示版本窗口，但传给后端时要按 UTC 时间查 `vite_analytics_events.created_at`。数据库当前 `created_at` 与 `NOW()` 都是 UTC。
 - 主漏斗必须按 `checkout_start` cohort 统计：时间窗口先圈定窗口内点击下单的 checkout session，后续步骤只能统计这批 session。不能单纯按每一步事件发生时间过滤，否则窄版本窗口里会把上一个版本遗留到本窗口的后续事件算进来，出现到达率超过 100%。
 - 管理端版本筛选对外只保留粗粒度版本：`v1 埋点上线` 与 `v2 下一步按钮固定`。中间定位、地图、布局等细节留在维护记录里，不放进后台筛选下拉。
+- 订单成功预览页按钮点击率按 `order_create_success` 去重人数做分母，因为 App 下载和 WhatsApp 联系按钮只在下单成功后出现。两个事件分别是 `order_success_app_download_click` 和 `order_success_whatsapp_contact_click`，只进第一方 checkout 埋点，不发给 Meta Pixel。
 
 ### 定位方式
 
@@ -161,6 +162,10 @@
 - 管理端漏斗文案继续业务化：
   - 表单数据不全卡片中，“修正后下单”和“放弃”人数后面补百分比。
   - 主漏斗右侧从“上步流失 X% / Y 人未进入本步”改为“X% 的人未完成某个具体步骤 / Y 人流失”。
+- 订单成功预览页新增两个按钮点击埋点：
+  - App 下载按钮：`order_success_app_download_click`。
+  - WhatsApp 联系按钮：`order_success_whatsapp_contact_click`。
+  - 后台 summary 展示两个点击人数和占下单成功人数的点击率。
 
 ## 验证方式
 
