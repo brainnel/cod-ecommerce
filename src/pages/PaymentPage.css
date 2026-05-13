@@ -272,6 +272,25 @@
   font-weight: 500;
 }
 
+.map-district-pill {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: calc(100% - 20px);
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+  color: #2f3742;
+  font-size: 13px;
+  font-weight: 700;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.16);
+  backdrop-filter: blur(8px);
+}
+
 .badge-icon {
   font-size: 16px;
 }
@@ -506,6 +525,7 @@
   overflow: hidden;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   margin-bottom: 16px;
+  position: relative;
 }
 
 .marker-info {
@@ -884,6 +904,19 @@
 
 /* 响应式设计 */
 @media (max-width: 768px) {
+  .payment-header {
+    padding: 8px 12px;
+  }
+
+  .back-btn {
+    padding: 6px;
+    line-height: 1;
+  }
+
+  .payment-title {
+    font-size: 16px;
+  }
+
   .payment-content {
     padding: 10px 12px 96px;
   }
@@ -907,19 +940,20 @@
   }
   
   .steps-indicator {
-    padding: 10px 12px;
-    margin-bottom: 12px;
-    border-radius: 14px;
+    padding: 8px 10px;
+    margin-bottom: 10px;
+    border-radius: 12px;
   }
   
   .step {
-    min-width: 60px;
+    min-width: 54px;
   }
   
   .step-icon {
-    width: 30px;
-    height: 30px;
-    font-size: 13px;
+    width: 28px;
+    height: 28px;
+    margin-bottom: 4px;
+    font-size: 12px;
   }
   
   .step-label {
@@ -927,8 +961,8 @@
   }
   
   .step-divider {
-    max-width: 34px;
-    margin: 0 6px;
+    max-width: 32px;
+    margin: 0 5px;
   }
 
   .location-hint {
@@ -962,8 +996,15 @@
     border-radius: 10px;
   }
 
+  .map-district-pill {
+    top: 8px;
+    left: 8px;
+    padding: 6px 9px;
+    font-size: 12px;
+  }
+
   .map-container {
-    height: 320px;
+    height: 360px;
     max-height: none;
     margin-bottom: 86px;
   }
@@ -974,7 +1015,7 @@
 
   @supports (height: 100dvh) {
     .map-container {
-      height: clamp(240px, calc(100dvh - 420px), 360px);
+      height: clamp(280px, calc(100dvh - 365px), 420px);
     }
   }
   
@@ -1047,7 +1088,7 @@
 
 @media (max-width: 480px) {
   .payment-header {
-    padding: 12px 16px;
+    padding: 8px 12px;
   }
   
   .payment-title {
@@ -1055,7 +1096,7 @@
   }
   
   .payment-content {
-    padding: 12px;
+    padding: 8px 12px 96px;
   }
   
   .section {
@@ -1107,7 +1148,7 @@
 
 @media (max-width: 768px) and (max-height: 720px) {
   .payment-header {
-    padding: 10px 16px;
+    padding: 7px 12px;
   }
 
   .payment-content {
@@ -1115,13 +1156,13 @@
   }
 
   .steps-indicator {
-    padding: 8px 12px;
-    margin-bottom: 10px;
+    padding: 7px 10px;
+    margin-bottom: 8px;
   }
 
   .step-icon {
-    width: 28px;
-    height: 28px;
+    width: 26px;
+    height: 26px;
     font-size: 12px;
   }
 
@@ -1146,13 +1187,13 @@
   }
 
   .map-container {
-    height: 250px;
+    height: 280px;
     margin-bottom: 78px;
   }
 
   @supports (height: 100dvh) {
     .map-container {
-      height: clamp(230px, calc(100dvh - 410px), 300px);
+      height: clamp(250px, calc(100dvh - 380px), 310px);
     }
   }
 

@@ -606,14 +606,13 @@ const PaymentPage = () => {
               </div>
             )}
             
-            {selectedDistrict && (
-              <div className="district-info-badge">
-                <span className="badge-icon">📍</span>
-                <span>{selectedDistrict.name} - {selectedDistrict.city_name}</span>
-              </div>
-            )}
-
             <div className="map-container">
+              {selectedDistrict && (
+                <div className="map-district-pill">
+                  <span className="badge-icon">📍</span>
+                  <span>{selectedDistrict.name} - {selectedDistrict.city_name}</span>
+                </div>
+              )}
               <MapSelector
                 center={mapCenter}
                 zoom={mapZoom}
