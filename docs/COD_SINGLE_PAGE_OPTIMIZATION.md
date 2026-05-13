@@ -1,6 +1,6 @@
 # COD 单页优化维护记录
 
-更新时间：2026-05-13 12:00 CST
+更新时间：2026-05-13 12:38 CST
 
 这个文档用于维护 COD ecommerce 单页优化的历史轨迹。后续如果对下单页、商品详情页、地图定位、埋点、后台漏斗分析、大区排序等做了重要调整，先把关键结论追加到这里。上下文压缩后，优先读这个文件恢复背景。
 
@@ -44,7 +44,7 @@
 - `location_selected` + `location_method = current_location`：最终使用当前定位成功落点。
 - `location_selected` + `location_method = manual_map`：最终手动在地图上选择位置。
 - `location_current_attempt`：用户明确点击过“使用当前定位”按钮。
-- `location_current_failed`：浏览器定位失败或超时。
+- `location_current_failed`：浏览器定位失败或超时。2026-05-13 12:38 后，该事件代表单次低精度定位 6 秒内最终失败，不再混入第二次高精度定位失败。
 
 如果用户先点“使用当前定位”，又手动点地图，最终定位方式按最后实际选择的位置判定；同时后台有“点过当前定位”维度，用来区分用户是否尝试过定位按钮。
 
@@ -59,6 +59,13 @@
 - unknown_error：其他未知错误。
 
 当前优化方向是：定位不能让用户一直干等，必须允许用户随时手动选地图。
+
+当前前台策略：
+
+- 点击“使用当前定位”后，只发起一次低精度浏览器定位：`enableHighAccuracy: false`，`timeout: 6000`，`maximumAge: 5min`。
+- 4 秒还没返回时，页面提示用户可以手动在地图上选，不阻塞页面。
+- 不再发起第二次 `enableHighAccuracy: true` 高精度定位请求；历史数据看高精度二次补救贡献很小，且会让失败口径变复杂。
+- `location_selected` / `location_current_failed` 会记录 `geolocation_duration_ms`、`geolocation_timeout_ms`、`geolocation_enable_high_accuracy`；成功时记录 `geolocation_accuracy_m`，失败时记录 `error_code` 和截断后的 `error_message`。
 
 ### 大区排序
 
@@ -166,6 +173,10 @@
   - App 下载按钮：`order_success_app_download_click`。
   - WhatsApp 联系按钮：`order_success_whatsapp_contact_click`。
   - 后台 summary 展示两个点击人数和占下单成功人数的点击率。
+- 当前定位策略调整：
+  - 取消 4 秒快速定位失败后的第二次高精度定位请求。
+  - 低精度定位总等待从 4 秒提高到 6 秒，但 4 秒时仍提示用户可手动选择地图位置。
+  - 成功和失败埋点补充定位耗时、超时阈值、是否高精度、成功精度和失败消息，便于后续判断是权限、设备不可用还是实际超时。
 
 ## 验证方式
 
@@ -181,7 +192,7 @@ npm run build
 ```bash
 html=$(curl -s 'https://www.brainnel.com/')
 asset=$(printf '%s' "$html" | rg -o '/assets/index-[^" ]+\.js' | head -1)
-curl -s "https://www.brainnel.com$asset" | rg 'gestureHandling:"greedy"|location_current_attempt|Recherche de position'
+curl -s "https://www.brainnel.com$asset" | rg 'geolocation_duration_ms|location_current_attempt|Recherche de position'
 ```
 
 ### 大区接口验证

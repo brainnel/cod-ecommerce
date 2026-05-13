@@ -17,8 +17,8 @@ import { DISTRICT_CENTERS, DEFAULT_CENTER, DEFAULT_ZOOM } from '../constants/dis
 import './PaymentPage.css'
 
 const GEOLOCATION_CACHE_MAX_AGE_MS = 5 * 60 * 1000
-const GEOLOCATION_FAST_TIMEOUT_MS = 4000
-const GEOLOCATION_HIGH_TIMEOUT_MS = 8000
+const GEOLOCATION_MANUAL_HINT_MS = 4000
+const GEOLOCATION_FAST_TIMEOUT_MS = 6000
 
 const PaymentPage = () => {
   const location = useLocation()
@@ -30,6 +30,7 @@ const PaymentPage = () => {
   const completedFieldsRef = useRef(new Set())
   const currentLocationRequestRef = useRef(0)
   const currentLocationTrackedRequestRef = useRef(null)
+  const currentLocationHintTimerRef = useRef(null)
   const markerSelectionSourceRef = useRef('none')
 
   // 三步流程：1=选大区, 2=地图标记, 3=填写信息
@@ -121,6 +122,12 @@ const PaymentPage = () => {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
   }, [])
 
+  useEffect(() => () => {
+    if (currentLocationHintTimerRef.current) {
+      clearTimeout(currentLocationHintTimerRef.current)
+    }
+  }, [])
+
   // 重定向检查
   useEffect(() => {
     if (!product || !quantity) {
@@ -197,11 +204,53 @@ const PaymentPage = () => {
 
   const positionToMarker = (position) => ({
     lat: position.coords.latitude,
-    lng: position.coords.longitude
+    lng: position.coords.longitude,
+    accuracy: typeof position.coords.accuracy === 'number' ? position.coords.accuracy : null
   })
 
-  const applyCurrentLocation = (position, requestId, stage) => {
+  const getMonotonicNow = () => {
+    if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
+      return performance.now()
+    }
+    return Date.now()
+  }
+
+  const getLocationDurationMs = (startedAtMs) => {
+    if (!startedAtMs) return 0
+    return Math.max(0, Math.round(getMonotonicNow() - startedAtMs))
+  }
+
+  const clearCurrentLocationHintTimer = () => {
+    if (!currentLocationHintTimerRef.current) return
+    clearTimeout(currentLocationHintTimerRef.current)
+    currentLocationHintTimerRef.current = null
+  }
+
+  const buildPositionAnalyticsProps = (position, startedAtMs, stage) => ({
+    geolocation_stage: stage,
+    geolocation_duration_ms: getLocationDurationMs(startedAtMs),
+    geolocation_accuracy_m: typeof position?.coords?.accuracy === 'number'
+      ? Math.round(position.coords.accuracy)
+      : null,
+    geolocation_timeout_ms: stage === 'cached' ? 0 : GEOLOCATION_FAST_TIMEOUT_MS,
+    geolocation_enable_high_accuracy: false,
+    geolocation_position_age_ms: typeof position?.timestamp === 'number'
+      ? Math.max(0, Date.now() - position.timestamp)
+      : null
+  })
+
+  const buildLocationErrorAnalyticsProps = (error, startedAtMs, stage) => ({
+    error_code: error?.code || 2,
+    error_message: error?.message ? String(error.message).slice(0, 160) : '',
+    geolocation_stage: stage,
+    geolocation_duration_ms: getLocationDurationMs(startedAtMs),
+    geolocation_timeout_ms: GEOLOCATION_FAST_TIMEOUT_MS,
+    geolocation_enable_high_accuracy: false
+  })
+
+  const applyCurrentLocation = (position, requestId, stage, startedAtMs) => {
     if (requestId !== currentLocationRequestRef.current) return false
+    clearCurrentLocationHintTimer()
 
     const userPos = positionToMarker(position)
     setUserLocation(userPos)
@@ -222,7 +271,7 @@ const PaymentPage = () => {
       trackPaymentEvent('location_selected', {
         ...getDistrictAnalyticsProps(),
         location_method: 'current_location',
-        geolocation_stage: stage
+        ...buildPositionAnalyticsProps(position, startedAtMs, stage)
       })
     }
 
@@ -230,38 +279,14 @@ const PaymentPage = () => {
     return true
   }
 
-  const trackCurrentLocationFailure = (error, requestId, stage) => {
+  const trackCurrentLocationFailure = (error, requestId, stage, startedAtMs) => {
     if (requestId !== currentLocationRequestRef.current) return
     if (currentLocationTrackedRequestRef.current === requestId) return
 
     trackPaymentEvent('location_current_failed', {
       ...getDistrictAnalyticsProps(),
-      error_code: error?.code || 2,
-      geolocation_stage: stage
+      ...buildLocationErrorAnalyticsProps(error, startedAtMs, stage)
     })
-  }
-
-  const runHighAccuracyLocation = (requestId) => {
-    requestBrowserLocation({
-      enableHighAccuracy: true,
-      timeout: GEOLOCATION_HIGH_TIMEOUT_MS,
-      maximumAge: GEOLOCATION_CACHE_MAX_AGE_MS
-    })
-      .then((position) => {
-        applyCurrentLocation(position, requestId, 'high_accuracy')
-      })
-      .catch((error) => {
-        console.log('高精度定位失败:', error.message)
-        trackCurrentLocationFailure(error, requestId, 'high_accuracy')
-        if (
-          requestId === currentLocationRequestRef.current &&
-          currentLocationTrackedRequestRef.current !== requestId &&
-          markerSelectionSourceRef.current !== 'manual'
-        ) {
-          setLocationRequestStatus('failed')
-          setLocationRequestMessage('Impossible d’obtenir votre position. Veuillez sélectionner votre position sur la carte.')
-        }
-      })
   }
 
   const handleUseCurrentLocation = () => {
@@ -269,15 +294,34 @@ const PaymentPage = () => {
     currentLocationRequestRef.current = requestId
     currentLocationTrackedRequestRef.current = null
     markerSelectionSourceRef.current = 'current_pending'
+    clearCurrentLocationHintTimer()
     setLocationRequestStatus('locating')
     setLocationRequestMessage('Recherche de votre position...')
     trackPaymentEvent('location_current_attempt', getDistrictAnalyticsProps())
 
+    const startedAtMs = getMonotonicNow()
+
     if (userLocation) {
-      applyCurrentLocation({ coords: { latitude: userLocation.lat, longitude: userLocation.lng } }, requestId, 'cached')
-      runHighAccuracyLocation(requestId)
+      applyCurrentLocation({
+        coords: {
+          latitude: userLocation.lat,
+          longitude: userLocation.lng,
+          accuracy: userLocation.accuracy ?? null
+        }
+      }, requestId, 'cached', startedAtMs)
       return
     }
+
+    currentLocationHintTimerRef.current = setTimeout(() => {
+      if (
+        requestId === currentLocationRequestRef.current &&
+        currentLocationTrackedRequestRef.current !== requestId &&
+        markerSelectionSourceRef.current !== 'manual'
+      ) {
+        setLocationRequestStatus('slow')
+        setLocationRequestMessage('La localisation prend plus de temps. Vous pouvez sélectionner votre position sur la carte.')
+      }
+    }, GEOLOCATION_MANUAL_HINT_MS)
 
     requestBrowserLocation({
       enableHighAccuracy: false,
@@ -285,16 +329,17 @@ const PaymentPage = () => {
       maximumAge: GEOLOCATION_CACHE_MAX_AGE_MS
     })
       .then((position) => {
-        applyCurrentLocation(position, requestId, 'fast')
-        runHighAccuracyLocation(requestId)
+        applyCurrentLocation(position, requestId, 'fast', startedAtMs)
       })
       .catch((error) => {
         console.log('快速定位失败:', error.message)
-        if (requestId === currentLocationRequestRef.current) {
-          setLocationRequestStatus('slow')
-          setLocationRequestMessage('La localisation prend plus de temps. Vous pouvez sélectionner votre position sur la carte.')
+        if (requestId !== currentLocationRequestRef.current) return
+        clearCurrentLocationHintTimer()
+        trackCurrentLocationFailure(error, requestId, 'fast', startedAtMs)
+        if (markerSelectionSourceRef.current !== 'manual') {
+          setLocationRequestStatus('failed')
+          setLocationRequestMessage('Impossible d’obtenir votre position. Veuillez sélectionner votre position sur la carte.')
         }
-        runHighAccuracyLocation(requestId)
       })
   }
 
@@ -325,6 +370,7 @@ const PaymentPage = () => {
   // 地图标记
   const handleMapClick = (marker) => {
     markerSelectionSourceRef.current = 'manual'
+    clearCurrentLocationHintTimer()
     setLocationRequestStatus('idle')
     setLocationRequestMessage('')
     setCustomMarker(marker)
