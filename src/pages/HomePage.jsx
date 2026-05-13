@@ -1,16 +1,33 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import CategoryTabs from '../components/CategoryTabs'
 import ProductList from '../components/ProductList'
 import logoImage from '../assets/logo.png'
 import './HomePage.css'
 
+const parseCategoryId = (value) => {
+  if (!value) return null
+  const parsed = Number(value)
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null
+}
+
 const HomePage = () => {
-  const [selectedCategoryId, setSelectedCategoryId] = useState(null) // null表示"全部"
+  const [searchParams, setSearchParams] = useSearchParams()
+  const categoryIdParam = searchParams.get('category_id')
+  const [selectedCategoryId, setSelectedCategoryId] = useState(() => parseCategoryId(searchParams.get('category_id'))) // null表示"全部"
   const navigate = useNavigate()
+
+  useEffect(() => {
+    setSelectedCategoryId(parseCategoryId(categoryIdParam))
+  }, [categoryIdParam])
 
   const handleCategoryChange = (categoryId) => {
     setSelectedCategoryId(categoryId)
+    if (categoryId) {
+      setSearchParams({ category_id: categoryId.toString() })
+    } else {
+      setSearchParams({})
+    }
     
     // 调试日志
     console.log('=== 分类切换 ===')

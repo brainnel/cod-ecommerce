@@ -15,11 +15,32 @@ import logoImage from '../assets/logo.png';
 const PRODUCT_UNAVAILABLE_BACKEND_MESSAGE = '此商品已下架，请查看其它商品';
 const PRODUCT_UNAVAILABLE_MESSAGE_FR = "Ce produit n'est plus disponible. Veuillez consulter d'autres produits.";
 const GENERIC_PRODUCT_FETCH_ERROR_FR = 'Échec de récupération des informations produit';
+const PRODUCT_UNAVAILABLE_REDIRECT_SECONDS = 3;
+
+const getBackendErrorDetail = (err) => err?.response?.data?.detail;
+
+const getBackendErrorMessage = (err) => {
+  const detail = getBackendErrorDetail(err);
+  return typeof detail === 'string' ? detail : detail?.message;
+};
+
+const isUnavailableProductError = (err) => {
+  const backendMessage = getBackendErrorMessage(err);
+  return backendMessage === PRODUCT_UNAVAILABLE_BACKEND_MESSAGE || err?.response?.status === 404;
+};
+
+const getUnavailableCategoryId = (err) => {
+  const rawCategoryId = err?.response?.data?.category_id ?? getBackendErrorDetail(err)?.category_id;
+  const parsedCategoryId = Number(rawCategoryId);
+  return Number.isInteger(parsedCategoryId) && parsedCategoryId > 0 ? parsedCategoryId : null;
+};
+
+const getProductListPath = (categoryId) => {
+  return categoryId ? `/?category_id=${encodeURIComponent(categoryId)}` : '/';
+};
 
 const getProductFetchErrorMessage = (err) => {
-  const backendMessage = err?.response?.data?.detail;
-
-  if (backendMessage === PRODUCT_UNAVAILABLE_BACKEND_MESSAGE || err?.response?.status === 404) {
+  if (isUnavailableProductError(err)) {
     return PRODUCT_UNAVAILABLE_MESSAGE_FR;
   }
 
@@ -35,6 +56,8 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
   const [product, setProduct] = useState(initialProduct);
   const [loading, setLoading] = useState(!initialProduct);
   const [error, setError] = useState(null);
+  const [errorRedirectCategoryId, setErrorRedirectCategoryId] = useState(null);
+  const [redirectCountdown, setRedirectCountdown] = useState(PRODUCT_UNAVAILABLE_REDIRECT_SECONDS);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [variants, setVariants] = useState([]);
   const navigate = useNavigate();
@@ -48,6 +71,8 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        setError(null);
+        setErrorRedirectCategoryId(null);
         let data;
         
         // 如果已经有初始产品数据，就不需要再次获取
@@ -86,6 +111,8 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
         }
       } catch (err) {
         setError(getProductFetchErrorMessage(err));
+        setErrorRedirectCategoryId(isUnavailableProductError(err) ? getUnavailableCategoryId(err) : null);
+        setRedirectCountdown(PRODUCT_UNAVAILABLE_REDIRECT_SECONDS);
         console.error('Error fetching product:', err);
       } finally {
         setLoading(false);
@@ -94,6 +121,28 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
 
     fetchData();
   }, [productId, initialProduct]);
+
+  const unavailableRedirectTarget = error === PRODUCT_UNAVAILABLE_MESSAGE_FR
+    ? getProductListPath(errorRedirectCategoryId)
+    : null;
+
+  useEffect(() => {
+    if (!unavailableRedirectTarget) return undefined;
+
+    setRedirectCountdown(PRODUCT_UNAVAILABLE_REDIRECT_SECONDS);
+
+    const countdownTimer = window.setInterval(() => {
+      setRedirectCountdown((current) => (current > 1 ? current - 1 : current));
+    }, 1000);
+    const redirectTimer = window.setTimeout(() => {
+      navigate(unavailableRedirectTarget, { replace: true });
+    }, PRODUCT_UNAVAILABLE_REDIRECT_SECONDS * 1000);
+
+    return () => {
+      window.clearInterval(countdownTimer);
+      window.clearTimeout(redirectTimer);
+    };
+  }, [navigate, unavailableRedirectTarget]);
 
   useEffect(() => {
     if (!product?.product_id) return;
@@ -127,9 +176,20 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
     return (
       <div className="error-container">
         <p>{error}</p>
-        <button type="button" className="error-home-btn" onClick={() => navigate('/')}>
-          Voir d'autres produits
-        </button>
+        <div className="error-actions">
+          <button
+            type="button"
+            className="error-home-btn"
+            onClick={() => navigate(unavailableRedirectTarget || '/')}
+          >
+            Voir d'autres produits
+          </button>
+          {unavailableRedirectTarget && (
+            <span className="error-redirect-countdown" aria-live="polite">
+              {redirectCountdown}
+            </span>
+          )}
+        </div>
       </div>
     );
   }
