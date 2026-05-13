@@ -1,6 +1,6 @@
 # COD 单页优化维护记录
 
-更新时间：2026-05-13 09:20 CST
+更新时间：2026-05-13 09:46 CST
 
 这个文档用于维护 COD ecommerce 单页优化的历史轨迹。后续如果对下单页、商品详情页、地图定位、埋点、后台漏斗分析、大区排序等做了重要调整，先把关键结论追加到这里。上下文压缩后，优先读这个文件恢复背景。
 
@@ -200,3 +200,9 @@ ORDER BY CASE WHEN d.sort_order = 0 THEN 999999 ELSE d.sort_order END ASC, d.nam
 - 手机端 Step 2 将 `Précédent / Suivant` 固定在屏幕底部。
 - 手机端地图高度从 400px 压到 `min(340px, 46vh)`。
 - 保留地图单指拖动体验，同时保证下一步按钮始终可见。
+
+后续视觉优化：
+
+- 进一步压缩 Step 2 顶部流程条、橙色定位说明和大区徽章。
+- 法语说明改短为“Adresse actuelle ? Appuyez sur « Utiliser ma position ». Sinon, touchez la carte.”
+- 地图高度改为移动端视口自适应，并在地图下方预留固定按钮高度，避免按钮遮住地图底部 10%-20%。

@@ -574,7 +574,7 @@ const PaymentPage = () => {
             <div className="location-hint">
               <div className="hint-content">
                 <span className="hint-text">
-                  Si votre position actuelle est votre adresse de livraison, cliquez sur « Utiliser ma position actuelle ». Sinon, veuillez sélectionner votre position manuellement.
+                  Adresse actuelle ? Appuyez sur « Utiliser ma position ». Sinon, touchez la carte.
                 </span>
               </div>
               <button 
@@ -594,8 +594,8 @@ const PaymentPage = () => {
                 </svg>
                 <span>
                   {locationRequestStatus === 'locating' || locationRequestStatus === 'slow'
-                    ? 'Recherche de position...'
-                    : 'Utiliser ma position actuelle'}
+                    ? 'Recherche...'
+                    : 'Utiliser ma position'}
                 </span>
               </button>
             </div>

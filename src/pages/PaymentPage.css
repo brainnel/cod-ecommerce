@@ -885,11 +885,11 @@
 /* 响应式设计 */
 @media (max-width: 768px) {
   .payment-content {
-    padding: 16px;
+    padding: 10px 12px 96px;
   }
   
   .section {
-    padding: 16px;
+    padding: 12px;
     margin-bottom: 12px;
   }
   
@@ -907,8 +907,9 @@
   }
   
   .steps-indicator {
-    padding: 16px;
-    margin-bottom: 24px;
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    border-radius: 14px;
   }
   
   .step {
@@ -916,27 +917,38 @@
   }
   
   .step-icon {
-    width: 32px;
-    height: 32px;
-    font-size: 14px;
+    width: 30px;
+    height: 30px;
+    font-size: 13px;
   }
   
   .step-label {
-    font-size: 11px;
+    font-size: 10px;
   }
   
   .step-divider {
-    max-width: 40px;
-    margin: 0 8px;
+    max-width: 34px;
+    margin: 0 6px;
   }
 
   .location-hint {
     flex-direction: column;
     align-items: stretch;
+    gap: 10px;
+    padding: 12px;
+    margin-bottom: 10px;
+    border-radius: 12px;
+  }
+
+  .hint-text {
+    font-size: 13px;
+    line-height: 1.35;
   }
 
   .use-location-btn {
     width: 100%;
+    min-height: 42px;
+    padding: 9px 12px;
     white-space: normal;
   }
 
@@ -944,9 +956,26 @@
     padding-bottom: 96px;
   }
 
+  .district-info-badge {
+    padding: 9px 12px;
+    margin-bottom: 10px;
+    border-radius: 10px;
+  }
+
   .map-container {
-    height: min(340px, 46vh);
-    max-height: 46vh;
+    height: 320px;
+    max-height: none;
+    margin-bottom: 86px;
+  }
+
+  .map-section .marker-info {
+    display: none;
+  }
+
+  @supports (height: 100dvh) {
+    .map-container {
+      height: clamp(280px, calc(100dvh - 430px), 360px);
+    }
   }
   
   .order-summary-info {
