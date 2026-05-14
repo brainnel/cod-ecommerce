@@ -1,6 +1,6 @@
 # COD 单页优化维护记录
 
-更新时间：2026-05-14 09:22 CST
+更新时间：2026-05-14 09:46 CST
 
 这个文档用于维护 COD ecommerce 单页优化的历史轨迹。后续如果对下单页、商品详情页、地图定位、埋点、后台漏斗分析、大区排序等做了重要调整，先把关键结论追加到这里。上下文压缩后，优先读这个文件恢复背景。
 
@@ -216,6 +216,10 @@
 - 个人信息填写页按钮固定：
   - 手机端第 3 步 `Informations de livraison` 的“Précédent / Passer la commande”固定在屏幕底部显示。
   - `info-section` 增加底部留白，避免固定按钮遮住地址描述、订单摘要或校验错误。
+- 个人信息填写页 WhatsApp 减摩擦：
+  - WhatsApp 默认勾选 `WhatsApp identique au téléphone`，用户只填电话即可自动复用为 WhatsApp。
+  - 用户取消勾选后才展开独立 WhatsApp 输入框；提交、表单校验、购买事件和订单成功页都使用最终有效 WhatsApp。
+  - checkout 埋点在字段完成、提交、成功/失败等关键事件中携带 `whatsapp_same_as_phone`，后续可评估该便捷项使用率和对表单流失的影响。
 
 ## 验证方式
 

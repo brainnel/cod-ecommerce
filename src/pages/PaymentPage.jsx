@@ -120,6 +120,7 @@ const PaymentPage = () => {
     whatsapp: '',
     addressDescription: ''
   })
+  const [whatsappSameAsPhone, setWhatsappSameAsPhone] = useState(true)
   const [errors, setErrors] = useState({})
   const [isPlacingOrder, setIsPlacingOrder] = useState(false)
   const [clientInfo, setClientInfo] = useState({})
@@ -456,6 +457,16 @@ const PaymentPage = () => {
   }
 
   // 表单输入处理
+  const trackFieldCompletedOnce = (field, extra = {}) => {
+    if (completedFieldsRef.current.has(field)) return
+    completedFieldsRef.current.add(field)
+    trackPaymentEvent('field_completed', {
+      ...getDistrictAnalyticsProps(),
+      field,
+      ...extra
+    })
+  }
+
   const handleInputChange = (field, value) => {
     let nextValue = value
 
@@ -465,9 +476,16 @@ const PaymentPage = () => {
       nextValue = value.slice(0, 200)
     }
 
-    setUserInfo(prev => ({ ...prev, [field]: nextValue }))
+    setUserInfo(prev => ({
+      ...prev,
+      [field]: nextValue,
+      ...(field === 'phone' && whatsappSameAsPhone ? { whatsapp: nextValue } : {})
+    }))
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }))
+    }
+    if (field === 'phone' && whatsappSameAsPhone && errors.whatsapp) {
+      setErrors(prev => ({ ...prev, whatsapp: '' }))
     }
 
     const isFieldComplete = (
@@ -476,18 +494,39 @@ const PaymentPage = () => {
       (field === 'addressDescription' && nextValue.trim().length >= 5)
     )
 
-    if (isFieldComplete && !completedFieldsRef.current.has(field)) {
-      completedFieldsRef.current.add(field)
-      trackPaymentEvent('field_completed', {
-        ...getDistrictAnalyticsProps(),
-        field
+    if (isFieldComplete) {
+      trackFieldCompletedOnce(field, {
+        ...(field === 'whatsapp' ? { whatsapp_same_as_phone: false } : {})
       })
+    }
+
+    if (field === 'phone' && whatsappSameAsPhone && nextValue.length === 10) {
+      trackFieldCompletedOnce('whatsapp', { whatsapp_same_as_phone: true })
+    }
+  }
+
+  const handleWhatsappSameAsPhoneChange = (checked) => {
+    setWhatsappSameAsPhone(checked)
+    setUserInfo(prev => ({
+      ...prev,
+      whatsapp: checked ? prev.phone : prev.whatsapp
+    }))
+    setErrors(prev => ({ ...prev, whatsapp: '' }))
+
+    trackPaymentEvent('whatsapp_same_as_phone_changed', {
+      ...getDistrictAnalyticsProps(),
+      whatsapp_same_as_phone: checked
+    })
+
+    if (checked && userInfo.phone.length === 10) {
+      trackFieldCompletedOnce('whatsapp', { whatsapp_same_as_phone: true })
     }
   }
 
   // 验证表单
   const validateForm = () => {
     const newErrors = {}
+    const effectiveWhatsapp = whatsappSameAsPhone ? userInfo.phone : userInfo.whatsapp
     
     if (!userInfo.fullName.trim()) {
       newErrors.fullName = 'Le nom complet est requis'
@@ -499,9 +538,9 @@ const PaymentPage = () => {
       newErrors.phone = 'Le numéro doit contenir 10 chiffres'
     }
     
-    if (!userInfo.whatsapp.trim()) {
+    if (!whatsappSameAsPhone && !effectiveWhatsapp.trim()) {
       newErrors.whatsapp = 'Le numéro WhatsApp est requis'
-    } else if (userInfo.whatsapp.length !== 10) {
+    } else if (!whatsappSameAsPhone && effectiveWhatsapp.length !== 10) {
       newErrors.whatsapp = 'Le numéro doit contenir 10 chiffres'
     }
     
@@ -524,20 +563,30 @@ const PaymentPage = () => {
 
   // 提交订单
   const handlePlaceOrder = async () => {
+    const effectiveWhatsapp = whatsappSameAsPhone ? userInfo.phone : userInfo.whatsapp
+    const effectiveUserInfo = {
+      ...userInfo,
+      whatsapp: effectiveWhatsapp
+    }
+
     if (!validateForm()) {
       const missingFields = []
       if (!userInfo.fullName.trim()) missingFields.push('fullName')
       if (userInfo.phone.length !== 10) missingFields.push('phone')
-      if (userInfo.whatsapp.length !== 10) missingFields.push('whatsapp')
+      if (!whatsappSameAsPhone && effectiveWhatsapp.length !== 10) missingFields.push('whatsapp')
       if (userInfo.addressDescription.trim().length < 5) missingFields.push('addressDescription')
       trackPaymentEvent('submit_validation_failed', {
         ...getDistrictAnalyticsProps(),
-        missing_fields: missingFields
+        missing_fields: missingFields,
+        whatsapp_same_as_phone: whatsappSameAsPhone
       })
       return
     }
     
-    trackPaymentEvent('submit_order_click', getDistrictAnalyticsProps())
+    trackPaymentEvent('submit_order_click', {
+      ...getDistrictAnalyticsProps(),
+      whatsapp_same_as_phone: whatsappSameAsPhone
+    })
     setIsPlacingOrder(true)
 
     try {
@@ -548,7 +597,7 @@ const PaymentPage = () => {
           district_id: selectedDistrict.id,
           full_name: userInfo.fullName,
           phone: `225${userInfo.phone}`,
-          whatsapp: `225${userInfo.whatsapp}`,
+          whatsapp: `225${effectiveWhatsapp}`,
           receiver_address: userInfo.addressDescription,
           latitude: customMarker.lat,
           longitude: customMarker.lng,
@@ -572,7 +621,7 @@ const PaymentPage = () => {
           district_id: selectedDistrict.id,
           full_name: userInfo.fullName,
           phone: `225${userInfo.phone}`,
-          whatsapp: `225${userInfo.whatsapp}`,
+          whatsapp: `225${effectiveWhatsapp}`,
           receiver_address: userInfo.addressDescription,
           latitude: customMarker.lat,
           longitude: customMarker.lng,
@@ -595,7 +644,8 @@ const PaymentPage = () => {
         trackPaymentEvent('order_create_success', {
           ...getDistrictAnalyticsProps(),
           order_no: response.data.order_no || response.data.order_id || null,
-          order_status: response.status
+          order_status: response.status,
+          whatsapp_same_as_phone: whatsappSameAsPhone
         })
 
         try {
@@ -605,7 +655,7 @@ const PaymentPage = () => {
             totalPrice: product.price * quantity,
             unitPrice: product.price,
             orderNo: response.data.order_no || response.data.order_id
-          }, userInfo, clientInfo).catch(err => console.warn('Facebook事件失败:', err))
+          }, effectiveUserInfo, clientInfo).catch(err => console.warn('Facebook事件失败:', err))
         } catch (fbError) {
           console.warn('Facebook事件错误:', fbError)
         }
@@ -616,7 +666,7 @@ const PaymentPage = () => {
         state: {
           product,
           quantity,
-          userInfo,
+          userInfo: effectiveUserInfo,
           selectedLocation: selectedDistrict,
           totalPrice: product.price * quantity,
           orderResponse: response.data
@@ -628,7 +678,8 @@ const PaymentPage = () => {
       trackPaymentEvent('order_create_failed', {
         ...getDistrictAnalyticsProps(),
         error_status: err.response?.status || null,
-        error_type: err.code || 'order_api_error'
+        error_type: err.code || 'order_api_error',
+        whatsapp_same_as_phone: whatsappSameAsPhone
       })
       alert(err.response?.data?.message || 'Une erreur est survenue')
     } finally {
@@ -818,17 +869,33 @@ const PaymentPage = () => {
 
             <div className="form-group">
               <label htmlFor="whatsapp" className="form-label">WhatsApp *</label>
-              <div className={`phone-input-group ${errors.whatsapp ? 'error' : ''}`}>
-                <div className="country-code-prefix">+225</div>
+              <label className="same-whatsapp-option">
                 <input
-                  id="whatsapp"
-                  type="tel"
-                  className="form-input phone-input"
-                  value={userInfo.whatsapp}
-                  onChange={(e) => handleInputChange('whatsapp', e.target.value)}
-                  placeholder="XXXXXXXX"
+                  type="checkbox"
+                  checked={whatsappSameAsPhone}
+                  onChange={(e) => handleWhatsappSameAsPhoneChange(e.target.checked)}
                 />
-              </div>
+                <span>WhatsApp identique au téléphone</span>
+              </label>
+              {whatsappSameAsPhone ? (
+                <div className={`same-whatsapp-summary ${errors.whatsapp ? 'error' : ''}`}>
+                  <span className="same-whatsapp-number">
+                    {userInfo.phone ? `+225 ${userInfo.phone}` : 'Le numéro sera copié automatiquement'}
+                  </span>
+                </div>
+              ) : (
+                <div className={`phone-input-group ${errors.whatsapp ? 'error' : ''}`}>
+                  <div className="country-code-prefix">+225</div>
+                  <input
+                    id="whatsapp"
+                    type="tel"
+                    className="form-input phone-input"
+                    value={userInfo.whatsapp}
+                    onChange={(e) => handleInputChange('whatsapp', e.target.value)}
+                    placeholder="XXXXXXXX"
+                  />
+                </div>
+              )}
               {errors.whatsapp && <div className="error-message">{errors.whatsapp}</div>}
             </div>
 
