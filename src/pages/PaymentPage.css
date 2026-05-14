@@ -427,25 +427,8 @@
   flex-shrink: 0;
 }
 
-.same-whatsapp-summary {
-  display: flex;
-  align-items: center;
-  min-height: 44px;
-  padding: 10px 12px;
-  border: 2px solid #e9ecef;
-  border-radius: 8px;
-  background: #fafafa;
-  color: #6c757d;
-  font-size: 14px;
-  font-weight: 500;
-}
-
-.same-whatsapp-summary.error {
-  border-color: #dc3545;
-}
-
-.same-whatsapp-number {
-  overflow-wrap: anywhere;
+.whatsapp-manual-input {
+  margin-top: 8px;
 }
 
 /* 错误状态样式 */

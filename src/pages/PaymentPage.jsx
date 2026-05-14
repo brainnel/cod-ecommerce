@@ -868,7 +868,7 @@ const PaymentPage = () => {
             </div>
 
             <div className="form-group">
-              <label htmlFor="whatsapp" className="form-label">WhatsApp *</label>
+              <label className="form-label">WhatsApp *</label>
               <label className="same-whatsapp-option">
                 <input
                   type="checkbox"
@@ -877,14 +877,8 @@ const PaymentPage = () => {
                 />
                 <span>WhatsApp identique au téléphone</span>
               </label>
-              {whatsappSameAsPhone ? (
-                <div className={`same-whatsapp-summary ${errors.whatsapp ? 'error' : ''}`}>
-                  <span className="same-whatsapp-number">
-                    {userInfo.phone ? `+225 ${userInfo.phone}` : 'Le numéro sera copié automatiquement'}
-                  </span>
-                </div>
-              ) : (
-                <div className={`phone-input-group ${errors.whatsapp ? 'error' : ''}`}>
+              {!whatsappSameAsPhone && (
+                <div className={`phone-input-group whatsapp-manual-input ${errors.whatsapp ? 'error' : ''}`}>
                   <div className="country-code-prefix">+225</div>
                   <input
                     id="whatsapp"
