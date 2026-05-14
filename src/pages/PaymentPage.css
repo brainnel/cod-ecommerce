@@ -163,8 +163,16 @@
   box-shadow: 0 2px 8px rgba(255, 81, 0, 0.2);
 }
 
+.location-hint.map-only {
+  justify-content: center;
+}
+
 .hint-content {
   flex: 1;
+}
+
+.location-hint.map-only .hint-content {
+  flex: 0 1 auto;
 }
 
 .hint-text {
@@ -173,6 +181,11 @@
   font-weight: 500;
   line-height: 1.5;
   display: block;
+}
+
+.location-hint.map-only .hint-text {
+  font-weight: 700;
+  text-align: center;
 }
 
 .use-location-btn {

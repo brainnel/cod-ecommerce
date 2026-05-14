@@ -20,6 +20,38 @@ const GEOLOCATION_CACHE_MAX_AGE_MS = 5 * 60 * 1000
 const GEOLOCATION_MANUAL_HINT_MS = 4000
 const GEOLOCATION_FAST_TIMEOUT_MS = 6000
 
+const getBrowserContext = () => {
+  if (typeof navigator === 'undefined') {
+    return {
+      browser_context: 'unknown',
+      is_meta_in_app_browser: false
+    }
+  }
+
+  const userAgent = navigator.userAgent || navigator.vendor || ''
+  const isInstagram = /Instagram/i.test(userAgent)
+  const isFacebook = /FBAN|FBAV|FB_IAB|FB4A|FBIOS/i.test(userAgent)
+
+  if (isInstagram) {
+    return {
+      browser_context: 'instagram_in_app',
+      is_meta_in_app_browser: true
+    }
+  }
+
+  if (isFacebook) {
+    return {
+      browser_context: 'facebook_in_app',
+      is_meta_in_app_browser: true
+    }
+  }
+
+  return {
+    browser_context: 'standard_browser',
+    is_meta_in_app_browser: false
+  }
+}
+
 const PaymentPage = () => {
   const location = useLocation()
   const navigate = useNavigate()
@@ -61,6 +93,8 @@ const PaymentPage = () => {
   const currentLocationTrackedRequestRef = useRef(null)
   const currentLocationHintTimerRef = useRef(null)
   const markerSelectionSourceRef = useRef('none')
+  const browserContext = useMemo(() => getBrowserContext(), [])
+  const isMetaInAppBrowser = browserContext.is_meta_in_app_browser
 
   // 三步流程：1=选大区, 2=地图标记, 3=填写信息
   const [currentStep, setCurrentStep] = useState(1)
@@ -133,6 +167,8 @@ const PaymentPage = () => {
         total_price: totalPrice,
         ad_id: adId
       }),
+      browser_context: browserContext.browser_context,
+      is_meta_in_app_browser: isMetaInAppBrowser,
       ...getDistrictAnalyticsProps(),
       ...extra
     }
@@ -667,33 +703,37 @@ const PaymentPage = () => {
         {currentStep === 2 && (
           <div className="section map-section">
             {/* 橙色提示条 */}
-            <div className="location-hint">
+            <div className={`location-hint ${isMetaInAppBrowser ? 'map-only' : ''}`}>
               <div className="hint-content">
                 <span className="hint-text">
-                  Si vous êtes à l’adresse de livraison, appuyez sur « Utiliser ma position ». Sinon, choisissez l’adresse sur la carte.
+                  {isMetaInAppBrowser
+                    ? 'Veuillez choisir votre adresse de livraison sur la carte.'
+                    : 'Si vous êtes à l’adresse de livraison, appuyez sur « Utiliser ma position ». Sinon, choisissez l’adresse sur la carte.'}
                 </span>
               </div>
-              <button 
-                className={`use-location-btn ${locationRequestStatus === 'locating' || locationRequestStatus === 'slow' ? 'loading' : ''}`}
-                onClick={handleUseCurrentLocation}
-                disabled={locationRequestStatus === 'locating' || locationRequestStatus === 'slow'}
-                type="button"
-                title="Utiliser ma position actuelle"
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="12" cy="12" r="10"/>
-                  <circle cx="12" cy="12" r="3"/>
-                  <line x1="12" y1="2" x2="12" y2="4"/>
-                  <line x1="12" y1="20" x2="12" y2="22"/>
-                  <line x1="2" y1="12" x2="4" y2="12"/>
-                  <line x1="20" y1="12" x2="22" y2="12"/>
-                </svg>
-                <span>
-                  {locationRequestStatus === 'locating' || locationRequestStatus === 'slow'
-                    ? 'Recherche...'
-                    : 'Utiliser ma position'}
-                </span>
-              </button>
+              {!isMetaInAppBrowser && (
+                <button
+                  className={`use-location-btn ${locationRequestStatus === 'locating' || locationRequestStatus === 'slow' ? 'loading' : ''}`}
+                  onClick={handleUseCurrentLocation}
+                  disabled={locationRequestStatus === 'locating' || locationRequestStatus === 'slow'}
+                  type="button"
+                  title="Utiliser ma position actuelle"
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <circle cx="12" cy="12" r="3"/>
+                    <line x1="12" y1="2" x2="12" y2="4"/>
+                    <line x1="12" y1="20" x2="12" y2="22"/>
+                    <line x1="2" y1="12" x2="4" y2="12"/>
+                    <line x1="20" y1="12" x2="22" y2="12"/>
+                  </svg>
+                  <span>
+                    {locationRequestStatus === 'locating' || locationRequestStatus === 'slow'
+                      ? 'Recherche...'
+                      : 'Utiliser ma position'}
+                  </span>
+                </button>
+              )}
             </div>
 
             {locationRequestMessage && (

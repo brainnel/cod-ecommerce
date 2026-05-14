@@ -1,6 +1,6 @@
 # COD 单页优化维护记录
 
-更新时间：2026-05-13 17:16 CST
+更新时间：2026-05-14 09:22 CST
 
 这个文档用于维护 COD ecommerce 单页优化的历史轨迹。后续如果对下单页、商品详情页、地图定位、埋点、后台漏斗分析、大区排序等做了重要调整，先把关键结论追加到这里。上下文压缩后，优先读这个文件恢复背景。
 
@@ -20,7 +20,7 @@
 1. 商品详情页点击下单，进入 checkout。
 2. SKU/数量选择。
 3. 大区选择。
-4. 定位选择，可以手动点地图，也可以点击“使用当前定位”。
+4. 定位选择，默认可以手动点地图，也可以点击“使用当前定位”；FB / Instagram 内置浏览器里隐藏当前定位按钮，直接引导用户在地图上选择收货地址。
 5. 个人信息填写：姓名、电话、WhatsApp、地址描述。
 6. 点击最终下单，创建 COD 订单。
 
@@ -71,6 +71,8 @@
 - 点击“使用当前定位”后，只发起一次低精度浏览器定位：`enableHighAccuracy: false`，`timeout: 6000`，`maximumAge: 5min`。
 - 4 秒还没返回时，页面提示用户可以手动在地图上选，不阻塞页面。
 - 不再发起第二次 `enableHighAccuracy: true` 高精度定位请求；历史数据看高精度二次补救贡献很小，且会让失败口径变复杂。
+- FB / Instagram 内置浏览器通过 UA 特征识别为 `facebook_in_app` / `instagram_in_app` 后，Step 2 隐藏“Utiliser ma position”按钮，提示改为“Veuillez choisir votre adresse de livraison sur la carte.”，避免把用户引到大概率失败的浏览器定位路径。
+- checkout 埋点属性会携带 `browser_context` 和 `is_meta_in_app_browser`，方便后续拆分内置浏览器和普通浏览器的定位/下单表现。
 - `location_selected` / `location_current_failed` 会记录 `geolocation_duration_ms`、`geolocation_timeout_ms`、`geolocation_enable_high_accuracy`；成功时记录 `geolocation_accuracy_m`，失败时记录 `error_code` 和截断后的 `error_message`。
 
 ### 大区排序
