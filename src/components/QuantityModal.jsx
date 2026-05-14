@@ -61,7 +61,7 @@ const QuantityModal = ({ isOpen, onClose, product }) => {
     }
 
     // 跳转到付款页面，传递产品和数量信息
-    navigate('/payment', {
+    navigate('/payment?step=1', {
       state: {
         product,
         quantity,

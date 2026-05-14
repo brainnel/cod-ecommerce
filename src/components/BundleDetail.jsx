@@ -155,7 +155,7 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
       console.warn('bundle checkout_start 埋点失败:', error)
     }
 
-    navigate('/payment', {
+    navigate('/payment?step=1', {
       state: {
         bundle,
         quantity,

@@ -19,6 +19,24 @@ import './PaymentPage.css'
 const GEOLOCATION_CACHE_MAX_AGE_MS = 5 * 60 * 1000
 const GEOLOCATION_MANUAL_HINT_MS = 4000
 const GEOLOCATION_FAST_TIMEOUT_MS = 6000
+const CHECKOUT_MIN_STEP = 1
+const CHECKOUT_MAX_STEP = 3
+
+const clampCheckoutStep = (step) => {
+  const parsedStep = Number(step)
+  if (!Number.isFinite(parsedStep)) return CHECKOUT_MIN_STEP
+  return Math.min(Math.max(parsedStep, CHECKOUT_MIN_STEP), CHECKOUT_MAX_STEP)
+}
+
+const getCheckoutStepFromSearch = (search) => {
+  const params = new URLSearchParams(search)
+  return clampCheckoutStep(params.get('step'))
+}
+
+const hasCheckoutStepInSearch = (search) => {
+  const params = new URLSearchParams(search)
+  return params.has('step')
+}
 
 const getBrowserContext = () => {
   if (typeof navigator === 'undefined') {
@@ -97,7 +115,7 @@ const PaymentPage = () => {
   const isMetaInAppBrowser = browserContext.is_meta_in_app_browser
 
   // 三步流程：1=选大区, 2=地图标记, 3=填写信息
-  const [currentStep, setCurrentStep] = useState(1)
+  const [currentStep, setCurrentStep] = useState(() => getCheckoutStepFromSearch(location.search))
   const [loading, setLoading] = useState(false)
 
   // 步顢1：大区选择
@@ -184,6 +202,35 @@ const PaymentPage = () => {
     })
   }
 
+  const getPaymentNavigationState = () => ({
+    ...(location.state || {}),
+    product: productFromState,
+    bundle: bundleFromState,
+    quantity,
+    productType: productTypeFromState,
+    checkoutSessionId: checkoutSessionIdRef.current || routeCheckoutSessionId || getCheckoutSessionId()
+  })
+
+  const navigateToCheckoutStep = (step, options = {}) => {
+    const nextStep = clampCheckoutStep(step)
+    const nextSearch = `?step=${nextStep}`
+
+    if (location.pathname === '/payment' && location.search === nextSearch && currentStep === nextStep) {
+      return
+    }
+
+    navigate(
+      {
+        pathname: '/payment',
+        search: nextSearch
+      },
+      {
+        replace: Boolean(options.replace),
+        state: getPaymentNavigationState()
+      }
+    )
+  }
+
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
   }, [])
@@ -223,6 +270,24 @@ const PaymentPage = () => {
       })
     }
   }, [product, quantity, navigate, routeCheckoutSessionId, adId])
+
+  useEffect(() => {
+    if (!product || !quantity) return
+
+    const requestedStep = getCheckoutStepFromSearch(location.search)
+    const hasStepInUrl = hasCheckoutStepInSearch(location.search)
+    const maxAllowedStep = selectedDistrict ? (customMarker ? 3 : 2) : 1
+    const nextStep = Math.min(requestedStep, maxAllowedStep)
+
+    if (!hasStepInUrl || nextStep !== requestedStep) {
+      navigateToCheckoutStep(nextStep, { replace: true })
+      return
+    }
+
+    if (currentStep !== nextStep) {
+      setCurrentStep(nextStep)
+    }
+  }, [location.search, product, quantity, selectedDistrict, customMarker, currentStep])
 
   // 加载大区列表（扁平化）
   useEffect(() => {
@@ -427,8 +492,13 @@ const PaymentPage = () => {
     }
     setMapCenter(districtCenter)
     setMapZoom(14)  // 大区级别，用更高的缩放
+    setCustomMarker(null)
+    markerSelectionSourceRef.current = 'none'
+    clearCurrentLocationHintTimer()
+    setLocationRequestStatus('idle')
+    setLocationRequestMessage('')
     
-    setCurrentStep(2)
+    navigateToCheckoutStep(2)
     // 显示引导动画
     setTimeout(() => setShowGuideModal(true), 500)
   }
@@ -453,7 +523,7 @@ const PaymentPage = () => {
       return
     }
     trackPaymentEvent('location_confirmed', getDistrictAnalyticsProps())
-    setCurrentStep(3)
+    navigateToCheckoutStep(3)
   }
 
   // 表单输入处理
@@ -818,7 +888,7 @@ const PaymentPage = () => {
             )}
 
             <div className="step-actions">
-              <button type="button" className="prev-btn" onClick={() => setCurrentStep(1)}>
+              <button type="button" className="prev-btn" onClick={() => navigate(-1)}>
                 Précédent
               </button>
               <button
@@ -941,7 +1011,7 @@ const PaymentPage = () => {
             </div>
 
             <div className="step-actions">
-              <button type="button" className="prev-btn" onClick={() => setCurrentStep(2)}>
+              <button type="button" className="prev-btn" onClick={() => navigate(-1)}>
                 Précédent
               </button>
               <button
