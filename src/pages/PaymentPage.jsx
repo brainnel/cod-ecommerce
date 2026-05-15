@@ -598,6 +598,7 @@ const PaymentPage = () => {
   const handleUseDistrictCenterFallback = () => {
     if (!selectedDistrict) return
 
+    const hadManualMapSelection = markerSelectionSourceRef.current === 'manual' || Boolean(customMarker)
     currentLocationRequestRef.current += 1
     clearCurrentLocationHintTimer()
     const fallbackMarker = getDistrictCenterMarker(selectedDistrict)
@@ -610,7 +611,8 @@ const PaymentPage = () => {
     const fallbackProps = {
       ...getDistrictAnalyticsProps(selectedDistrict),
       location_method: 'district_center_fallback',
-      location_fallback_requires_address_detail: true
+      location_fallback_requires_address_detail: true,
+      location_fallback_after_manual_map: hadManualMapSelection
     }
     trackPaymentEvent('location_fallback_used', fallbackProps)
     trackPaymentEvent('location_selected', fallbackProps)
@@ -986,7 +988,7 @@ const PaymentPage = () => {
 
         {/* 步顢2: 地图标记 */}
         {currentStep === 2 && (
-          <div className={`section map-section ${isInlineQuantityVariant && !customMarker ? 'with-location-fallback' : ''}`}>
+          <div className={`section map-section ${isInlineQuantityVariant ? 'with-location-fallback' : ''}`}>
             {/* 橙色提示条 */}
             <div className={`location-hint ${isMetaInAppBrowser ? 'map-only' : ''}`}>
               <div className="hint-content">
@@ -1051,8 +1053,8 @@ const PaymentPage = () => {
               </div>
             )}
 
-            <div className={`step-actions map-actions ${isInlineQuantityVariant && !customMarker ? 'with-location-fallback' : ''}`}>
-              {isInlineQuantityVariant && !customMarker && (
+            <div className={`step-actions map-actions ${isInlineQuantityVariant ? 'with-location-fallback' : ''}`}>
+              {isInlineQuantityVariant && (
                 <button
                   type="button"
                   className="location-fallback-btn"
