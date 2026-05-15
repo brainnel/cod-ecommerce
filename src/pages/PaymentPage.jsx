@@ -39,6 +39,38 @@ const hasCheckoutStepInSearch = (search) => {
   return params.has('step')
 }
 
+const getLocalPreviewBrowserContext = (search = '') => {
+  if (typeof window === 'undefined') return null
+  const isLocalPreview = ['localhost', '127.0.0.1'].includes(window.location.hostname)
+  if (!isLocalPreview) return null
+
+  const params = new URLSearchParams(search || window.location.search)
+  const urlContext = params.get('browser_context')
+  if (urlContext === 'facebook_in_app' || urlContext === 'instagram_in_app') return urlContext
+
+  try {
+    const storedContext = window.localStorage?.getItem('brainnel_cod_browser_context_preview')
+    return storedContext === 'facebook_in_app' || storedContext === 'instagram_in_app'
+      ? storedContext
+      : null
+  } catch (error) {
+    console.warn('browser context preview storage unavailable:', error)
+    return null
+  }
+}
+
+const buildCheckoutStepSearch = (step, currentSearch = '') => {
+  const params = new URLSearchParams()
+  params.set('step', String(clampCheckoutStep(step)))
+
+  const previewContext = getLocalPreviewBrowserContext(currentSearch)
+  if (previewContext) {
+    params.set('browser_context', previewContext)
+  }
+
+  return `?${params.toString()}`
+}
+
 const getProductStockLimit = (product) => {
   const stock = Number(product?.stock)
   return Number.isFinite(stock) && stock > 0 ? Math.floor(stock) : 99
@@ -52,6 +84,22 @@ const clampQuantity = (value, product) => {
 }
 
 const getBrowserContext = () => {
+  const previewContext = getLocalPreviewBrowserContext()
+
+  if (previewContext === 'instagram_in_app') {
+    return {
+      browser_context: 'instagram_in_app',
+      is_meta_in_app_browser: true
+    }
+  }
+
+  if (previewContext === 'facebook_in_app') {
+    return {
+      browser_context: 'facebook_in_app',
+      is_meta_in_app_browser: true
+    }
+  }
+
   if (typeof navigator === 'undefined') {
     return {
       browser_context: 'unknown',
@@ -274,7 +322,7 @@ const PaymentPage = () => {
 
   const navigateToCheckoutStep = (step, options = {}) => {
     const nextStep = clampCheckoutStep(step)
-    const nextSearch = `?step=${nextStep}`
+    const nextSearch = buildCheckoutStepSearch(nextStep, location.search)
 
     if (location.pathname === '/payment' && location.search === nextSearch && currentStep === nextStep) {
       return

@@ -23,6 +23,18 @@ const PRODUCT_UNAVAILABLE_MESSAGE_FR = "Ce produit n'est plus disponible. Veuill
 const GENERIC_PRODUCT_FETCH_ERROR_FR = 'Échec de récupération des informations produit';
 const PRODUCT_UNAVAILABLE_REDIRECT_SECONDS = 3;
 
+const getLocalPreviewBrowserContextSearch = () => {
+  if (typeof window === 'undefined') return '';
+  const isLocalPreview = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+  if (!isLocalPreview) return '';
+
+  const params = new URLSearchParams(window.location.search);
+  const previewContext = params.get('browser_context');
+  return previewContext === 'facebook_in_app' || previewContext === 'instagram_in_app'
+    ? `&browser_context=${encodeURIComponent(previewContext)}`
+    : '';
+};
+
 const getBackendErrorDetail = (err) => err?.response?.data?.detail;
 
 const getBackendErrorMessage = (err) => {
@@ -281,7 +293,7 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
         console.warn('Facebook AddToCart 事件错误:', fbError);
       }
 
-      navigate('/payment?step=1', {
+      navigate(`/payment?step=1${getLocalPreviewBrowserContextSearch()}`, {
         state: {
           product,
           quantity: defaultQuantity,
@@ -295,10 +307,6 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
 
     setIsModalOpen(true);
   };
-
-  // 设置倒计时目标时间（7天后）
-  const targetDate = new Date()
-  targetDate.setDate(targetDate.getDate() + 7)
 
   return (
     <div className="product-detail">
@@ -320,9 +328,6 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
           <img src={logoImage} alt="Brainnel" className="logo-image" />
         </div>
       </div>
-
-      {/* 倒计时组件 */}
-      <Countdown targetDate={targetDate} />
 
       <div className="product-detail-main">
         {/* 产品图片轮播 */}
@@ -361,12 +366,11 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
               {product.original_price && product.original_price > product.price && (
                 <div className="original-price">{formatPrice(product.original_price)} FCFA</div>
               )}
+              <Countdown />
             </div>
 
             {isCheckoutOptimizationVariant && (
-              <div className="delivery-benefit-pill">
-                Livraison gratuite à Abidjan sous 24h
-              </div>
+              <ServiceInfo variant="benefits" compact />
             )}
 
             {/* 库存信息 */}
@@ -398,13 +402,13 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
           </div>
 
           {/* 服务信息 */}
-          <ServiceInfo variant={isCheckoutOptimizationVariant ? 'benefits' : 'classic'} />
+          {!isCheckoutOptimizationVariant && <ServiceInfo variant="classic" />}
 
           {/* 底部操作按钮 */}
           <div className="bottom-actions">
             {isCheckoutOptimizationVariant && (
               <div className="cta-trust-note">
-                Aucun paiement maintenant. Vous payez à la réception.
+                Aucun paiement maintenant. À la réception, payez par Wave ou en cash.
               </div>
             )}
             <button

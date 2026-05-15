@@ -235,9 +235,7 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
             </div>
 
             {isCheckoutOptimizationVariant && (
-              <div className="delivery-benefit-pill">
-                Livraison gratuite à Abidjan sous 24h
-              </div>
+              <ServiceInfo variant="benefits" compact />
             )}
 
             {/* 数量选择器 */}
@@ -277,7 +275,7 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
             </div>
           </div>
 
-          <ServiceInfo variant={isCheckoutOptimizationVariant ? 'benefits' : 'classic'} />
+          {!isCheckoutOptimizationVariant && <ServiceInfo variant="classic" />}
 
           {/* 包含产品列表 */}
           {items.length > 0 && (
@@ -309,7 +307,7 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
           <div className="bottom-actions">
             {isCheckoutOptimizationVariant && (
               <div className="cta-trust-note">
-                Aucun paiement maintenant. Vous payez à la réception.
+                Aucun paiement maintenant. À la réception, payez par Wave ou en cash.
               </div>
             )}
             <button type="button" className="buy-now-btn" onClick={handleBuyNow}>

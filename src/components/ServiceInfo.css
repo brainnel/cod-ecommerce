@@ -7,11 +7,28 @@
 
 .service-info.benefit-style {
   padding-bottom: 18px;
-  background: #fffaf7;
+  background: #fbfcfd;
+}
+
+.service-info.compact-benefits {
+  padding: 6px 0 0;
+  margin: 0 0 12px;
+  background: transparent;
+  border-bottom: 0;
 }
 
 .service-benefit-header {
   margin-bottom: 12px;
+}
+
+.service-info.compact-benefits .service-benefit-header {
+  display: none;
+}
+
+.service-info.compact-benefits .service-benefit-kicker {
+  min-height: 19px;
+  padding: 2px 7px;
+  font-size: 10px;
 }
 
 .service-benefit-kicker {
@@ -20,8 +37,8 @@
   min-height: 22px;
   padding: 3px 8px;
   border-radius: 999px;
-  background: #fff0e6;
-  color: #ff5a1f;
+  background: #fff1e8;
+  color: #e94a00;
   font-size: 11px;
   font-weight: 800;
   line-height: 1;
@@ -35,6 +52,10 @@
   line-height: 1.25;
 }
 
+.service-info.compact-benefits .service-benefit-header h3 {
+  display: none;
+}
+
 .service-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -43,6 +64,10 @@
 
 .service-info.benefit-style .service-grid {
   gap: 10px;
+}
+
+.service-info.compact-benefits .service-grid {
+  gap: 6px;
 }
 
 .service-item {
@@ -68,13 +93,26 @@
   padding: 10px;
   border-radius: 10px;
   background: #fff;
-  border-color: #ffe1d0;
-  box-shadow: 0 4px 12px rgba(255, 107, 53, 0.06);
+  border-color: #eef1f4;
+  box-shadow: 0 4px 12px rgba(18, 32, 50, 0.05);
+}
+
+.service-info.compact-benefits .service-item {
+  align-items: center;
+  gap: 6px;
+  padding: 7px 8px;
+  min-height: 46px;
+}
+
+.service-info.compact-benefits .service-icon {
+  width: 20px;
+  height: 20px;
+  font-size: 11px;
 }
 
 .service-info.benefit-style .service-item:hover {
-  background: #fff7f2;
-  border-color: #ffc6a8;
+  background: #fff;
+  border-color: #d9e2ea;
 }
 
 .service-icon {
@@ -92,9 +130,49 @@
   width: 26px;
   height: 26px;
   border-radius: 999px;
-  background: #fff0e6;
+  background: #fff1e8;
   color: #ff5a1f;
   font-size: 14px;
+}
+
+.service-info.benefit-style .service-tone-delivery {
+  background: #fff8ed;
+  border-color: #ffe0ad;
+}
+
+.service-info.benefit-style .service-tone-delivery .service-icon {
+  background: #ffe9c8;
+  color: #e77700;
+}
+
+.service-info.benefit-style .service-tone-payment {
+  background: #f0f7ff;
+  border-color: #cfe3ff;
+}
+
+.service-info.benefit-style .service-tone-payment .service-icon {
+  background: #dcecff;
+  color: #1f6fd1;
+}
+
+.service-info.benefit-style .service-tone-assurance {
+  background: #effaf4;
+  border-color: #ccefd9;
+}
+
+.service-info.benefit-style .service-tone-assurance .service-icon {
+  background: #d9f4e4;
+  color: #168246;
+}
+
+.service-info.benefit-style .service-tone-support {
+  background: #f8f3ff;
+  border-color: #e4d6ff;
+}
+
+.service-info.benefit-style .service-tone-support .service-icon {
+  background: #eadfff;
+  color: #7850c7;
 }
 
 .service-content {
@@ -116,12 +194,24 @@
   line-height: 1.25;
 }
 
+.service-info.compact-benefits .service-title {
+  font-size: 11.5px;
+  line-height: 1.16;
+}
+
 .service-subtitle {
   margin: 3px 0 0;
   color: #777;
   font-size: 11px;
   font-weight: 600;
   line-height: 1.25;
+}
+
+.service-info.compact-benefits .service-subtitle {
+  display: block;
+  margin-top: 2px;
+  font-size: 9.5px;
+  line-height: 1.1;
 }
 
 /* 响应式设计 */
@@ -132,6 +222,11 @@
 
   .service-info.benefit-style {
     padding-bottom: 16px;
+  }
+
+  .service-info.compact-benefits {
+    padding-top: 5px;
+    padding-bottom: 0;
   }
 
   .service-benefit-header h3 {
@@ -145,6 +240,10 @@
   .service-info.benefit-style .service-grid {
     gap: 8px;
   }
+
+  .service-info.compact-benefits .service-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   
   .service-item {
     padding: 6px;
@@ -153,6 +252,12 @@
 
   .service-info.benefit-style .service-item {
     padding: 9px 8px;
+  }
+
+  .service-info.compact-benefits .service-item {
+    gap: 5px;
+    min-height: 46px;
+    padding: 7px 6px;
   }
   
   .service-icon {
@@ -174,12 +279,20 @@
   .service-subtitle {
     font-size: 10.5px;
   }
+
+  .service-info.compact-benefits .service-subtitle {
+    font-size: 9.2px;
+  }
 }
 
 @media (max-width: 360px) {
   .service-grid {
     grid-template-columns: 1fr;
     gap: 8px;
+  }
+
+  .service-info.compact-benefits .service-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   
   .service-item {

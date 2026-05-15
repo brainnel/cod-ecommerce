@@ -254,8 +254,9 @@
 /* 价格区域 */
 .price-section {
   display: flex;
-  align-items: baseline;
-  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 10px;
   margin-bottom: 8px;
 }
 

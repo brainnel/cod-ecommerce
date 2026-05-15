@@ -7,48 +7,26 @@ import {
 } from 'react-icons/fa';
 import './ServiceInfo.css';
 
-const ServiceInfo = ({ variant = 'classic' }) => {
+const ServiceInfo = ({ variant = 'classic', compact = false }) => {
   const isBenefitVariant = variant === 'benefits';
   const classicServices = [
     {
       id: 1,
-      icon: FaMoneyBillWave,
-      title: 'Paiement à la livraison'
-    },
-    {
-      id: 2,
-      icon: FaUndo,
-      title: 'Garantie de retour'
-    },
-    {
-      id: 3,
-      icon: FaTruck,
-      title: 'Livraison en 24 heures'
-    },
-    {
-      id: 4,
       icon: FaGift,
-      title: 'Livraison gratuite'
-    }
-  ];
-  const benefitServices = [
-    {
-      id: 1,
-      icon: FaGift,
-      title: 'Livraison offerte',
+      title: 'Livraison gratuite',
       subtitle: 'à Abidjan'
     },
     {
       id: 2,
       icon: FaTruck,
-      title: 'Livré en 24h',
-      subtitle: 'rapide et local'
+      title: 'Livraison 24h',
+      subtitle: 'à Abidjan'
     },
     {
       id: 3,
       icon: FaMoneyBillWave,
-      title: 'Payez à la réception',
-      subtitle: 'rien à payer maintenant'
+      title: 'Paiement à réception',
+      subtitle: 'cash ou Wave'
     },
     {
       id: 4,
@@ -57,13 +35,43 @@ const ServiceInfo = ({ variant = 'classic' }) => {
       subtitle: 'si problème'
     }
   ];
+  const benefitServices = [
+    {
+      id: 1,
+      icon: FaGift,
+      title: 'Livraison gratuite',
+      subtitle: 'à Abidjan',
+      tone: 'delivery'
+    },
+    {
+      id: 2,
+      icon: FaTruck,
+      title: 'Livraison 24h',
+      subtitle: 'à Abidjan',
+      tone: 'payment'
+    },
+    {
+      id: 3,
+      icon: FaMoneyBillWave,
+      title: 'Paiement à réception',
+      subtitle: 'cash ou Wave',
+      tone: 'assurance'
+    },
+    {
+      id: 4,
+      icon: FaUndo,
+      title: 'Retour possible',
+      subtitle: 'si problème',
+      tone: 'support'
+    }
+  ];
   const services = isBenefitVariant ? benefitServices : classicServices;
 
   return (
-    <div className={`service-info ${isBenefitVariant ? 'benefit-style' : ''}`}>
+    <div className={`service-info ${isBenefitVariant ? 'benefit-style' : ''} ${compact ? 'compact-benefits' : ''}`}>
       {isBenefitVariant && (
         <div className="service-benefit-header">
-          <span className="service-benefit-kicker">Inclus aujourd’hui</span>
+          <span className="service-benefit-kicker">Inclus avec votre commande</span>
           <h3>Vos avantages avec cette commande</h3>
         </div>
       )}
@@ -71,7 +79,7 @@ const ServiceInfo = ({ variant = 'classic' }) => {
         {services.map((service) => {
           const Icon = service.icon;
           return (
-            <div key={service.id} className="service-item">
+            <div key={service.id} className={`service-item ${service.tone ? `service-tone-${service.tone}` : ''}`}>
               <div className="service-icon">
                 <Icon />
               </div>

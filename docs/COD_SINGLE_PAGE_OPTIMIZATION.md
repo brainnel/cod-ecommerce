@@ -74,6 +74,7 @@
 - 不再发起第二次 `enableHighAccuracy: true` 高精度定位请求；历史数据看高精度二次补救贡献很小，且会让失败口径变复杂。
 - FB / Instagram 内置浏览器通过 UA 特征识别为 `facebook_in_app` / `instagram_in_app` 后，Step 2 隐藏“Utiliser ma position”按钮，提示改为“Veuillez choisir votre adresse de livraison sur la carte.”，避免把用户引到大概率失败的浏览器定位路径。
 - FB / Instagram 内置浏览器和普通浏览器的 Step 2 不是同一套体验：内置浏览器默认只引导手动点地图；普通浏览器可以展示“Utiliser ma position”。以后改定位页时必须同时检查这两种环境，不要只按普通 Chrome 体验判断。
+- 本地预览 FB / Instagram 定位页：`localhost` / `127.0.0.1` 下可在商品页或支付页 URL 追加 `browser_context=facebook_in_app` 或 `browser_context=instagram_in_app`，用于预览内置浏览器 UI。该预览参数仅本地生效，线上仍按真实 UA 识别。
 - 手机端地图页必须防止“单指拖地图后页面滑不下去”的旧问题复发：关键继续按钮必须固定在地图下方的底部操作区，不能依赖用户继续向下滚动才能看到。
 - checkout 埋点属性会携带 `browser_context` 和 `is_meta_in_app_browser`，方便后续拆分内置浏览器和普通浏览器的定位/下单表现。
 - `location_selected` / `location_current_failed` 会记录 `geolocation_duration_ms`、`geolocation_timeout_ms`、`geolocation_enable_high_accuracy`；成功时记录 `geolocation_accuracy_m`，失败时记录 `error_code` 和截断后的 `error_message`。
@@ -241,7 +242,9 @@
   - 表单校验失败主要来自地址描述缺失：首次失败字段中 `addressDescription 208`，但多数用户会修正后下单。
 - 2026-05-15 checkout 减摩擦 A/B 实验包：
   - 分流方式：设备级固定 50% / 50%，A 组保持旧落地页 + 旧数量弹窗，B 组进入“落地页福利化 + checkout 减摩擦”完整优化包。落地页优化和 checkout 流程优化暂时使用同一套 A/B，不拆成两个实验，便于最快观察整体下单率变化。
-  - B 组落地页把四个服务点从“功能说明”改成“今日下单包含的福利”：阿比让 24h 免运费、收货后付款、出现问题可处理；价格附近展示 `Livraison gratuite à Abidjan sous 24h`，CTA 附近展示“现在不用付款，收到再付”的信任文案。
+  - B 组落地页把四个服务点从“功能说明”改成“今日下单包含的福利”：阿比让免运费、24 小时内派送、货到付款（cash 或 Wave）、可退货。权益文案当前为 `Livraison gratuite / à Abidjan`、`Livraison 24h / à Abidjan`、`Paiement à réception / cash ou Wave`、`Retour possible / si problème`。
+  - 倒计时不要放在页面最顶部，否则和价格/权益割裂；放在价格行右侧，桌面可显示 `Offre du jour · HH:MM:SS`，手机端只显示 `HH:MM:SS` 小胶囊，不重复四个权益文案，也不单独占一行。倒计时按设备生成 2-8 小时随机值并写入 localStorage，刷新不重新抽，避免看起来假。
+  - CTA 附近展示“现在不用付款，收到再付”的信任文案。
   - B 组商品详情页点击下单后默认数量 1，直接进入大区选择；数量控件放在大区选择页上方，用户仍可加减数量。
   - B 组定位页增加兜底按钮，但文案必须带前置条件“Je ne trouve pas le point exact”，避免用户误以为可以直接跳过地图点选。
   - 兜底按钮使用二级按钮样式，仍然清楚可点，但不能比地图点选后的“Suivant”更像主路径。用户如果找不到精确地图位置，可以用所选大区中心点先继续到信息页。
@@ -250,6 +253,8 @@
   - B 组表单页地址描述文案改成“Adresse détaillée et repère”，因为兜底路径可能没有精确坐标，不能只要求用户写参考物；placeholder 引导用户写街道/街区/门口颜色/附近药店等信息。校验失败时自动滚到第一个缺失字段。
   - 这组实验的埋点统一带 `checkout_quantity_experiment=checkout_quantity_flow_v1` 和 `checkout_quantity_variant=inline_quantity/quantity_modal`，后续后台按 variant 拆结果。`product_landing_view` 也会带同一组 variant，因此可以看落地页到点击下单率，也可以看 checkout 后续转化率。
   - 管理端下单漏斗新增版本窗口“下单减摩擦AB”，开始时间为 `2026-05-15 03:42:42 UTC`（北京时间 05-15 11:42）。后台新增 `A/B 分组`筛选和 A/B 对比表，可在同一版本窗口里分别查看 A 组旧流程、B 组优化包，以及整体对比。
+  - 后续涉及 COD 单页上线前，必须先在线上环境走一个正式订单验证下单链路，再用取消订单接口取消该测试订单，避免再次出现“前端可点但订单接口失败”的事故。
+  - COD 测试订单姓名固定使用 `Codex Test`，方便后台筛查和取消；不要临时起其它测试名。
 
 ## 验证方式
 
