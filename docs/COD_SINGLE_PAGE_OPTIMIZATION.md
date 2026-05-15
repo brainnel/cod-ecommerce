@@ -52,6 +52,7 @@
 - 本地调试可以用 URL 参数强制分组：`checkout_quantity_variant=inline_quantity` 或 `checkout_quantity_variant=quantity_modal`。
 - B 组里“数量已定”和“已选大区”不是同一个动作：点击商品页下单按钮时会默认确认数量 1 件并记录 `quantity_confirmed`；进入大区页后，只有用户点击大区卡片才记录 `district_selected`。
 - B 组兜底按钮事件是 `location_fallback_used`。点击兜底按钮后会同步记录 `location_selected`，且 `location_method = district_center_fallback`，所以在主漏斗里计入“完成定位”；后台 A/B 表单独展示兜底按钮人数和占已选大区比例。
+- 定位方式需要同时看整体和 A/B 组内占比：整体“定位方式”会混入 A 组和 B 组，只适合看大盘；判断兜底按钮是否过度使用时，应看“定位方式 A/B 对比”里 B 组内部的 `district_center_fallback / manual_map / current_location` 分布。
 
 ### 定位方式
 
@@ -265,6 +266,7 @@
   - 管理端下单漏斗新增版本窗口“下单减摩擦AB”，开始时间为 `2026-05-15 03:42:42 UTC`（北京时间 05-15 11:42）。后台新增 `A/B 分组`筛选和 A/B 对比表，可在同一版本窗口里分别查看 A 组旧流程、B 组优化包，以及整体对比。
   - 管理端 A/B 表新增“兜底按钮”列，后端字段为 `location_fallback_sessions`；比例默认看占已选大区人数，因为兜底按钮出现在大区之后、定位完成之前。
   - A/B 表头改成“数量已定 / 已选大区 / 完成定位”，避免误解 B 组同页里的不同事件。
+  - 管理端新增“定位方式 A/B 对比”，每组内部单独计算最终定位方式占比，避免 B 组兜底按钮比例被 A 组流量稀释。
   - 后续涉及 COD 单页上线前，必须先在线上环境走一个正式订单验证下单链路，再用取消订单接口取消该测试订单，避免再次出现“前端可点但订单接口失败”的事故。
   - COD 测试订单姓名固定使用 `Codex Test`，方便后台筛查和取消；不要临时起其它测试名。
 
