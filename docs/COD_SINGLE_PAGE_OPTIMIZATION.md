@@ -51,6 +51,7 @@
 - A/B 分组不是每次打开页面重新随机，而是设备级固定分流：首次生成 `device_id` 后，对 `device_id` 做 hash，`bucket < 50` 进入 B 组 `inline_quantity`，其余进入 A 组 `quantity_modal`。同一浏览器在不清 localStorage 的情况下会稳定留在同一组。
 - 本地调试可以用 URL 参数强制分组：`checkout_quantity_variant=inline_quantity` 或 `checkout_quantity_variant=quantity_modal`。
 - B 组里“数量已定”和“已选大区”不是同一个动作：点击商品页下单按钮时会默认确认数量 1 件并记录 `quantity_confirmed`；进入大区页后，只有用户点击大区卡片才记录 `district_selected`。
+- 判断默认数量 1 是否值得保留时，不能只看转化率，还要看平均件数。后台 A/B 表的“单均件数”主值来自 `order_create_success` 的成功订单平均数量；灰字“确认”来自 `quantity_confirmed` 的数量确认平均值。
 - B 组兜底按钮事件是 `location_fallback_used`。点击兜底按钮后会同步记录 `location_selected`，且 `location_method = district_center_fallback`，所以在主漏斗里计入“完成定位”；后台 A/B 表单独展示兜底按钮人数和占已选大区比例。
 - 定位方式需要同时看整体和 A/B 组内占比：整体“定位方式”会混入 A 组和 B 组，只适合看大盘；判断兜底按钮是否过度使用时，应看“定位方式 A/B 对比”里 B 组内部的 `district_center_fallback / manual_map / current_location` 分布。
 
@@ -267,6 +268,7 @@
   - 管理端 A/B 表新增“兜底按钮”列，后端字段为 `location_fallback_sessions`；比例默认看占已选大区人数，因为兜底按钮出现在大区之后、定位完成之前。
   - A/B 表头改成“数量已定 / 已选大区 / 完成定位”，避免误解 B 组同页里的不同事件。
   - 管理端新增“定位方式 A/B 对比”，每组内部单独计算最终定位方式占比，避免 B 组兜底按钮比例被 A 组流量稀释。
+  - 管理端 A/B 表新增“单均件数”，用来观察 B 组默认数量 1 是否压低平均购买件数；主值为成功订单平均件数，灰字为数量确认平均件数。
   - 后续涉及 COD 单页上线前，必须先在线上环境走一个正式订单验证下单链路，再用取消订单接口取消该测试订单，避免再次出现“前端可点但订单接口失败”的事故。
   - COD 测试订单姓名固定使用 `Codex Test`，方便后台筛查和取消；不要临时起其它测试名。
 
