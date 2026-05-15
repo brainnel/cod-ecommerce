@@ -5,8 +5,11 @@ const DEVICE_ID_STORAGE_KEY = 'cod_checkout_device_id'
 const LANDING_SESSION_ID_STORAGE_KEY = 'cod_landing_session_id'
 const SESSION_ID_STORAGE_KEY = 'cod_checkout_session_id'
 const SESSION_CONTEXT_STORAGE_KEY = 'cod_checkout_context'
+const QUANTITY_EXPERIMENT_STORAGE_KEY = 'cod_checkout_quantity_flow_variant'
 const AD_ID_STORAGE_KEY = 'facebook_ad_id'
 const CHECKOUT_FLOW = 'cod_checkout'
+const QUANTITY_FLOW_EXPERIMENT = 'checkout_quantity_flow_v1'
+const QUANTITY_FLOW_INLINE_PERCENT = 50
 const PENDING_CHECKOUT_REUSE_MS = 10 * 60 * 1000
 
 const safeGetStorage = (storage, key) => {
@@ -86,6 +89,65 @@ const parseStoredTimestamp = (value) => {
 
 const sameValue = (left, right) => String(left || '') === String(right || '')
 
+const hashStringToBucket = (value) => {
+  const text = String(value || '')
+  let hash = 0
+  for (let i = 0; i < text.length; i += 1) {
+    hash = ((hash << 5) - hash + text.charCodeAt(i)) | 0
+  }
+  return Math.abs(hash) % 100
+}
+
+const getDevelopmentQuantityVariantOverride = () => {
+  if (!import.meta.env.DEV || typeof window === 'undefined') return null
+
+  try {
+    const params = new URLSearchParams(window.location.search)
+    const variant = params.get('checkout_quantity_variant')
+    return variant === 'inline_quantity' || variant === 'quantity_modal' ? variant : null
+  } catch (error) {
+    return null
+  }
+}
+
+export const getCheckoutQuantityExperiment = () => {
+  const fallback = {
+    checkout_quantity_experiment: QUANTITY_FLOW_EXPERIMENT,
+    checkout_quantity_variant: 'quantity_modal',
+    checkout_quantity_ab_group: 'control',
+    checkout_quantity_inline_percent: QUANTITY_FLOW_INLINE_PERCENT
+  }
+
+  if (typeof window === 'undefined') return fallback
+
+  const developmentOverride = getDevelopmentQuantityVariantOverride()
+  if (developmentOverride) {
+    return {
+      ...fallback,
+      checkout_quantity_variant: developmentOverride,
+      checkout_quantity_ab_group: developmentOverride === 'inline_quantity' ? 'variant' : 'control'
+    }
+  }
+
+  const cached = safeGetStorage(window.localStorage, QUANTITY_EXPERIMENT_STORAGE_KEY)
+  if (cached === 'inline_quantity' || cached === 'quantity_modal') {
+    return {
+      ...fallback,
+      checkout_quantity_variant: cached,
+      checkout_quantity_ab_group: cached === 'inline_quantity' ? 'variant' : 'control'
+    }
+  }
+
+  const bucket = hashStringToBucket(getCheckoutDeviceId())
+  const variant = bucket < QUANTITY_FLOW_INLINE_PERCENT ? 'inline_quantity' : 'quantity_modal'
+  safeSetStorage(window.localStorage, QUANTITY_EXPERIMENT_STORAGE_KEY, variant)
+  return {
+    ...fallback,
+    checkout_quantity_variant: variant,
+    checkout_quantity_ab_group: variant === 'inline_quantity' ? 'variant' : 'control'
+  }
+}
+
 const canReusePendingCheckoutSession = (existingContext, nextContext) => {
   if (!existingContext?.checkout_started_at) return false
   if (existingContext.quantity_confirmed_at) return false
@@ -107,9 +169,18 @@ export const buildCheckoutProductProperties = (product, extra = {}) => {
   const sku = getSku(product)
   const quantity = extra.quantity || 1
   const unitPrice = Number(product?.price || extra.unit_price || 0)
+  const quantityExperiment = extra.checkout_quantity_experiment
+    ? {
+      checkout_quantity_experiment: extra.checkout_quantity_experiment,
+      checkout_quantity_variant: extra.checkout_quantity_variant,
+      checkout_quantity_ab_group: extra.checkout_quantity_ab_group,
+      checkout_quantity_inline_percent: extra.checkout_quantity_inline_percent
+    }
+    : getCheckoutQuantityExperiment()
 
   return {
     checkout_flow: CHECKOUT_FLOW,
+    ...quantityExperiment,
     product_id: product?.product_id ? String(product.product_id) : extra.product_id || null,
     product_name: product?.name_fr || extra.product_name || null,
     internal_no: product?.internal_no || extra.internal_no || null,

@@ -5,6 +5,7 @@ import { useAdId } from '../hooks/useAdTrackingHooks.js'
 import { trackPurchaseEvent, getClientInfo } from '../services/facebookConversions'
 import {
   buildCheckoutProductProperties,
+  getCheckoutQuantityExperiment,
   getCheckoutSessionId,
   resumeCheckoutSession,
   startCheckoutSession,
@@ -36,6 +37,18 @@ const getCheckoutStepFromSearch = (search) => {
 const hasCheckoutStepInSearch = (search) => {
   const params = new URLSearchParams(search)
   return params.has('step')
+}
+
+const getProductStockLimit = (product) => {
+  const stock = Number(product?.stock)
+  return Number.isFinite(stock) && stock > 0 ? Math.floor(stock) : 99
+}
+
+const clampQuantity = (value, product) => {
+  const parsedQuantity = Number.parseInt(value, 10)
+  const stockLimit = getProductStockLimit(product)
+  if (!Number.isFinite(parsedQuantity)) return 1
+  return Math.min(Math.max(parsedQuantity, 1), stockLimit)
 }
 
 const getBrowserContext = () => {
@@ -76,9 +89,11 @@ const PaymentPage = () => {
   const {
     product: productFromState,
     bundle: bundleFromState,
-    quantity,
+    quantity: routeQuantity,
     productType: productTypeFromState,
-    checkoutSessionId: routeCheckoutSessionId
+    checkoutSessionId: routeCheckoutSessionId,
+    checkoutQuantityExperiment: routeCheckoutQuantityExperiment,
+    quantityConfirmed: routeQuantityConfirmed
   } = location.state || {}
 
   // Detect flow: 'bundle' or 'product' (default).
@@ -103,20 +118,28 @@ const PaymentPage = () => {
   }, [isBundleFlow, bundleFromState, productFromState])
 
   const bundle = isBundleFlow ? bundleFromState : null
+  const checkoutQuantityExperiment = useMemo(
+    () => routeCheckoutQuantityExperiment || getCheckoutQuantityExperiment(),
+    [routeCheckoutQuantityExperiment]
+  )
   const adId = useAdId()
   const checkoutSessionIdRef = useRef(routeCheckoutSessionId || null)
+  const inlineQuantityConfirmedRef = useRef(Boolean(routeQuantityConfirmed))
   const infoStepTrackedRef = useRef(false)
   const completedFieldsRef = useRef(new Set())
+  const fieldRefs = useRef({})
   const currentLocationRequestRef = useRef(0)
   const currentLocationTrackedRequestRef = useRef(null)
   const currentLocationHintTimerRef = useRef(null)
   const markerSelectionSourceRef = useRef('none')
   const browserContext = useMemo(() => getBrowserContext(), [])
   const isMetaInAppBrowser = browserContext.is_meta_in_app_browser
+  const isInlineQuantityVariant = checkoutQuantityExperiment.checkout_quantity_variant === 'inline_quantity'
 
   // 三步流程：1=选大区, 2=地图标记, 3=填写信息
   const [currentStep, setCurrentStep] = useState(() => getCheckoutStepFromSearch(location.search))
   const [loading, setLoading] = useState(false)
+  const [quantity, setQuantity] = useState(() => clampQuantity(routeQuantity || 1, product))
 
   // 步顢1：大区选择
   const [districts, setDistricts] = useState([])
@@ -158,12 +181,14 @@ const PaymentPage = () => {
     checkoutSessionIdRef.current = startCheckoutSession(product, {
       quantity: quantity || 1,
       total_price: totalPrice,
-      ad_id: adId
+      ad_id: adId,
+      ...checkoutQuantityExperiment
     })
     trackCheckoutEvent('checkout_start', buildCheckoutProductProperties(product, {
       quantity: quantity || 1,
       total_price: totalPrice,
-      ad_id: adId
+      ad_id: adId,
+      ...checkoutQuantityExperiment
     }), { sessionId: checkoutSessionIdRef.current })
     return checkoutSessionIdRef.current
   }
@@ -178,13 +203,25 @@ const PaymentPage = () => {
     }
   }
 
+  const getDistrictCenterMarker = (district = selectedDistrict) => {
+    const districtLat = Number.parseFloat(district?.latitude)
+    const districtLng = Number.parseFloat(district?.longitude)
+    const fallbackCenter = mapCenter || DEFAULT_CENTER
+
+    return {
+      lat: Number.isFinite(districtLat) ? districtLat : fallbackCenter.lat,
+      lng: Number.isFinite(districtLng) ? districtLng : fallbackCenter.lng
+    }
+  }
+
   const getCheckoutAnalyticsProps = (extra = {}) => {
     const totalPrice = product ? product.price * (quantity || 1) : 0
     return {
       ...buildCheckoutProductProperties(product, {
         quantity: quantity || 1,
         total_price: totalPrice,
-        ad_id: adId
+        ad_id: adId,
+        ...checkoutQuantityExperiment
       }),
       browser_context: browserContext.browser_context,
       is_meta_in_app_browser: isMetaInAppBrowser,
@@ -202,13 +239,37 @@ const PaymentPage = () => {
     })
   }
 
+  const handleInlineQuantityChange = (nextQuantity) => {
+    const normalizedQuantity = clampQuantity(nextQuantity, product)
+    if (normalizedQuantity === quantity) return
+
+    const previousQuantity = quantity
+    const totalPrice = product.price * normalizedQuantity
+    setQuantity(normalizedQuantity)
+    updateCheckoutContext(product, {
+      quantity: normalizedQuantity,
+      total_price: totalPrice,
+      ad_id: adId,
+      ...checkoutQuantityExperiment
+    })
+    trackPaymentEvent('quantity_changed', {
+      quantity: normalizedQuantity,
+      previous_quantity: previousQuantity,
+      total_price: totalPrice,
+      quantity_change_method: 'district_stepper',
+      ...checkoutQuantityExperiment
+    })
+  }
+
   const getPaymentNavigationState = () => ({
     ...(location.state || {}),
     product: productFromState,
     bundle: bundleFromState,
     quantity,
     productType: productTypeFromState,
-    checkoutSessionId: checkoutSessionIdRef.current || routeCheckoutSessionId || getCheckoutSessionId()
+    checkoutSessionId: checkoutSessionIdRef.current || routeCheckoutSessionId || getCheckoutSessionId(),
+    checkoutQuantityExperiment,
+    quantityConfirmed: inlineQuantityConfirmedRef.current
   })
 
   const navigateToCheckoutStep = (step, options = {}) => {
@@ -256,7 +317,8 @@ const PaymentPage = () => {
       resumeCheckoutSession(routeCheckoutSessionId, product, {
         quantity,
         total_price: totalPrice,
-        ad_id: adId
+        ad_id: adId,
+        ...checkoutQuantityExperiment
       })
     } else {
       const storedSessionId = getCheckoutSessionId()
@@ -266,10 +328,16 @@ const PaymentPage = () => {
       updateCheckoutContext(product, {
         quantity,
         total_price: totalPrice,
-        ad_id: adId
+        ad_id: adId,
+        ...checkoutQuantityExperiment
       })
     }
-  }, [product, quantity, navigate, routeCheckoutSessionId, adId])
+  }, [product, quantity, navigate, routeCheckoutSessionId, adId, checkoutQuantityExperiment])
+
+  useEffect(() => {
+    if (!product) return
+    setQuantity((currentQuantity) => clampQuantity(currentQuantity || routeQuantity || 1, product))
+  }, [product, routeQuantity])
 
   useEffect(() => {
     if (!product || !quantity) return
@@ -481,6 +549,7 @@ const PaymentPage = () => {
       quantity,
       total_price: product.price * quantity,
       ad_id: adId,
+      ...checkoutQuantityExperiment,
       ...getDistrictAnalyticsProps(district)
     })
     trackPaymentEvent('district_selected', getDistrictAnalyticsProps(district))
@@ -523,6 +592,29 @@ const PaymentPage = () => {
       return
     }
     trackPaymentEvent('location_confirmed', getDistrictAnalyticsProps())
+    navigateToCheckoutStep(3)
+  }
+
+  const handleUseDistrictCenterFallback = () => {
+    if (!selectedDistrict) return
+
+    currentLocationRequestRef.current += 1
+    clearCurrentLocationHintTimer()
+    const fallbackMarker = getDistrictCenterMarker(selectedDistrict)
+    markerSelectionSourceRef.current = 'district_center_fallback'
+    setCustomMarker(fallbackMarker)
+    setMapCenter(fallbackMarker)
+    setLocationRequestStatus('idle')
+    setLocationRequestMessage('')
+
+    const fallbackProps = {
+      ...getDistrictAnalyticsProps(selectedDistrict),
+      location_method: 'district_center_fallback',
+      location_fallback_requires_address_detail: true
+    }
+    trackPaymentEvent('location_fallback_used', fallbackProps)
+    trackPaymentEvent('location_selected', fallbackProps)
+    trackPaymentEvent('location_confirmed', fallbackProps)
     navigateToCheckoutStep(3)
   }
 
@@ -593,6 +685,21 @@ const PaymentPage = () => {
     }
   }
 
+  const scrollToFirstMissingField = (missingFields) => {
+    if (!isInlineQuantityVariant || missingFields.length === 0) return
+
+    const field = missingFields[0]
+    const fieldNode = fieldRefs.current[field]
+    if (!fieldNode) return
+
+    window.requestAnimationFrame(() => {
+      fieldNode.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      if (typeof fieldNode.focus === 'function') {
+        fieldNode.focus({ preventScroll: true })
+      }
+    })
+  }
+
   // 验证表单
   const validateForm = () => {
     const newErrors = {}
@@ -615,9 +722,13 @@ const PaymentPage = () => {
     }
     
     if (!userInfo.addressDescription.trim()) {
-      newErrors.addressDescription = 'La description de l\'adresse est requise'
+      newErrors.addressDescription = isInlineQuantityVariant
+        ? 'Ajoutez votre adresse et un repère pour le livreur'
+        : 'La description de l\'adresse est requise'
     } else if (userInfo.addressDescription.trim().length < 5) {
-      newErrors.addressDescription = 'Au moins 5 caractères requis'
+      newErrors.addressDescription = isInlineQuantityVariant
+        ? 'Ajoutez une adresse plus précise'
+        : 'Au moins 5 caractères requis'
     }
     
     setErrors(newErrors)
@@ -650,6 +761,7 @@ const PaymentPage = () => {
         missing_fields: missingFields,
         whatsapp_same_as_phone: whatsappSameAsPhone
       })
+      scrollToFirstMissingField(missingFields)
       return
     }
     
@@ -675,7 +787,8 @@ const PaymentPage = () => {
           currency: "FCFA",
           is_web: 1,
           quantity,
-          ad_id: adId
+          ad_id: adId,
+          ab_group: checkoutQuantityExperiment.checkout_quantity_variant
         }
         console.log('提交组合产品订单:', bundleOrderData)
         response = await bundleAPI.createBundleOrder(bundle.id, bundleOrderData)
@@ -701,7 +814,8 @@ const PaymentPage = () => {
           discount_amount: 0,
           currency: "FCFA",
           is_web: 1,
-          ad_id: adId
+          ad_id: adId,
+          ab_group: checkoutQuantityExperiment.checkout_quantity_variant
         }
 
         console.log('提交订单:', orderData)
@@ -739,7 +853,8 @@ const PaymentPage = () => {
           userInfo: effectiveUserInfo,
           selectedLocation: selectedDistrict,
           totalPrice: product.price * quantity,
-          orderResponse: response.data
+          orderResponse: response.data,
+          checkoutQuantityExperiment
         }
       })
 
@@ -792,6 +907,55 @@ const PaymentPage = () => {
         {currentStep === 1 && (
           <div className="section district-section">
             <h2 className="section-title">Sélectionnez votre district</h2>
+            {isInlineQuantityVariant && (
+              <div className="inline-quantity-card">
+                <img
+                  src={product.image_url?.[0]}
+                  alt={product.name_fr}
+                  className="inline-quantity-image"
+                />
+                <div className="inline-quantity-info">
+                  <div className="inline-quantity-title">{product.name_fr}</div>
+                  <div className="inline-quantity-price">{product.price} FCFA</div>
+                </div>
+                <div className="inline-quantity-control" aria-label="Quantité">
+                  <span className="inline-quantity-label">Quantité</span>
+                  <div className="inline-quantity-stepper">
+                    <button
+                      type="button"
+                      className="inline-quantity-btn"
+                      onClick={() => handleInlineQuantityChange(quantity - 1)}
+                      disabled={quantity <= 1}
+                      aria-label="Réduire la quantité"
+                    >
+                      -
+                    </button>
+                    <input
+                      type="number"
+                      className="inline-quantity-input"
+                      value={quantity}
+                      min="1"
+                      max={getProductStockLimit(product)}
+                      onChange={(event) => handleInlineQuantityChange(event.target.value)}
+                      aria-label="Quantité"
+                    />
+                    <button
+                      type="button"
+                      className="inline-quantity-btn"
+                      onClick={() => handleInlineQuantityChange(quantity + 1)}
+                      disabled={quantity >= getProductStockLimit(product)}
+                      aria-label="Augmenter la quantité"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+                <div className="inline-quantity-total">
+                  <span>Total</span>
+                  <strong>{totalPrice} FCFA</strong>
+                </div>
+              </div>
+            )}
             {loading ? (
               <div className="loading-container">
                 <div className="loading-spinner"></div>
@@ -822,7 +986,7 @@ const PaymentPage = () => {
 
         {/* 步顢2: 地图标记 */}
         {currentStep === 2 && (
-          <div className="section map-section">
+          <div className={`section map-section ${isInlineQuantityVariant && !customMarker ? 'with-location-fallback' : ''}`}>
             {/* 橙色提示条 */}
             <div className={`location-hint ${isMetaInAppBrowser ? 'map-only' : ''}`}>
               <div className="hint-content">
@@ -887,7 +1051,20 @@ const PaymentPage = () => {
               </div>
             )}
 
-            <div className="step-actions">
+            <div className={`step-actions map-actions ${isInlineQuantityVariant && !customMarker ? 'with-location-fallback' : ''}`}>
+              {isInlineQuantityVariant && !customMarker && (
+                <button
+                  type="button"
+                  className="location-fallback-btn"
+                  onClick={handleUseDistrictCenterFallback}
+                >
+                  <span className="location-fallback-copy">
+                    <span className="location-fallback-title">Je ne trouve pas le point exact</span>
+                    <span className="location-fallback-subtitle">Continuer avec adresse et repère</span>
+                  </span>
+                  <span className="location-fallback-arrow">›</span>
+                </button>
+              )}
               <button type="button" className="prev-btn" onClick={() => navigate(-1)}>
                 Précédent
               </button>
@@ -913,6 +1090,7 @@ const PaymentPage = () => {
               <input
                 id="fullName"
                 type="text"
+                ref={(node) => { fieldRefs.current.fullName = node }}
                 className={`form-input ${errors.fullName ? 'error' : ''}`}
                 value={userInfo.fullName}
                 onChange={(e) => handleInputChange('fullName', e.target.value)}
@@ -928,6 +1106,7 @@ const PaymentPage = () => {
                 <input
                   id="phone"
                   type="tel"
+                  ref={(node) => { fieldRefs.current.phone = node }}
                   className="form-input phone-input"
                   value={userInfo.phone}
                   onChange={(e) => handleInputChange('phone', e.target.value)}
@@ -953,6 +1132,7 @@ const PaymentPage = () => {
                   <input
                     id="whatsapp"
                     type="tel"
+                    ref={(node) => { fieldRefs.current.whatsapp = node }}
                     className="form-input phone-input"
                     value={userInfo.whatsapp}
                     onChange={(e) => handleInputChange('whatsapp', e.target.value)}
@@ -964,13 +1144,18 @@ const PaymentPage = () => {
             </div>
 
             <div className="form-group">
-              <label htmlFor="addressDescription" className="form-label">Description de l'adresse *</label>
+              <label htmlFor="addressDescription" className="form-label">
+                {isInlineQuantityVariant ? 'Adresse détaillée et repère *' : 'Description de l\'adresse *'}
+              </label>
               <textarea
                 id="addressDescription"
+                ref={(node) => { fieldRefs.current.addressDescription = node }}
                 className={`form-textarea ${errors.addressDescription ? 'error' : ''}`}
                 value={userInfo.addressDescription}
                 onChange={(e) => handleInputChange('addressDescription', e.target.value)}
-                placeholder="Ex: Près de l'université, à côté du bâtiment rouge"
+                placeholder={isInlineQuantityVariant
+                  ? 'Ex: rue, quartier, portail bleu, près de la pharmacie'
+                  : 'Ex: Près de l\'université, à côté du bâtiment rouge'}
                 rows={4}
               />
               <div className="char-count">{userInfo.addressDescription.length}/200</div>

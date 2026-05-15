@@ -1,10 +1,16 @@
-import { useState, useEffect, useRef, useLayoutEffect } from 'react';
+import { useState, useEffect, useRef, useLayoutEffect, useMemo } from 'react';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Pagination, Navigation } from 'swiper/modules';
 import { useNavigate } from 'react-router-dom';
 import { productAPI } from '../services/api';
-import { trackViewContentEvent, getClientInfo } from '../services/facebookConversions';
-import { beginCheckoutFunnel, trackProductLandingView } from '../services/checkoutFunnelAnalytics';
+import { trackViewContentEvent, trackAddToCartEvent, getClientInfo } from '../services/facebookConversions';
+import {
+  beginCheckoutFunnel,
+  buildCheckoutProductProperties,
+  getCheckoutQuantityExperiment,
+  trackCheckoutEvent,
+  trackProductLandingView
+} from '../services/checkoutFunnelAnalytics';
 import { useAdTrackingContext } from '../hooks/useAdTrackingHooks.js';
 import Countdown from './Countdown';
 import QuantityModal from './QuantityModal';
@@ -63,6 +69,8 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
   const navigate = useNavigate();
   const { adId, isLoading: adTrackingLoading } = useAdTrackingContext();
   const viewTrackedProductRef = useRef(null);
+  const checkoutQuantityExperiment = useMemo(() => getCheckoutQuantityExperiment(), []);
+  const isCheckoutOptimizationVariant = checkoutQuantityExperiment.checkout_quantity_variant === 'inline_quantity';
 
   useLayoutEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
@@ -230,11 +238,61 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
   };
 
   const handleBuyNowClick = () => {
+    const quantityExperiment = checkoutQuantityExperiment;
+    const isInlineQuantityVariant = quantityExperiment.checkout_quantity_variant === 'inline_quantity';
+    const defaultQuantity = 1;
+    const totalPrice = product.price * defaultQuantity;
+    let checkoutSessionId = null;
+
     try {
-      beginCheckoutFunnel(product, { ad_id: adId });
+      checkoutSessionId = beginCheckoutFunnel(product, {
+        ad_id: adId,
+        quantity: defaultQuantity,
+        total_price: totalPrice,
+        ...quantityExperiment
+      });
     } catch (error) {
       console.warn('checkout_start 埋点失败:', error);
     }
+
+    if (isInlineQuantityVariant) {
+      if (checkoutSessionId) {
+        try {
+          trackCheckoutEvent('quantity_confirmed', buildCheckoutProductProperties(product, {
+            ad_id: adId,
+            quantity: defaultQuantity,
+            total_price: totalPrice,
+            quantity_confirm_method: 'inline_default',
+            ...quantityExperiment
+          }), { sessionId: checkoutSessionId });
+        } catch (error) {
+          console.warn('quantity_confirmed 埋点失败:', error);
+        }
+      }
+
+      try {
+        trackAddToCartEvent({
+          productId: product.product_id,
+          quantity: defaultQuantity,
+          totalPrice,
+          unitPrice: product.price
+        }, getClientInfo()).catch(err => console.warn('Facebook AddToCart 事件失败:', err));
+      } catch (fbError) {
+        console.warn('Facebook AddToCart 事件错误:', fbError);
+      }
+
+      navigate('/payment?step=1', {
+        state: {
+          product,
+          quantity: defaultQuantity,
+          checkoutSessionId,
+          checkoutQuantityExperiment: quantityExperiment,
+          quantityConfirmed: true
+        }
+      });
+      return;
+    }
+
     setIsModalOpen(true);
   };
 
@@ -305,6 +363,12 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
               )}
             </div>
 
+            {isCheckoutOptimizationVariant && (
+              <div className="delivery-benefit-pill">
+                Livraison gratuite à Abidjan sous 24h
+              </div>
+            )}
+
             {/* 库存信息 */}
             <div className="stock-info">
               <span className="stock-label">Stock : </span>
@@ -334,10 +398,15 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
           </div>
 
           {/* 服务信息 */}
-          <ServiceInfo />
+          <ServiceInfo variant={isCheckoutOptimizationVariant ? 'benefits' : 'classic'} />
 
           {/* 底部操作按钮 */}
           <div className="bottom-actions">
+            {isCheckoutOptimizationVariant && (
+              <div className="cta-trust-note">
+                Aucun paiement maintenant. Vous payez à la réception.
+              </div>
+            )}
             <button
               type="button"
               className="buy-now-btn"
@@ -375,6 +444,7 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         product={product}
+        checkoutQuantityExperiment={checkoutQuantityExperiment}
         onConfirm={handleOrderConfirm}
       />
     </div>

@@ -150,6 +150,132 @@
   margin: 0 0 20px 0;
 }
 
+.inline-quantity-card {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) auto;
+  grid-template-areas:
+    "image info control"
+    "image total total";
+  gap: 10px 12px;
+  align-items: center;
+  padding: 12px;
+  margin-bottom: 16px;
+  border: 1px solid #ffe0d2;
+  border-radius: 10px;
+  background: #fff7f2;
+}
+
+.inline-quantity-image {
+  grid-area: image;
+  width: 64px;
+  height: 64px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: white;
+}
+
+.inline-quantity-info {
+  grid-area: info;
+  min-width: 0;
+}
+
+.inline-quantity-title {
+  color: #20242a;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.inline-quantity-price {
+  margin-top: 4px;
+  color: #FF5100;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.inline-quantity-control {
+  grid-area: control;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.inline-quantity-label {
+  color: #6c757d;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.inline-quantity-stepper {
+  display: grid;
+  grid-template-columns: 36px 48px 36px;
+  height: 36px;
+  border: 1px solid #ffd0bb;
+  border-radius: 999px;
+  overflow: hidden;
+  background: white;
+}
+
+.inline-quantity-btn {
+  border: 0;
+  background: white;
+  color: #FF5100;
+  font-size: 20px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.inline-quantity-btn:disabled {
+  color: #c6cbd2;
+  cursor: not-allowed;
+}
+
+.inline-quantity-input {
+  width: 100%;
+  border: 0;
+  border-left: 1px solid #ffe0d2;
+  border-right: 1px solid #ffe0d2;
+  color: #20242a;
+  font-size: 16px;
+  font-weight: 800;
+  text-align: center;
+  appearance: textfield;
+}
+
+.inline-quantity-input::-webkit-outer-spin-button,
+.inline-quantity-input::-webkit-inner-spin-button {
+  margin: 0;
+  appearance: none;
+}
+
+.inline-quantity-input:focus {
+  outline: none;
+}
+
+.inline-quantity-total {
+  grid-area: total;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 32px;
+  padding-top: 8px;
+  border-top: 1px solid #ffe0d2;
+  color: #6c757d;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.inline-quantity-total strong {
+  color: #FF5100;
+  font-size: 18px;
+  font-weight: 900;
+}
+
 /* 橙色位置提示条 */
 .location-hint {
   background: #FF5100;
@@ -881,6 +1007,70 @@
   color: #495057;
 }
 
+.map-actions.with-location-fallback {
+  flex-wrap: wrap;
+}
+
+.location-fallback-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-basis: 100%;
+  min-height: 54px;
+  padding: 10px 14px;
+  border: 1px solid #ffd0bb;
+  border-radius: 12px;
+  background: #fff7f2;
+  color: #d94300;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.3;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  box-shadow: 0 4px 12px rgba(255, 81, 0, 0.12);
+  touch-action: manipulation;
+}
+
+.location-fallback-btn:hover {
+  background: #fff0e6;
+  border-color: #FF5100;
+  box-shadow: 0 6px 16px rgba(255, 81, 0, 0.16);
+}
+
+.location-fallback-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.location-fallback-title {
+  color: #b63a00;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.location-fallback-subtitle {
+  color: #d94300;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.location-fallback-arrow {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: #FF5100;
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  line-height: 1;
+}
+
 /* 订单摘要信息 */
 .order-summary-info {
   display: grid;
@@ -1022,6 +1212,10 @@
     padding-bottom: 96px;
   }
 
+  .map-section.with-location-fallback {
+    padding-bottom: 150px;
+  }
+
   .info-section {
     padding-bottom: 112px;
   }
@@ -1111,6 +1305,15 @@
     backdrop-filter: blur(10px);
   }
 
+  .map-section > .step-actions.with-location-fallback {
+    flex-wrap: wrap;
+  }
+
+  .map-section > .step-actions.with-location-fallback .location-fallback-btn {
+    flex: 0 0 100%;
+    order: -1;
+  }
+
   .map-section > .step-actions .prev-btn,
   .map-section > .step-actions .next-btn {
     flex: 1;
@@ -1168,6 +1371,36 @@
   
   .section {
     padding: 12px;
+  }
+
+  .inline-quantity-card {
+    grid-template-columns: 54px minmax(0, 1fr);
+    grid-template-areas:
+      "image info"
+      "control control"
+      "total total";
+    gap: 8px 10px;
+    padding: 10px;
+  }
+
+  .inline-quantity-image {
+    width: 54px;
+    height: 54px;
+  }
+
+  .inline-quantity-control {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .inline-quantity-stepper {
+    grid-template-columns: 34px 46px 34px;
+    height: 34px;
+  }
+
+  .inline-quantity-total strong {
+    font-size: 17px;
   }
 
   .district-list {
@@ -1277,6 +1510,23 @@
   .map-section > .step-actions .next-btn {
     min-height: 46px;
     padding: 10px 12px;
+  }
+
+  .map-section.with-location-fallback {
+    padding-bottom: 140px;
+  }
+
+  .map-section > .step-actions.with-location-fallback .location-fallback-btn {
+    min-height: 48px;
+    padding: 9px 10px;
+  }
+
+  .location-fallback-title {
+    font-size: 12.5px;
+  }
+
+  .location-fallback-subtitle {
+    font-size: 11.5px;
   }
 
   .info-section {

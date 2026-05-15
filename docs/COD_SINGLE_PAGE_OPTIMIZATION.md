@@ -1,6 +1,6 @@
 # COD 单页优化维护记录
 
-更新时间：2026-05-14 15:18 CST
+更新时间：2026-05-15 CST
 
 这个文档用于维护 COD ecommerce 单页优化的历史轨迹。后续如果对下单页、商品详情页、地图定位、埋点、后台漏斗分析、大区排序等做了重要调整，先把关键结论追加到这里。上下文压缩后，优先读这个文件恢复背景。
 
@@ -73,6 +73,8 @@
 - 4 秒还没返回时，页面提示用户可以手动在地图上选，不阻塞页面。
 - 不再发起第二次 `enableHighAccuracy: true` 高精度定位请求；历史数据看高精度二次补救贡献很小，且会让失败口径变复杂。
 - FB / Instagram 内置浏览器通过 UA 特征识别为 `facebook_in_app` / `instagram_in_app` 后，Step 2 隐藏“Utiliser ma position”按钮，提示改为“Veuillez choisir votre adresse de livraison sur la carte.”，避免把用户引到大概率失败的浏览器定位路径。
+- FB / Instagram 内置浏览器和普通浏览器的 Step 2 不是同一套体验：内置浏览器默认只引导手动点地图；普通浏览器可以展示“Utiliser ma position”。以后改定位页时必须同时检查这两种环境，不要只按普通 Chrome 体验判断。
+- 手机端地图页必须防止“单指拖地图后页面滑不下去”的旧问题复发：关键继续按钮必须固定在地图下方的底部操作区，不能依赖用户继续向下滚动才能看到。
 - checkout 埋点属性会携带 `browser_context` 和 `is_meta_in_app_browser`，方便后续拆分内置浏览器和普通浏览器的定位/下单表现。
 - `location_selected` / `location_current_failed` 会记录 `geolocation_duration_ms`、`geolocation_timeout_ms`、`geolocation_enable_high_accuracy`；成功时记录 `geolocation_accuracy_m`，失败时记录 `error_code` 和截断后的 `error_message`。
 
@@ -231,6 +233,21 @@
   - 窗口开始时间为 `2026-05-14 01:27:30 UTC`（北京时间 05-14 09:27），对应 `cod-ecommerce` commit `e8b6eb7`。
   - 后台默认选中该版本窗口，用来观察 FB / Instagram 内置浏览器隐藏获取定位按钮后的全链路数据。
   - WhatsApp 同电话属于小改动，不单独作为大版本筛选入口。
+- 2026-05-15 “FB排除获取定位按钮”后续观察：
+  - 统计窗口：`2026-05-14 01:27 UTC` 到 `2026-05-15 02:05 UTC`，仅看带 Ad ID 的 COD checkout session。
+  - 主漏斗：`checkout_start 1716 -> quantity_confirmed 1319 -> district_selected 1160 -> location_selected 854 -> info_step_view 771 -> submit_order_click/order_create_success 642`，下单成功率约 `37.4%`。
+  - 最大剩余损耗为 `checkout_start -> quantity_confirmed`（23.1%）和 `district_selected -> location_selected`（26.4%）。
+  - 最终定位方式基本转为手动地图：`manual_map 831`，`current_location 23`；当前定位失败仍有少量，但已不是主漏斗核心问题。
+  - 表单校验失败主要来自地址描述缺失：首次失败字段中 `addressDescription 208`，但多数用户会修正后下单。
+- 2026-05-15 checkout 减摩擦 A/B 实验包：
+  - 分流方式：设备级固定 50% / 50%，A 组保持旧落地页 + 旧数量弹窗，B 组进入“落地页福利化 + checkout 减摩擦”完整优化包。落地页优化和 checkout 流程优化暂时使用同一套 A/B，不拆成两个实验，便于最快观察整体下单率变化。
+  - B 组落地页把四个服务点从“功能说明”改成“今日下单包含的福利”：阿比让 24h 免运费、收货后付款、出现问题可处理；价格附近展示 `Livraison gratuite à Abidjan sous 24h`，CTA 附近展示“现在不用付款，收到再付”的信任文案。
+  - B 组商品详情页点击下单后默认数量 1，直接进入大区选择；数量控件放在大区选择页上方，用户仍可加减数量。
+  - B 组定位页增加兜底按钮，但文案必须带前置条件“Je ne trouve pas le point exact”，避免用户误以为可以直接跳过地图点选。
+  - 兜底按钮使用二级按钮样式，仍然清楚可点，但不能比地图点选后的“Suivant”更像主路径。用户如果找不到精确地图位置，可以用所选大区中心点先继续到信息页。
+  - 兜底按钮必须在手机端固定在底部操作区，避免 Google Maps 单指拖动捕获页面滚动后用户找不到继续入口。
+  - B 组表单页地址描述文案改成“Adresse détaillée et repère”，因为兜底路径可能没有精确坐标，不能只要求用户写参考物；placeholder 引导用户写街道/街区/门口颜色/附近药店等信息。校验失败时自动滚到第一个缺失字段。
+  - 这组实验的埋点统一带 `checkout_quantity_experiment=checkout_quantity_flow_v1` 和 `checkout_quantity_variant=inline_quantity/quantity_modal`，后续后台按 variant 拆结果。`product_landing_view` 也会带同一组 variant，因此可以看落地页到点击下单率，也可以看 checkout 后续转化率。
 
 ## 验证方式
 

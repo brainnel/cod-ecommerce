@@ -3,7 +3,11 @@ import { useNavigate } from 'react-router-dom'
 import { Swiper, SwiperSlide } from 'swiper/react'
 import { Pagination, Navigation } from 'swiper/modules'
 import { bundleAPI } from '../services/api'
-import { beginCheckoutFunnel, trackProductLandingView } from '../services/checkoutFunnelAnalytics'
+import {
+  beginCheckoutFunnel,
+  getCheckoutQuantityExperiment,
+  trackProductLandingView
+} from '../services/checkoutFunnelAnalytics'
 import { useAdTrackingContext } from '../hooks/useAdTrackingHooks.js'
 import ServiceInfo from './ServiceInfo'
 import logoImage from '../assets/logo.png'
@@ -36,6 +40,8 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
   const [error, setError] = useState(null)
   const [quantity, setQuantity] = useState(1)
   const viewTrackedBundleRef = useRef(null)
+  const checkoutQuantityExperiment = useMemo(() => getCheckoutQuantityExperiment(), [])
+  const isCheckoutOptimizationVariant = checkoutQuantityExperiment.checkout_quantity_variant === 'inline_quantity'
 
   const bundleProduct = useMemo(() => {
     if (!bundle) return null
@@ -149,7 +155,8 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
         total_price: totalPrice,
         ad_id: adId,
         product_type: 'bundle',
-        bundle_id: String(bundle.id)
+        bundle_id: String(bundle.id),
+        ...checkoutQuantityExperiment
       })
     } catch (error) {
       console.warn('bundle checkout_start 埋点失败:', error)
@@ -160,7 +167,8 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
         bundle,
         quantity,
         productType: 'bundle',
-        checkoutSessionId
+        checkoutSessionId,
+        checkoutQuantityExperiment
       }
     })
   }
@@ -226,6 +234,12 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
               <div className="current-price">{formatFcfa(bundle.cfa_price)} FCFA</div>
             </div>
 
+            {isCheckoutOptimizationVariant && (
+              <div className="delivery-benefit-pill">
+                Livraison gratuite à Abidjan sous 24h
+              </div>
+            )}
+
             {/* 数量选择器 */}
             <div className="bundle-quantity-row">
               <span className="bundle-quantity-label">Quantité :</span>
@@ -263,7 +277,7 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
             </div>
           </div>
 
-          <ServiceInfo />
+          <ServiceInfo variant={isCheckoutOptimizationVariant ? 'benefits' : 'classic'} />
 
           {/* 包含产品列表 */}
           {items.length > 0 && (
@@ -293,6 +307,11 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
           )}
 
           <div className="bottom-actions">
+            {isCheckoutOptimizationVariant && (
+              <div className="cta-trust-note">
+                Aucun paiement maintenant. Vous payez à la réception.
+              </div>
+            )}
             <button type="button" className="buy-now-btn" onClick={handleBuyNow}>
               Acheter maintenant - Paiement à la livraison
             </button>

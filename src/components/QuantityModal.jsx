@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { trackAddToCartEvent, getClientInfo } from '../services/facebookConversions'
 import {
   buildCheckoutProductProperties,
+  getCheckoutQuantityExperiment,
   getCheckoutSessionId,
   startCheckoutSession,
   trackCheckoutEvent,
@@ -10,7 +11,7 @@ import {
 } from '../services/checkoutFunnelAnalytics'
 import './QuantityModal.css'
 
-const QuantityModal = ({ isOpen, onClose, product }) => {
+const QuantityModal = ({ isOpen, onClose, product, checkoutQuantityExperiment }) => {
   const navigate = useNavigate()
   const [quantity, setQuantity] = useState(1)
   const [isClosing, setIsClosing] = useState(false)
@@ -34,19 +35,31 @@ const QuantityModal = ({ isOpen, onClose, product }) => {
   const handleConfirm = () => {
     const totalPrice = product.price * quantity
     let checkoutSessionId = getCheckoutSessionId()
+    const quantityExperiment = checkoutQuantityExperiment || getCheckoutQuantityExperiment()
 
     if (!checkoutSessionId) {
-      checkoutSessionId = startCheckoutSession(product, { quantity, total_price: totalPrice })
+      checkoutSessionId = startCheckoutSession(product, {
+        quantity,
+        total_price: totalPrice,
+        ...quantityExperiment
+      })
       trackCheckoutEvent('checkout_start', buildCheckoutProductProperties(product, {
         quantity,
-        total_price: totalPrice
+        total_price: totalPrice,
+        ...quantityExperiment
       }), { sessionId: checkoutSessionId })
     }
 
-    updateCheckoutContext(product, { quantity, total_price: totalPrice })
+    updateCheckoutContext(product, {
+      quantity,
+      total_price: totalPrice,
+      ...quantityExperiment
+    })
     trackCheckoutEvent('quantity_confirmed', buildCheckoutProductProperties(product, {
       quantity,
-      total_price: totalPrice
+      total_price: totalPrice,
+      quantity_confirm_method: 'quantity_modal',
+      ...quantityExperiment
     }), { sessionId: checkoutSessionId })
 
     try {
@@ -65,7 +78,9 @@ const QuantityModal = ({ isOpen, onClose, product }) => {
       state: {
         product,
         quantity,
-        checkoutSessionId
+        checkoutSessionId,
+        checkoutQuantityExperiment: quantityExperiment,
+        quantityConfirmed: true
       }
     })
     handleClose()
