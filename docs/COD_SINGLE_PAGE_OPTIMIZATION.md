@@ -304,6 +304,23 @@ ORDER BY CASE WHEN d.sort_order = 0 THEN 999999 ELSE d.sort_order END ASC, d.nam
 
 ## 事故记录
 
+### 2026-05-15 checkout A/B 字段误传导致下单 500
+
+现象：下单减摩擦 A/B 上线后，后台看板显示 `submit_order_click` 有数据，但 `order_create_success` 为 0，`order_create_failed` 与最终点下单数接近一致。实测网页最终下单接口返回 500。
+
+根因：
+
+- 前端把 checkout 流程实验值 `checkout_quantity_variant=inline_quantity/quantity_modal` 传给订单接口的 `ab_group` 字段。
+- 订单表里的 `ab_group` 是老预付款 A/B 字段，不适合存这类字符串流程标签。
+- 后端插入订单时收到 `ab_group: "inline_quantity"` 会触发入库失败，导致订单创建接口返回 500。
+
+修复：
+
+- `cod-ecommerce` 不再向订单创建接口传 `ab_group`；checkout A/B 分组只保留在第一方埋点里。
+- `app_backend` 增加兜底：如果旧页面缓存继续传非数字 `ab_group`，后端忽略该值，不阻塞下单。
+- 线上验证：带旧 `ab_group: "inline_quantity"` 的最小订单 payload 已从 500 恢复为 201。
+- 验证过程中创建的 `Codex Test` 测试订单已同步取消：`flash_order.order_status=5`，`admin_orders.status=10`。
+
 ### 2026-05-13 定位后进个人信息页转化下滑
 
 现象：2026-05-12 晚最后一版前台代码上线后，下单率明显下降。按小时拆 checkout 漏斗发现，主要断点不是订单接口，而是 `location_selected -> info_step_view`。
