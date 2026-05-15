@@ -36,7 +36,7 @@
 - 主漏斗右侧用带前置动作的业务句解释相邻步骤损耗，例如“34.5% 的人在完成大区选择后，未完成定位选择”“50.2% 的人在完成定位选择后，未进入个人信息填写”。不要只写“上步流失 / 未进入本步”这种需要二次理解的内部话术。
 - 管理端版本筛选使用北京时间展示版本窗口，但传给后端时要按 UTC 时间查 `vite_analytics_events.created_at`。数据库当前 `created_at` 与 `NOW()` 都是 UTC。
 - 主漏斗必须按 `checkout_start` cohort 统计：时间窗口先圈定窗口内点击下单的 checkout session，后续步骤只能统计这批 session。不能单纯按每一步事件发生时间过滤，否则窄版本窗口里会把上一个版本遗留到本窗口的后续事件算进来，出现到达率超过 100%。
-- 管理端版本筛选对外只保留粗粒度版本。当前保留“当前稳定口径”“FB排除获取定位按钮”和“自定义日期”；其中“FB排除获取定位按钮”从 `2026-05-14 01:27:30 UTC`（北京时间 05-14 09:27）开始。
+- 管理端版本筛选对外只保留粗粒度版本。当前保留“当前稳定口径”“FB排除获取定位按钮”“下单减摩擦AB”和“自定义日期”；其中“FB排除获取定位按钮”从 `2026-05-14 01:27:30 UTC`（北京时间 05-14 09:27）开始。
 - 订单成功预览页按钮点击率按 `order_create_success` 去重人数做分母，因为 App 下载和 WhatsApp 联系按钮只在下单成功后出现。两个事件分别是 `order_success_app_download_click` 和 `order_success_whatsapp_contact_click`，只进第一方 checkout 埋点，不发给 Meta Pixel。
 - 2026-05-13 12:41 CST 后，管理端下单漏斗稳定基线改为“当前稳定口径”：所有维度不早于 `2026-05-13 04:41:34 UTC`。旧数据保留在库里，但不再混入后台默认分析，避免新旧埋点字段不一致造成只有分母或只有分子的指标。
 - 2026-05-14 09:27 CST 后，管理端下单漏斗默认版本窗口改为“FB排除获取定位按钮”：所有维度默认只统计 `2026-05-14 01:27:30 UTC` 之后的广告流量，便于观察 FB / Instagram 内置浏览器隐藏当前定位按钮后的转化变化。
@@ -46,10 +46,18 @@
   - 第 4 次及之后计入 `duplicate_checkout_excluded_sessions`，后台顶部显示“已排除重复点击”，不再污染商品/广告/主漏斗下单尝试数。
   - 这个规则只处理未完成 SKU 数量选择的重复点击；已经进入后续步骤的 session 不会被剔除。
 
+### 下单减摩擦 A/B
+
+- A/B 分组不是每次打开页面重新随机，而是设备级固定分流：首次生成 `device_id` 后，对 `device_id` 做 hash，`bucket < 50` 进入 B 组 `inline_quantity`，其余进入 A 组 `quantity_modal`。同一浏览器在不清 localStorage 的情况下会稳定留在同一组。
+- 本地调试可以用 URL 参数强制分组：`checkout_quantity_variant=inline_quantity` 或 `checkout_quantity_variant=quantity_modal`。
+- B 组里“数量已定”和“已选大区”不是同一个动作：点击商品页下单按钮时会默认确认数量 1 件并记录 `quantity_confirmed`；进入大区页后，只有用户点击大区卡片才记录 `district_selected`。
+- B 组兜底按钮事件是 `location_fallback_used`。点击兜底按钮后会同步记录 `location_selected`，且 `location_method = district_center_fallback`，所以在主漏斗里计入“完成定位”；后台 A/B 表单独展示兜底按钮人数和占已选大区比例。
+
 ### 定位方式
 
 - `location_selected` + `location_method = current_location`：最终使用当前定位成功落点。
 - `location_selected` + `location_method = manual_map`：最终手动在地图上选择位置。
+- `location_selected` + `location_method = district_center_fallback`：用户没有点地图坐标，点击兜底按钮后用所选大区中心点继续。
 - `location_current_attempt`：用户明确点击过“使用当前定位”按钮。
 - `location_current_failed`：浏览器定位失败或超时。2026-05-13 12:38 后，该事件代表单次低精度定位 6 秒内最终失败，不再混入第二次高精度定位失败。
 
@@ -255,6 +263,8 @@
   - B 组表单页地址描述文案改成“Adresse détaillée et repère”，因为兜底路径可能没有精确坐标，不能只要求用户写参考物；placeholder 引导用户写街道/街区/门口颜色/附近药店等信息。校验失败时自动滚到第一个缺失字段。
   - 这组实验的埋点统一带 `checkout_quantity_experiment=checkout_quantity_flow_v1` 和 `checkout_quantity_variant=inline_quantity/quantity_modal`，后续后台按 variant 拆结果。`product_landing_view` 也会带同一组 variant，因此可以看落地页到点击下单率，也可以看 checkout 后续转化率。
   - 管理端下单漏斗新增版本窗口“下单减摩擦AB”，开始时间为 `2026-05-15 03:42:42 UTC`（北京时间 05-15 11:42）。后台新增 `A/B 分组`筛选和 A/B 对比表，可在同一版本窗口里分别查看 A 组旧流程、B 组优化包，以及整体对比。
+  - 管理端 A/B 表新增“兜底按钮”列，后端字段为 `location_fallback_sessions`；比例默认看占已选大区人数，因为兜底按钮出现在大区之后、定位完成之前。
+  - A/B 表头改成“数量已定 / 已选大区 / 完成定位”，避免误解 B 组同页里的不同事件。
   - 后续涉及 COD 单页上线前，必须先在线上环境走一个正式订单验证下单链路，再用取消订单接口取消该测试订单，避免再次出现“前端可点但订单接口失败”的事故。
   - COD 测试订单姓名固定使用 `Codex Test`，方便后台筛查和取消；不要临时起其它测试名。
 
