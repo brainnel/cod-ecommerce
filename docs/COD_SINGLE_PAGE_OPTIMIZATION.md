@@ -246,10 +246,12 @@
   - 倒计时不要放在页面最顶部，否则和价格/权益割裂；放在价格行右侧，桌面可显示 `Offre du jour · HH:MM:SS`，手机端只显示 `HH:MM:SS` 小胶囊，不重复四个权益文案，也不单独占一行。倒计时按设备生成 2-8 小时随机值并写入 localStorage，刷新不重新抽，避免看起来假。
   - CTA 附近展示“现在不用付款，收到再付”的信任文案。
   - B 组商品详情页点击下单后默认数量 1，直接进入大区选择；数量控件放在大区选择页上方，用户仍可加减数量。
-  - B 组定位页增加兜底按钮，但文案必须带前置条件“Je ne trouve pas le point exact”，避免用户误以为可以直接跳过地图点选。
+  - B 组定位页增加兜底按钮，但文案必须带前置条件“Je n’arrive pas à choisir sur la carte”，避免用户误以为可以直接跳过地图点选。
   - 兜底按钮使用二级按钮样式，仍然清楚可点，但不能比地图点选后的“Suivant”更像主路径。用户如果找不到精确地图位置，可以用所选大区中心点先继续到信息页。
   - 兜底按钮必须在手机端固定在底部操作区，避免 Google Maps 单指拖动捕获页面滚动后用户找不到继续入口。
-  - 兜底按钮必须始终可见，即使用户已经点过地图也能使用。用户可能会先在地图上找一找，找不到精确点后再点兜底；此时不能使用刚刚点过的坐标，必须改用大区中心 fallback，并在埋点里记录 `location_fallback_after_manual_map=true`。
+  - 兜底按钮只在用户尚未点过地图时展示；一旦用户在地图上点了坐标，兜底按钮隐藏，只保留“Suivant”。这样避免“用户已经给了自己的坐标，又被引导走大区中心兜底”的冲突。
+  - B 组前端提交订单时按定位来源取坐标：未点地图而使用兜底按钮时提交所选大区中心点；用户点过地图时提交用户最后选择的地图坐标。
+  - 注意：订单创建后 `app_backend` 会在后台异步调用 `app_admin` 的 `/address-tool/auto-check-and-fix-orders`。只要订单带经纬度，这个流程就会用 Google 反查 + Gemini 判断地址/大区/坐标是否一致；如果 AI 认为需要修正，会二次更新 `flash_order.latitude` / `flash_order.longitude` 和 `location_status`。因此排查“前端到底提交了哪个坐标”时，要看订单请求体或创建瞬间坐标；最终 DB 坐标可能已经是后端 AI 地址修正后的结果。
   - B 组表单页地址描述文案改成“Adresse détaillée et repère”，因为兜底路径可能没有精确坐标，不能只要求用户写参考物；placeholder 引导用户写街道/街区/门口颜色/附近药店等信息。校验失败时自动滚到第一个缺失字段。
   - 这组实验的埋点统一带 `checkout_quantity_experiment=checkout_quantity_flow_v1` 和 `checkout_quantity_variant=inline_quantity/quantity_modal`，后续后台按 variant 拆结果。`product_landing_view` 也会带同一组 variant，因此可以看落地页到点击下单率，也可以看 checkout 后续转化率。
   - 管理端下单漏斗新增版本窗口“下单减摩擦AB”，开始时间为 `2026-05-15 03:42:42 UTC`（北京时间 05-15 11:42）。后台新增 `A/B 分组`筛选和 A/B 对比表，可在同一版本窗口里分别查看 A 组旧流程、B 组优化包，以及整体对比。

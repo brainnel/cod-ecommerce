@@ -198,6 +198,7 @@ const PaymentPage = () => {
   const [mapZoom, setMapZoom] = useState(DEFAULT_ZOOM)
   const [customMarker, setCustomMarker] = useState(null)
   const [userLocation, setUserLocation] = useState(null)  // 用户当前位置
+  const [markerSelectionSource, setMarkerSelectionSourceState] = useState('none')
   const [locationRequestStatus, setLocationRequestStatus] = useState('idle')
   const [locationRequestMessage, setLocationRequestMessage] = useState('')
   const [showGuideModal, setShowGuideModal] = useState(false)
@@ -213,6 +214,15 @@ const PaymentPage = () => {
   const [errors, setErrors] = useState({})
   const [isPlacingOrder, setIsPlacingOrder] = useState(false)
   const [clientInfo, setClientInfo] = useState({})
+
+  const mapSelectedNoteText = markerSelectionSource === 'district_center_fallback'
+    ? 'Adresse prise en compte. Appuyez sur Suivant.'
+    : 'Position marquée. Appuyez sur Suivant.'
+
+  const setMarkerSelectionSource = (source) => {
+    markerSelectionSourceRef.current = source
+    setMarkerSelectionSourceState(source)
+  }
 
   const ensureCheckoutSession = () => {
     if (checkoutSessionIdRef.current) return checkoutSessionIdRef.current
@@ -260,6 +270,13 @@ const PaymentPage = () => {
       lat: Number.isFinite(districtLat) ? districtLat : fallbackCenter.lat,
       lng: Number.isFinite(districtLng) ? districtLng : fallbackCenter.lng
     }
+  }
+
+  const getDeliveryMarkerForOrder = () => {
+    if (markerSelectionSourceRef.current === 'district_center_fallback') {
+      return getDistrictCenterMarker(selectedDistrict)
+    }
+    return customMarker
   }
 
   const getCheckoutAnalyticsProps = (extra = {}) => {
@@ -507,7 +524,7 @@ const PaymentPage = () => {
       return false
     }
 
-    markerSelectionSourceRef.current = 'current'
+    setMarkerSelectionSource('current')
     setCustomMarker(userPos)
     setMapCenter(userPos)
     setLocationRequestStatus('success')
@@ -540,7 +557,7 @@ const PaymentPage = () => {
     const requestId = currentLocationRequestRef.current + 1
     currentLocationRequestRef.current = requestId
     currentLocationTrackedRequestRef.current = null
-    markerSelectionSourceRef.current = 'current_pending'
+    setMarkerSelectionSource('current_pending')
     clearCurrentLocationHintTimer()
     setLocationRequestStatus('locating')
     setLocationRequestMessage('Recherche de votre position...')
@@ -610,7 +627,7 @@ const PaymentPage = () => {
     setMapCenter(districtCenter)
     setMapZoom(14)  // 大区级别，用更高的缩放
     setCustomMarker(null)
-    markerSelectionSourceRef.current = 'none'
+    setMarkerSelectionSource('none')
     clearCurrentLocationHintTimer()
     setLocationRequestStatus('idle')
     setLocationRequestMessage('')
@@ -622,7 +639,7 @@ const PaymentPage = () => {
 
   // 地图标记
   const handleMapClick = (marker) => {
-    markerSelectionSourceRef.current = 'manual'
+    setMarkerSelectionSource('manual')
     clearCurrentLocationHintTimer()
     setLocationRequestStatus('idle')
     setLocationRequestMessage('')
@@ -650,7 +667,7 @@ const PaymentPage = () => {
     currentLocationRequestRef.current += 1
     clearCurrentLocationHintTimer()
     const fallbackMarker = getDistrictCenterMarker(selectedDistrict)
-    markerSelectionSourceRef.current = 'district_center_fallback'
+    setMarkerSelectionSource('district_center_fallback')
     setCustomMarker(fallbackMarker)
     setMapCenter(fallbackMarker)
     setLocationRequestStatus('idle')
@@ -823,6 +840,11 @@ const PaymentPage = () => {
 
     try {
       let response
+      const deliveryMarker = getDeliveryMarkerForOrder()
+      if (!deliveryMarker) {
+        throw new Error('Delivery location is missing')
+      }
+
       if (isBundleFlow && bundle) {
         // Bundle flow: backend builds child SKU items from bundle definition.
         const bundleOrderData = {
@@ -831,8 +853,8 @@ const PaymentPage = () => {
           phone: `225${userInfo.phone}`,
           whatsapp: `225${effectiveWhatsapp}`,
           receiver_address: userInfo.addressDescription,
-          latitude: customMarker.lat,
-          longitude: customMarker.lng,
+          latitude: deliveryMarker.lat,
+          longitude: deliveryMarker.lng,
           payment_method: "cod",
           currency: "FCFA",
           is_web: 1,
@@ -855,8 +877,8 @@ const PaymentPage = () => {
           phone: `225${userInfo.phone}`,
           whatsapp: `225${effectiveWhatsapp}`,
           receiver_address: userInfo.addressDescription,
-          latitude: customMarker.lat,
-          longitude: customMarker.lng,
+          latitude: deliveryMarker.lat,
+          longitude: deliveryMarker.lng,
           payment_method: "cod",
           total_amount: product.price * quantity,
           actual_amount: product.price * quantity,
@@ -1099,19 +1121,12 @@ const PaymentPage = () => {
               </div>
             )}
 
-            <div className={`step-actions map-actions ${isInlineQuantityVariant ? 'with-location-fallback' : ''}`}>
-              {isInlineQuantityVariant && (
-                <button
-                  type="button"
-                  className="location-fallback-btn"
-                  onClick={handleUseDistrictCenterFallback}
-                >
-                  <span className="location-fallback-copy">
-                    <span className="location-fallback-title">Je ne trouve pas le point exact</span>
-                    <span className="location-fallback-subtitle">Continuer avec adresse et repère</span>
-                  </span>
-                  <span className="location-fallback-arrow">›</span>
-                </button>
+            <div className={`step-actions map-actions ${isInlineQuantityVariant ? 'with-location-fallback' : ''} ${customMarker ? 'has-selected-marker' : ''}`}>
+              {customMarker && (
+                <div className="map-selected-note">
+                  <span className="marker-check">✓</span>
+                  <span>{mapSelectedNoteText}</span>
+                </div>
               )}
               <button type="button" className="prev-btn" onClick={() => navigate(-1)}>
                 Précédent
@@ -1124,6 +1139,18 @@ const PaymentPage = () => {
               >
                 Suivant
               </button>
+              {isInlineQuantityVariant && !customMarker && (
+                <button
+                  type="button"
+                  className="location-fallback-btn"
+                  onClick={handleUseDistrictCenterFallback}
+                >
+                  <span className="location-fallback-copy">
+                    <span className="location-fallback-title">Je n’arrive pas à choisir sur la carte</span>
+                    <span className="location-fallback-subtitle">Utiliser l’adresse et un repère</span>
+                  </span>
+                </button>
+              )}
             </div>
           </div>
         )}
