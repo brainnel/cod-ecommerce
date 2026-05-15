@@ -789,8 +789,7 @@ const PaymentPage = () => {
           currency: "FCFA",
           is_web: 1,
           quantity,
-          ad_id: adId,
-          ab_group: checkoutQuantityExperiment.checkout_quantity_variant
+          ad_id: adId
         }
         console.log('提交组合产品订单:', bundleOrderData)
         response = await bundleAPI.createBundleOrder(bundle.id, bundleOrderData)
@@ -816,8 +815,7 @@ const PaymentPage = () => {
           discount_amount: 0,
           currency: "FCFA",
           is_web: 1,
-          ad_id: adId,
-          ab_group: checkoutQuantityExperiment.checkout_quantity_variant
+          ad_id: adId
         }
 
         console.log('提交订单:', orderData)
