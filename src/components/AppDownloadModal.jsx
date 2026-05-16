@@ -1,3 +1,4 @@
+import { FiCheckCircle } from 'react-icons/fi'
 import './AppDownloadModal.css'
 
 const AppDownloadModal = ({ isOpen, onClose, onConfirm, whatsappNumber }) => {
@@ -20,7 +21,7 @@ const AppDownloadModal = ({ isOpen, onClose, onConfirm, whatsappNumber }) => {
     >
       <div className="modal-content">
         <div className="modal-header">
-          <div className="success-icon">🎉</div>
+          <div className="download-modal-success-icon"><FiCheckCircle aria-hidden="true" /></div>
           <h2 className="modal-title">Félicitations !</h2>
           <button 
             type="button"

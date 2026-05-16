@@ -18,7 +18,7 @@
 ## 当前下单流程
 
 1. 商品详情页点击下单，进入 checkout。
-2. SKU/数量选择。
+2. A 组旧流程进入 SKU/数量弹窗；B/C 组默认数量 1 并把数量控件放在大区页上方。
 3. 大区选择。
 4. 定位选择，默认可以手动点地图，也可以点击“使用当前定位”；FB / Instagram 内置浏览器里隐藏当前定位按钮，直接引导用户在地图上选择收货地址。
 5. 个人信息填写：姓名、电话、WhatsApp、地址描述。
@@ -36,7 +36,7 @@
 - 主漏斗右侧用带前置动作的业务句解释相邻步骤损耗，例如“34.5% 的人在完成大区选择后，未完成定位选择”“50.2% 的人在完成定位选择后，未进入个人信息填写”。不要只写“上步流失 / 未进入本步”这种需要二次理解的内部话术。
 - 管理端版本筛选使用北京时间展示版本窗口，但传给后端时要按 UTC 时间查 `vite_analytics_events.created_at`。数据库当前 `created_at` 与 `NOW()` 都是 UTC。
 - 主漏斗必须按 `checkout_start` cohort 统计：时间窗口先圈定窗口内点击下单的 checkout session，后续步骤只能统计这批 session。不能单纯按每一步事件发生时间过滤，否则窄版本窗口里会把上一个版本遗留到本窗口的后续事件算进来，出现到达率超过 100%。
-- 管理端版本筛选对外只保留粗粒度版本。当前保留“当前稳定口径”“FB排除获取定位按钮”“下单减摩擦AB”和“自定义日期”；其中“FB排除获取定位按钮”从 `2026-05-14 01:27:30 UTC`（北京时间 05-14 09:27）开始。
+- 管理端版本筛选对外只保留粗粒度版本。当前保留“当前稳定口径”“FB排除获取定位按钮”“下单减摩擦A/B/C”和“自定义日期”；其中“FB排除获取定位按钮”从 `2026-05-14 01:27:30 UTC`（北京时间 05-14 09:27）开始。
 - 订单成功预览页按钮点击率按 `order_create_success` 去重人数做分母，因为 App 下载和 WhatsApp 联系按钮只在下单成功后出现。两个事件分别是 `order_success_app_download_click` 和 `order_success_whatsapp_contact_click`，只进第一方 checkout 埋点，不发给 Meta Pixel。
 - 2026-05-13 12:41 CST 后，管理端下单漏斗稳定基线改为“当前稳定口径”：所有维度不早于 `2026-05-13 04:41:34 UTC`。旧数据保留在库里，但不再混入后台默认分析，避免新旧埋点字段不一致造成只有分母或只有分子的指标。
 - 2026-05-14 09:27 CST 后，管理端下单漏斗默认版本窗口改为“FB排除获取定位按钮”：所有维度默认只统计 `2026-05-14 01:27:30 UTC` 之后的广告流量，便于观察 FB / Instagram 内置浏览器隐藏当前定位按钮后的转化变化。
@@ -46,14 +46,14 @@
   - 第 4 次及之后计入 `duplicate_checkout_excluded_sessions`，后台顶部显示“已排除重复点击”，不再污染商品/广告/主漏斗下单尝试数。
   - 这个规则只处理未完成 SKU 数量选择的重复点击；已经进入后续步骤的 session 不会被剔除。
 
-### 下单减摩擦 A/B
+### 下单减摩擦 A/B/C
 
-- A/B 分组不是每次打开页面重新随机，而是设备级固定分流：首次生成 `device_id` 后，对 `device_id` 做 hash，`bucket < 50` 进入 B 组 `inline_quantity`，其余进入 A 组 `quantity_modal`。同一浏览器在不清 localStorage 的情况下会稳定留在同一组。
-- 本地调试可以用 URL 参数强制分组：`checkout_quantity_variant=inline_quantity` 或 `checkout_quantity_variant=quantity_modal`。
+- A/B/C 分组不是每次打开页面重新随机，而是设备级固定分流：首次生成 `device_id` 后，对 `device_id` 做 hash，A 组 `quantity_modal` 保留旧流程，B 组 `inline_quantity` 是当前稳定优化版，C 组 `cod_trust` 在 B 组基础上加强 COD 承诺文案。上线前规划为 A 10% / B 45% / C 45%。
+- 本地调试可以用 URL 参数强制分组：`checkout_quantity_variant=quantity_modal`、`checkout_quantity_variant=inline_quantity` 或 `checkout_quantity_variant=cod_trust`。
 - B 组里“数量已定”和“已选大区”不是同一个动作：点击商品页下单按钮时会默认确认数量 1 件并记录 `quantity_confirmed`；进入大区页后，只有用户点击大区卡片才记录 `district_selected`。
-- 判断默认数量 1 是否值得保留时，不能只看转化率，还要看平均件数。后台 A/B 表的“单均件数”主值来自 `order_create_success` 的成功订单平均数量；灰字“确认”来自 `quantity_confirmed` 的数量确认平均值。
-- B 组兜底按钮事件是 `location_fallback_used`。点击兜底按钮后会同步记录 `location_selected`，且 `location_method = district_center_fallback`，所以在主漏斗里计入“完成定位”；后台 A/B 表单独展示兜底按钮人数和占已选大区比例。
-- 定位方式需要同时看整体和 A/B 组内占比：整体“定位方式”会混入 A 组和 B 组，只适合看大盘；判断兜底按钮是否过度使用时，应看“定位方式 A/B 对比”里 B 组内部的 `district_center_fallback / manual_map / current_location` 分布。
+- 判断默认数量 1 是否值得保留时，不能只看转化率，还要看平均件数。后台 A/B/C 表的“单均件数”主值来自 `order_create_success` 的成功订单平均数量；灰字“确认”来自 `quantity_confirmed` 的数量确认平均值。
+- B/C 组兜底按钮事件是 `location_fallback_used`。点击兜底按钮后会同步记录 `location_selected`，且 `location_method = district_center_fallback`，所以在主漏斗里计入“完成定位”；后台 A/B/C 表单独展示兜底按钮人数和占已选大区比例。
+- 定位方式需要同时看整体和 A/B/C 组内占比：整体“定位方式”会混入不同组，只适合看大盘；判断兜底按钮是否过度使用时，应看“定位方式 A/B/C 对比”里组内的 `district_center_fallback / manual_map / current_location` 分布。
 
 ### 定位方式
 
@@ -84,7 +84,7 @@
 - 不再发起第二次 `enableHighAccuracy: true` 高精度定位请求；历史数据看高精度二次补救贡献很小，且会让失败口径变复杂。
 - FB / Instagram 内置浏览器通过 UA 特征识别为 `facebook_in_app` / `instagram_in_app` 后，Step 2 隐藏“Utiliser ma position”按钮，提示改为“Veuillez choisir votre adresse de livraison sur la carte.”，避免把用户引到大概率失败的浏览器定位路径。
 - FB / Instagram 内置浏览器和普通浏览器的 Step 2 不是同一套体验：内置浏览器默认只引导手动点地图；普通浏览器可以展示“Utiliser ma position”。以后改定位页时必须同时检查这两种环境，不要只按普通 Chrome 体验判断。
-- 本地预览 FB / Instagram 定位页：`localhost` / `127.0.0.1` 下可在商品页或支付页 URL 追加 `browser_context=facebook_in_app` 或 `browser_context=instagram_in_app`，用于预览内置浏览器 UI。该预览参数仅本地生效，线上仍按真实 UA 识别。
+- 本地预览 FB / Instagram 定位页：`localhost` / `127.0.0.1` 下可在商品页或支付页 URL 追加 `browser_context=facebook_in_app` 或 `browser_context=instagram_in_app`，用于预览内置浏览器 UI。该预览参数仅本地生效，线上仍按真实 UA 识别；商品页进入 checkout、A 组数量弹窗进入 checkout、支付页 step 切换都必须保留该参数，避免预览到一半变回普通浏览器版本。
 - 手机端地图页必须防止“单指拖地图后页面滑不下去”的旧问题复发：关键继续按钮必须固定在地图下方的底部操作区，不能依赖用户继续向下滚动才能看到。
 - checkout 埋点属性会携带 `browser_context` 和 `is_meta_in_app_browser`，方便后续拆分内置浏览器和普通浏览器的定位/下单表现。
 - `location_selected` / `location_current_failed` 会记录 `geolocation_duration_ms`、`geolocation_timeout_ms`、`geolocation_enable_high_accuracy`；成功时记录 `geolocation_accuracy_m`，失败时记录 `error_code` 和截断后的 `error_message`。
@@ -269,8 +269,22 @@
   - A/B 表头改成“数量已定 / 已选大区 / 完成定位”，避免误解 B 组同页里的不同事件。
   - 管理端新增“定位方式 A/B 对比”，每组内部单独计算最终定位方式占比，避免 B 组兜底按钮比例被 A 组流量稀释。
   - 管理端 A/B 表新增“单均件数”，用来观察 B 组默认数量 1 是否压低平均购买件数；主值为成功订单平均件数，灰字为数量确认平均件数。
+  - 2026-05-16 抽查 B 组兜底按钮成功单：纯数字 Meta Ad ID 口径下，`location_fallback_used` 109 个 session，其中 88 个成功下单。成功单里地址描述平均约 33 字符，中位数约 31 字符；约 77% 地址描述可用，约 15% 中等，约 8% 太短或过泛。后台地址修正后约 65% 仍停留在大区中心附近，约 35% 被移动到离大区中心 80m 以上的位置，约 9% 最终大区发生变化。风险点：少量用户只写外地城市或非常泛的地址时，Google/Gemini 修正可能把订单带到错误或服务范围外的位置；兜底按钮要继续看配送异常和取消率，不能只看下单成功率。
   - 后续涉及 COD 单页上线前，必须先在线上环境走一个正式订单验证下单链路，再用取消订单接口取消该测试订单，避免再次出现“前端可点但订单接口失败”的事故。
   - COD 测试订单姓名固定使用 `Codex Test`，方便后台筛查和取消；不要临时起其它测试名。
+- 2026-05-16 下单减摩擦实验升级为 A/B/C：
+  - 新分流为 A 组旧流程 10%，B 组当前稳定版 45%，C 组 COD 承诺版 45%；设备级 hash 固定，localStorage 不清时用户不跳组。
+  - C 组在 B 组基础上加强“无风险 COD”表达：商品页权益卡标题为 `Recevez d’abord, payez après`，CTA 附近强调 `Aucun paiement maintenant. Recevez le produit, puis payez en cash ou Wave.`。不要再额外加迷你流程条，因为下单页顶部已有 3 步流程指示。
+  - C 组权益里的免运费必须直白写 `Livraison gratuite / à Abidjan`，不要改成 `Livraison offerte`，避免“免运费”利益点不够清楚。
+  - C 组个人信息页地址描述 placeholder 改为引导用户写街区、附近药店、门口颜色、楼房/店铺旁边等配送员能用的地标；摘要区强调 `Aucun paiement maintenant. Cash ou Wave à la livraison.`
+  - `BundleDetail` 同步补上 `quantity_confirmed`，否则组合品在 B/C 组会出现“点击下单后数量已定缺失”的漏斗假损耗。
+  - 后台分组支持 `cod_trust`，管理端筛选和对比表改为 A/B/C；B 组文案从“优化包”改为“当前稳定版”，C 组显示“COD承诺版”。
+  - `app_admin` Gemini 地址修正加保护：地址描述过泛、建议大区无法匹配后台有效大区、正向搜索/备用搜索无法通过反向大区验证时，不自动改经纬度，只把 `location_status` 标为 2 等人工确认，避免兜底订单被修到错误城市或错误大区。
+  - C 组视觉层去 emoji 化：权益卡、支付提醒、大区图标、订单完成页和 App 下载弹窗统一换成 `react-icons` 线性图标；不使用固定生成图替代权益区，避免增加加载、降低文案灵活性和不同商品适配能力。
+  - C 组商品主图开启轻量自动轮播：仅多图商品生效，3.5 秒切换一次，用户手动滑动/点击后停止自动切换；A/B 组保持原来的手动轮播。
+  - 订单完成页不改流程和埋点，只做视觉升级：成功状态、履约承诺、配送信息、App 下载和 WhatsApp 联系按钮统一成更干净的卡片风格；重复的 `Rendez-vous de livraison` 提醒卡已删除，因为顶部文案已经说明会在 24 小时内通过电话或 WhatsApp 联系。
+  - C 组信息页地址描述 helper 使用“téléphone ou WhatsApp”双通道表达，不要只写 WhatsApp。
+  - 本地开发可用 `/order-success?preview_order_success=1` 预览订单完成页视觉；该入口仅 `DEV` 环境生效，线上无订单 state 仍会回首页。
 
 ## 验证方式
 

@@ -1,5 +1,19 @@
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
+import {
+  FiCheckCircle,
+  FiClock,
+  FiCreditCard,
+  FiDownload,
+  FiHome,
+  FiMap,
+  FiMapPin,
+  FiMessageCircle,
+  FiPhone,
+  FiTruck,
+  FiUser
+} from 'react-icons/fi'
+import { FaWhatsapp } from 'react-icons/fa'
 import AppDownloadModal from '../components/AppDownloadModal'
 import { appDownloadAPI } from '../services/api'
 import { trackCheckoutEvent } from '../services/checkoutFunnelAnalytics'
@@ -8,10 +22,42 @@ import './OrderSuccessPage.css'
 // 缓存下载链接，避免重复请求
 let cachedDownloadLinks = null
 
+const getDevOrderSuccessPreviewState = (search) => {
+  if (!import.meta.env.DEV) return null
+  const params = new URLSearchParams(search)
+  if (params.get('preview_order_success') !== '1') return null
+
+  return {
+    product: {
+      product_id: '946101641067',
+      name_fr: 'Ventilateur de taille portable refroidissement chantier rechargeable anti-chaleur',
+      image_url: ['https://api.brainnel.com/admin/static/uploads/image2_946101641067_01_white_main_bbf7918c754546a590b2396a78d49b65.jpg'],
+      price: 10500
+    },
+    quantity: 1,
+    userInfo: {
+      fullName: 'Codex Test',
+      phone: '0700000000',
+      whatsapp: '0700000000',
+      addressDescription: 'Cocody, près de la pharmacie, portail bleu'
+    },
+    selectedLocation: {
+      name: 'Cocody',
+      city_name: 'Abidjan'
+    },
+    totalPrice: 10500,
+    orderResponse: {
+      order_id: 'preview',
+      order_no: 'FL-PREVIEW'
+    }
+  }
+}
+
 const OrderSuccessPage = () => {
   const location = useLocation()
   const navigate = useNavigate()
-  const { product, quantity, userInfo, selectedLocation, totalPrice, orderResponse } = location.state || {}
+  const previewState = getDevOrderSuccessPreviewState(location.search)
+  const { product, quantity, userInfo, selectedLocation, totalPrice, orderResponse } = location.state || previewState || {}
   const [isModalOpen, setIsModalOpen] = useState(false)
 
   useEffect(() => {
@@ -117,9 +163,7 @@ const OrderSuccessPage = () => {
       {/* 顶部标题栏 */}
       <div className="order-success-header">
         <button type="button" className="back-btn" onClick={() => navigate('/')}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M3 12L5 10M5 10L12 3L19 10M5 10V20C5 20.5523 5.44772 21 6 21H9M19 10L21 12M19 10V20C19 20.5523 18.5523 21 18 21H15M9 21C9.55228 21 10 20.5523 10 20V16C10 15.4477 10.4477 15 11 15H13C13.5523 15 14 15.4477 14 16V20C14 20.5523 14.4477 21 15 21M9 21H15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
+          <FiHome aria-hidden="true" />
         </button>
         <h1 className="header-title">Commande confirmée</h1>
       </div>
@@ -128,15 +172,22 @@ const OrderSuccessPage = () => {
         {/* 成功图标和标题 */}
         <div className="success-header">
           <div className="success-icon">
-            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Succès">
-              <circle cx="12" cy="12" r="10" fill="#28a745"/>
-              <path d="m9 12 2 2 4-4" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
+            <FiCheckCircle aria-label="Succès" />
           </div>
           <h2 className="success-title">Commande confirmée !</h2>
           <p className="success-subtitle">
             Nous vous contacterons dans les 24 heures via WhatsApp ou par téléphone pour convenir d'un horaire de livraison.
           </p>
+          <div className="success-promise-grid">
+            <div className="success-promise-item">
+              <FiTruck aria-hidden="true" />
+              <span>Livraison gratuite à Abidjan</span>
+            </div>
+            <div className="success-promise-item">
+              <FiCreditCard aria-hidden="true" />
+              <span>Cash ou Wave à la réception</span>
+            </div>
+          </div>
         </div>
 
         {/* 订单摘要 */}
@@ -159,56 +210,49 @@ const OrderSuccessPage = () => {
           <h3 className="info-section-title">Informations de livraison</h3>
           
           <div className="info-row">
-            <div className="info-label">👤 Nom complet</div>
+            <div className="info-label"><span className="info-label-icon"><FiUser /></span>Nom complet</div>
             <div className="info-value">{userInfo.fullName}</div>
           </div>
           
           <div className="info-row">
-            <div className="info-label">📞 Téléphone</div>
+            <div className="info-label"><span className="info-label-icon"><FiPhone /></span>Téléphone</div>
             <div className="info-value">+{userInfo.phone}</div>
           </div>
           
           <div className="info-row">
-            <div className="info-label">💬 WhatsApp</div>
+            <div className="info-label"><span className="info-label-icon"><FiMessageCircle /></span>WhatsApp</div>
             <div className="info-value">+{userInfo.whatsapp}</div>
           </div>
           
           {userInfo.addressDescription && (
             <div className="info-row address-row">
-              <div className="info-label">📍 Adresse</div>
+              <div className="info-label"><span className="info-label-icon"><FiMapPin /></span>Adresse</div>
               <div className="info-value">{userInfo.addressDescription}</div>
             </div>
           )}
           
           {selectedLocation && (
             <div className="info-row">
-              <div className="info-label">🏢 District</div>
+              <div className="info-label"><span className="info-label-icon"><FiMap /></span>District</div>
               <div className="info-value">{selectedLocation.name}</div>
             </div>
           )}
 
           <div className="info-row">
-            <div className="info-label">🕐 Horaires de livraison</div>
+            <div className="info-label"><span className="info-label-icon"><FiClock /></span>Horaires</div>
             <div className="info-value">8:00 - 21:00</div>
-          </div>
-        </div>
-
-        {/* 重要提醒 */}
-        <div className="phone-notice delivery-notice">
-          <div className="notice-icon">⏰</div>
-          <div className="notice-text">
-            <strong>Rendez-vous de livraison</strong>
-            <p>Notre équipe vous contactera dans les <strong>24 heures</strong> via WhatsApp (+{userInfo.whatsapp}) ou par téléphone (+{userInfo.phone}) pour planifier la livraison à votre convenance.</p>
           </div>
         </div>
 
         {/* 操作按钮 */}
         <div className="success-actions">
           <button type="button" className="download-btn" onClick={handleDownloadApp}>
-            📱 Télécharger l'app
+            <FiDownload aria-hidden="true" />
+            <span>Télécharger l'app</span>
           </button>
           <button type="button" className="whatsapp-btn" onClick={handleWhatsAppContact}>
-            💬 Nous contacter sur WhatsApp
+            <FaWhatsapp aria-hidden="true" />
+            <span>Nous contacter sur WhatsApp</span>
           </button>
         </div>
       </div>

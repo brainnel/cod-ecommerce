@@ -1,16 +1,24 @@
 import { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Swiper, SwiperSlide } from 'swiper/react'
-import { Pagination, Navigation } from 'swiper/modules'
+import { Pagination, Navigation, Autoplay } from 'swiper/modules'
 import { bundleAPI } from '../services/api'
 import {
   beginCheckoutFunnel,
+  buildCheckoutProductProperties,
   getCheckoutQuantityExperiment,
+  isCodTrustCheckoutVariant,
+  isInlineCheckoutVariant,
+  trackCheckoutEvent,
   trackProductLandingView
 } from '../services/checkoutFunnelAnalytics'
 import { useAdTrackingContext } from '../hooks/useAdTrackingHooks.js'
 import ServiceInfo from './ServiceInfo'
 import logoImage from '../assets/logo.png'
+import {
+  getLocalPreviewBrowserContextParam,
+  syncLocalPreviewBrowserContextFromSearch
+} from '../utils/checkoutBrowserContextPreview'
 
 import 'swiper/css'
 import 'swiper/css/pagination'
@@ -41,7 +49,11 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
   const [quantity, setQuantity] = useState(1)
   const viewTrackedBundleRef = useRef(null)
   const checkoutQuantityExperiment = useMemo(() => getCheckoutQuantityExperiment(), [])
-  const isCheckoutOptimizationVariant = checkoutQuantityExperiment.checkout_quantity_variant === 'inline_quantity'
+  const isCheckoutOptimizationVariant = isInlineCheckoutVariant(checkoutQuantityExperiment)
+  const isCodTrustVariant = isCodTrustCheckoutVariant(checkoutQuantityExperiment)
+  const bundleSwiperModules = isCodTrustVariant
+    ? [Pagination, Navigation, Autoplay]
+    : [Pagination, Navigation]
 
   const bundleProduct = useMemo(() => {
     if (!bundle) return null
@@ -59,6 +71,10 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
   useLayoutEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
   }, [bundleId])
+
+  useEffect(() => {
+    syncLocalPreviewBrowserContextFromSearch(window.location.search)
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -162,13 +178,30 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
       console.warn('bundle checkout_start 埋点失败:', error)
     }
 
-    navigate('/payment?step=1', {
+    if (checkoutSessionId && bundleProduct) {
+      try {
+        trackCheckoutEvent('quantity_confirmed', buildCheckoutProductProperties(bundleProduct, {
+          quantity,
+          total_price: totalPrice,
+          ad_id: adId,
+          product_type: 'bundle',
+          bundle_id: String(bundle.id),
+          quantity_confirm_method: 'bundle_detail_quantity',
+          ...checkoutQuantityExperiment
+        }), { sessionId: checkoutSessionId })
+      } catch (error) {
+        console.warn('bundle quantity_confirmed 埋点失败:', error)
+      }
+    }
+
+    navigate(`/payment?step=1${getLocalPreviewBrowserContextParam()}`, {
       state: {
         bundle,
         quantity,
         productType: 'bundle',
         checkoutSessionId,
-        checkoutQuantityExperiment
+        checkoutQuantityExperiment,
+        quantityConfirmed: true
       }
     })
   }
@@ -177,6 +210,13 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
   const detailImages = Array.isArray(bundle.detail_images) ? bundle.detail_images : []
   const items = Array.isArray(bundle.items) ? bundle.items : []
   const galleryImages = bundle.cover_image_url ? [bundle.cover_image_url] : []
+  const bundleGalleryAutoplay = isCodTrustVariant && galleryImages.length > 1
+    ? {
+        delay: 3500,
+        disableOnInteraction: true,
+        pauseOnMouseEnter: true
+      }
+    : false
 
   return (
     <div className="product-detail bundle-detail">
@@ -204,11 +244,13 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
         <div className="product-gallery">
           {galleryImages.length > 0 ? (
             <Swiper
-              modules={[Pagination, Navigation]}
+              modules={bundleSwiperModules}
               spaceBetween={0}
               slidesPerView={1}
               pagination={{ clickable: true }}
               navigation={true}
+              autoplay={bundleGalleryAutoplay}
+              speed={450}
               className="main-swiper"
             >
               {galleryImages.map((image, index) => (
@@ -235,7 +277,7 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
             </div>
 
             {isCheckoutOptimizationVariant && (
-              <ServiceInfo variant="benefits" compact />
+              <ServiceInfo variant={isCodTrustVariant ? 'cod_trust' : 'benefits'} compact />
             )}
 
             {/* 数量选择器 */}
@@ -306,8 +348,10 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
 
           <div className="bottom-actions">
             {isCheckoutOptimizationVariant && (
-              <div className="cta-trust-note">
-                Aucun paiement maintenant. À la réception, payez par Wave ou en cash.
+              <div className={`cta-trust-note ${isCodTrustVariant ? 'cod-trust' : ''}`}>
+                {isCodTrustVariant
+                  ? 'Aucun paiement maintenant. Recevez le pack, puis payez en cash ou Wave.'
+                  : 'Aucun paiement maintenant. À la réception, payez par Wave ou en cash.'}
               </div>
             )}
             <button type="button" className="buy-now-btn" onClick={handleBuyNow}>

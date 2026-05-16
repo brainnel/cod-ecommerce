@@ -1,39 +1,41 @@
 .order-success-page {
   min-height: 100vh;
-  background: #f8f9fa;
+  background: #f4f6f8;
 }
 
 /* 顶部标题栏 */
 .order-success-header {
-  background: white;
-  padding: 16px 20px;
+  background: rgba(255, 255, 255, 0.96);
+  padding: 14px 18px;
   display: flex;
   align-items: center;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-bottom: 1px solid #edf0f4;
+  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.06);
   position: sticky;
   top: 0;
   z-index: 100;
   position: relative;
+  backdrop-filter: blur(10px);
 }
 
 .order-success-header .back-btn {
   background: none;
-  border: none;
+  border: 1px solid #e5e9ef;
   cursor: pointer;
   padding: 8px;
-  border-radius: 6px;
+  border-radius: 999px;
   transition: all 0.3s ease;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #666;
+  color: #4b5563;
   width: 36px;
   height: 36px;
 }
 
 .order-success-header .back-btn:hover {
-  background: #f5f5f5;
-  color: #333;
+  background: #f8fafc;
+  color: #20242a;
   transform: scale(1.05);
 }
 
@@ -43,8 +45,8 @@
 
 .header-title {
   font-size: 18px;
-  font-weight: 600;
-  color: #333;
+  font-weight: 800;
+  color: #20242a;
   margin: 0;
   position: absolute;
   left: 50%;
@@ -56,18 +58,38 @@
   max-width: 600px;
   width: 100%;
   margin: 0 auto;
-  padding: 20px;
+  padding: 16px;
 }
 
 /* 成功标题区域 */
 .success-header {
   text-align: center;
-  margin-bottom: 32px;
+  margin-bottom: 16px;
+  padding: 24px 18px;
+  border: 1px solid #e7efe9;
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(248, 253, 250, 0.98) 100%);
+  box-shadow: 0 14px 36px rgba(25, 32, 45, 0.08);
 }
 
 .success-icon {
-  margin-bottom: 16px;
+  width: 68px;
+  height: 68px;
+  margin: 0 auto 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #e8f8ee;
+  color: #1fa052;
   animation: successPulse 0.6s ease-out;
+}
+
+.success-icon svg {
+  width: 40px;
+  height: 40px;
+  stroke-width: 1.8;
 }
 
 @keyframes successPulse {
@@ -85,29 +107,58 @@
 }
 
 .success-title {
-  font-size: 28px;
-  font-weight: 700;
-  color: #28a745;
-  margin: 0 0 12px 0;
+  font-size: 24px;
+  font-weight: 900;
+  color: #20242a;
+  margin: 0 0 8px 0;
 }
 
 .success-subtitle {
-  font-size: 16px;
-  color: #666;
+  font-size: 14px;
+  color: #5f6875;
   line-height: 1.5;
   margin: 0;
-  max-width: 400px;
+  max-width: 460px;
   margin-left: auto;
   margin-right: auto;
+}
+
+.success-promise-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.success-promise-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid #edf0f4;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #3c4652;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.success-promise-item svg {
+  color: #ff5a1f;
+  flex-shrink: 0;
 }
 
 /* 订单摘要 */
 .order-summary {
   background: white;
-  border-radius: 12px;
+  border: 1px solid #edf0f4;
+  border-radius: 16px;
   padding: 16px;
   margin-bottom: 16px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 10px 30px rgba(25, 32, 45, 0.06);
 }
 
 /* 订单项 */
@@ -118,11 +169,12 @@
 }
 
 .item-image {
-  width: 60px;
-  height: 60px;
-  border-radius: 8px;
+  width: 64px;
+  height: 64px;
+  border-radius: 12px;
   object-fit: cover;
   flex-shrink: 0;
+  background: #f8fafc;
 }
 
 .item-details {
@@ -131,14 +183,16 @@
 
 .item-name {
   font-size: 15px;
-  font-weight: 600;
-  color: #333;
+  font-weight: 800;
+  color: #20242a;
   margin-bottom: 4px;
+  line-height: 1.35;
 }
 
 .item-info {
   font-size: 13px;
-  color: #666;
+  color: #ff5a1f;
+  font-weight: 800;
 }
 
 /* 取件码区域 */
@@ -221,17 +275,17 @@
 /* 订单信息区域 */
 .order-info-section {
   background: white;
-  border-radius: 12px;
+  border: 1px solid #edf0f4;
+  border-radius: 16px;
   padding: 20px;
   margin-bottom: 16px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
-  border-left: 4px solid #FF5100;
+  box-shadow: 0 10px 30px rgba(25, 32, 45, 0.06);
 }
 
 .info-section-title {
   font-size: 16px;
-  font-weight: 700;
-  color: #333;
+  font-weight: 900;
+  color: #20242a;
   margin: 0 0 16px 0;
   display: flex;
   align-items: center;
@@ -241,8 +295,9 @@
 .info-row {
   display: flex;
   align-items: flex-start;
+  gap: 12px;
   padding: 12px 0;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid #f1f3f5;
 }
 
 .info-row:last-child {
@@ -255,17 +310,37 @@
 }
 
 .info-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 14px;
-  color: #666;
-  font-weight: 500;
+  color: #6b7480;
+  font-weight: 800;
   min-width: 140px;
   flex-shrink: 0;
 }
 
+.info-label-icon {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #f4f6f8;
+  color: #ff5a1f;
+  flex-shrink: 0;
+}
+
+.info-label-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
 .info-value {
   font-size: 14px;
-  color: #1a1a1a;
-  font-weight: 600;
+  color: #20242a;
+  font-weight: 800;
   flex: 1;
   word-break: break-word;
 }
@@ -274,109 +349,68 @@
   line-height: 1.6;
 }
 
-/* 电话通知 */
-.phone-notice {
-  background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
-  border-radius: 12px;
-  padding: 16px;
-  margin-bottom: 24px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  border: 1px solid #90caf9;
-}
-
-.delivery-notice {
-  background: linear-gradient(135deg, #FFF0E5 0%, #FFE5D0 100%);
-  border: 1px solid #FFB380;
-  align-items: flex-start;
-}
-
-.notice-icon {
-  font-size: 24px;
-  flex-shrink: 0;
-}
-
-.notice-text {
-  flex: 1;
-  font-size: 14px;
-  color: #1976d2;
-  line-height: 1.6;
-}
-
-.delivery-notice .notice-text {
-  color: #D94300;
-}
-
-.notice-text strong {
-  color: #1565c0;
-  display: block;
-  margin-bottom: 6px;
-  font-size: 15px;
-}
-
-.delivery-notice .notice-text strong {
-  color: #BF3600;
-}
-
-.notice-text p {
-  margin: 0;
-  line-height: 1.6;
-}
-
-
 /* 操作按钮 */
 .success-actions {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   margin-bottom: 0;
 }
 
 .download-btn {
   width: 100%;
   padding: 16px 20px;
-  border-radius: 10px;
+  border-radius: 13px;
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
   border: none;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  background: #ffffff;
+  color: #20242a;
+  border: 1px solid #dbe3ee;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
+  box-shadow: 0 8px 22px rgba(25, 32, 45, 0.07);
 }
 
 .download-btn:hover {
-  background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
+  background: #f8fafc;
   transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 12px 28px rgba(25, 32, 45, 0.1);
 }
 
 .whatsapp-btn {
   width: 100%;
   padding: 16px 20px;
-  border-radius: 10px;
+  border-radius: 13px;
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
   border: none;
-  background: linear-gradient(135deg, #25d366 0%, #128c7e 100%);
+  background: #20c362;
   color: white;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
+  box-shadow: 0 8px 22px rgba(32, 195, 98, 0.22);
 }
 
 .whatsapp-btn:hover {
-  background: linear-gradient(135deg, #1fd655 0%, #0f7a6e 100%);
+  background: #17ad55;
   transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(37, 211, 102, 0.3);
+  box-shadow: 0 12px 28px rgba(32, 195, 98, 0.28);
+}
+
+.download-btn svg,
+.whatsapp-btn svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
 }
 
 
@@ -424,11 +458,6 @@
     height: 50px;
   }
   
-  .phone-notice {
-    padding: 14px;
-    margin-bottom: 20px;
-  }
-  
   .order-info-section {
     padding: 16px;
   }
@@ -466,10 +495,6 @@
   
   .pickup-code-section {
     padding: 20px;
-  }
-  
-  .phone-notice {
-    padding: 12px;
   }
   
   .order-info-section {
@@ -532,11 +557,6 @@
   .order-info-section {
     grid-column: 1;
     grid-row: 2 / span 2;
-    margin-bottom: 0;
-  }
-
-  .phone-notice {
-    grid-column: 1;
     margin-bottom: 0;
   }
 

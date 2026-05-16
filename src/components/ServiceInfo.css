@@ -10,11 +10,33 @@
   background: #fbfcfd;
 }
 
+.service-info.cod-trust-style {
+  background: #fbfcfd;
+}
+
 .service-info.compact-benefits {
-  padding: 6px 0 0;
+  padding: 0;
   margin: 0 0 12px;
   background: transparent;
   border-bottom: 0;
+}
+
+.service-info.compact-benefits.cod-trust-style {
+  position: relative;
+  padding: 9px;
+  overflow: hidden;
+  border: 1px solid #edf0f4;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfcfd 100%);
+  box-shadow: 0 8px 24px rgba(25, 32, 45, 0.07);
+}
+
+.service-info.compact-benefits.cod-trust-style::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: #ff5a1f;
 }
 
 .service-benefit-header {
@@ -67,7 +89,7 @@
 }
 
 .service-info.compact-benefits .service-grid {
-  gap: 6px;
+  gap: 7px;
 }
 
 .service-item {
@@ -99,15 +121,23 @@
 
 .service-info.compact-benefits .service-item {
   align-items: center;
-  gap: 6px;
-  padding: 7px 8px;
-  min-height: 46px;
+  gap: 7px;
+  padding: 8px;
+  min-height: 48px;
+}
+
+.service-info.compact-benefits.cod-trust-style .service-item {
+  position: relative;
+  border: 1px solid #eef1f4;
+  border-radius: 11px;
+  background: #ffffff;
+  box-shadow: none;
 }
 
 .service-info.compact-benefits .service-icon {
-  width: 20px;
-  height: 20px;
-  font-size: 11px;
+  width: 22px;
+  height: 22px;
+  font-size: 12px;
 }
 
 .service-info.benefit-style .service-item:hover {
@@ -127,52 +157,65 @@
 }
 
 .service-info.benefit-style .service-icon {
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   border-radius: 999px;
   background: #fff1e8;
   color: #ff5a1f;
+  font-size: 15px;
+}
+
+.service-info.compact-benefits.cod-trust-style .service-icon {
+  width: 26px;
+  height: 26px;
+  background: #fff4ec;
+  color: #f05a20;
   font-size: 14px;
 }
 
 .service-info.benefit-style .service-tone-delivery {
-  background: #fff8ed;
-  border-color: #ffe0ad;
+  background: #fffaf4;
+  border-color: #f1e3d5;
 }
 
 .service-info.benefit-style .service-tone-delivery .service-icon {
-  background: #ffe9c8;
-  color: #e77700;
+  background: #fff0de;
+  color: #d97800;
 }
 
 .service-info.benefit-style .service-tone-payment {
-  background: #f0f7ff;
-  border-color: #cfe3ff;
+  background: #f7fbff;
+  border-color: #dce9f7;
 }
 
 .service-info.benefit-style .service-tone-payment .service-icon {
-  background: #dcecff;
-  color: #1f6fd1;
+  background: #e8f3ff;
+  color: #276cae;
 }
 
 .service-info.benefit-style .service-tone-assurance {
-  background: #effaf4;
-  border-color: #ccefd9;
+  background: #f5fbf7;
+  border-color: #dbeee2;
+}
+
+.service-info.cod-trust-style .service-tone-assurance {
+  background: #f5fbf7;
+  border-color: #dbeee2;
 }
 
 .service-info.benefit-style .service-tone-assurance .service-icon {
-  background: #d9f4e4;
+  background: #e4f5ea;
   color: #168246;
 }
 
 .service-info.benefit-style .service-tone-support {
-  background: #f8f3ff;
-  border-color: #e4d6ff;
+  background: #fbf8ff;
+  border-color: #e8deef;
 }
 
 .service-info.benefit-style .service-tone-support .service-icon {
-  background: #eadfff;
-  color: #7850c7;
+  background: #f0e8fb;
+  color: #7554a6;
 }
 
 .service-content {
@@ -190,13 +233,18 @@
 
 .service-info.benefit-style .service-title {
   font-weight: 800;
-  color: #252525;
+  color: #20242a;
   line-height: 1.25;
 }
 
 .service-info.compact-benefits .service-title {
   font-size: 11.5px;
   line-height: 1.16;
+}
+
+.service-info.compact-benefits.cod-trust-style .service-title {
+  font-size: 11px;
+  letter-spacing: 0;
 }
 
 .service-subtitle {
@@ -214,6 +262,11 @@
   line-height: 1.1;
 }
 
+.service-info.compact-benefits.cod-trust-style .service-subtitle {
+  color: #68717d;
+  font-weight: 700;
+}
+
 /* 响应式设计 */
 @media (max-width: 480px) {
   .service-info {
@@ -225,8 +278,12 @@
   }
 
   .service-info.compact-benefits {
-    padding-top: 5px;
+    padding-top: 0;
     padding-bottom: 0;
+  }
+
+  .service-info.compact-benefits.cod-trust-style {
+    padding: 8px;
   }
 
   .service-benefit-header h3 {

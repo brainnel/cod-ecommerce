@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { FiCreditCard, FiMapPin } from 'react-icons/fi'
 import { districtAPI, orderAPI, bundleAPI } from '../services/api'
 import { useAdId } from '../hooks/useAdTrackingHooks.js'
 import { trackPurchaseEvent, getClientInfo } from '../services/facebookConversions'
@@ -7,6 +8,8 @@ import {
   buildCheckoutProductProperties,
   getCheckoutQuantityExperiment,
   getCheckoutSessionId,
+  isCodTrustCheckoutVariant,
+  isInlineCheckoutVariant,
   resumeCheckoutSession,
   startCheckoutSession,
   trackCheckoutEvent,
@@ -15,6 +18,10 @@ import {
 import MapSelector from '../components/MapSelector'
 import MapGuideModal from '../components/MapGuideModal'
 import { DISTRICT_CENTERS, DEFAULT_CENTER, DEFAULT_ZOOM } from '../constants/districtCenters'
+import {
+  getLocalPreviewBrowserContext as getPreviewBrowserContext,
+  syncLocalPreviewBrowserContextFromSearch
+} from '../utils/checkoutBrowserContextPreview'
 import './PaymentPage.css'
 
 const GEOLOCATION_CACHE_MAX_AGE_MS = 5 * 60 * 1000
@@ -39,31 +46,11 @@ const hasCheckoutStepInSearch = (search) => {
   return params.has('step')
 }
 
-const getLocalPreviewBrowserContext = (search = '') => {
-  if (typeof window === 'undefined') return null
-  const isLocalPreview = ['localhost', '127.0.0.1'].includes(window.location.hostname)
-  if (!isLocalPreview) return null
-
-  const params = new URLSearchParams(search || window.location.search)
-  const urlContext = params.get('browser_context')
-  if (urlContext === 'facebook_in_app' || urlContext === 'instagram_in_app') return urlContext
-
-  try {
-    const storedContext = window.localStorage?.getItem('brainnel_cod_browser_context_preview')
-    return storedContext === 'facebook_in_app' || storedContext === 'instagram_in_app'
-      ? storedContext
-      : null
-  } catch (error) {
-    console.warn('browser context preview storage unavailable:', error)
-    return null
-  }
-}
-
 const buildCheckoutStepSearch = (step, currentSearch = '') => {
   const params = new URLSearchParams()
   params.set('step', String(clampCheckoutStep(step)))
 
-  const previewContext = getLocalPreviewBrowserContext(currentSearch)
+  const previewContext = getPreviewBrowserContext(currentSearch)
   if (previewContext) {
     params.set('browser_context', previewContext)
   }
@@ -84,7 +71,7 @@ const clampQuantity = (value, product) => {
 }
 
 const getBrowserContext = () => {
-  const previewContext = getLocalPreviewBrowserContext()
+  const previewContext = getPreviewBrowserContext()
 
   if (previewContext === 'instagram_in_app') {
     return {
@@ -182,7 +169,8 @@ const PaymentPage = () => {
   const markerSelectionSourceRef = useRef('none')
   const browserContext = useMemo(() => getBrowserContext(), [])
   const isMetaInAppBrowser = browserContext.is_meta_in_app_browser
-  const isInlineQuantityVariant = checkoutQuantityExperiment.checkout_quantity_variant === 'inline_quantity'
+  const isInlineQuantityVariant = isInlineCheckoutVariant(checkoutQuantityExperiment)
+  const isCodTrustVariant = isCodTrustCheckoutVariant(checkoutQuantityExperiment)
 
   // 三步流程：1=选大区, 2=地图标记, 3=填写信息
   const [currentStep, setCurrentStep] = useState(() => getCheckoutStepFromSearch(location.search))
@@ -361,6 +349,10 @@ const PaymentPage = () => {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
   }, [])
 
+  useEffect(() => {
+    syncLocalPreviewBrowserContextFromSearch(location.search)
+  }, [location.search])
+
   useEffect(() => () => {
     if (currentLocationHintTimerRef.current) {
       clearTimeout(currentLocationHintTimerRef.current)
@@ -411,8 +403,9 @@ const PaymentPage = () => {
     const hasStepInUrl = hasCheckoutStepInSearch(location.search)
     const maxAllowedStep = selectedDistrict ? (customMarker ? 3 : 2) : 1
     const nextStep = Math.min(requestedStep, maxAllowedStep)
+    const canonicalSearch = buildCheckoutStepSearch(nextStep, location.search)
 
-    if (!hasStepInUrl || nextStep !== requestedStep) {
+    if (!hasStepInUrl || nextStep !== requestedStep || location.search !== canonicalSearch) {
       navigateToCheckoutStep(nextStep, { replace: true })
       return
     }
@@ -1041,7 +1034,7 @@ const PaymentPage = () => {
                     role="button"
                     tabIndex={0}
                   >
-                    <div className="district-icon">📍</div>
+                    <div className="district-icon"><FiMapPin aria-hidden="true" /></div>
                     <div className="district-info">
                       <div className="district-name">{district.name}</div>
                       <div className="district-city">{district.city_name}</div>
@@ -1109,7 +1102,7 @@ const PaymentPage = () => {
 
             {selectedDistrict && (
               <div className="map-district-note">
-                <span className="badge-icon">📍</span>
+                <span className="badge-icon"><FiMapPin aria-hidden="true" /></span>
                 <span>{selectedDistrict.name} - {selectedDistrict.city_name}</span>
               </div>
             )}
@@ -1228,11 +1221,18 @@ const PaymentPage = () => {
                 className={`form-textarea ${errors.addressDescription ? 'error' : ''}`}
                 value={userInfo.addressDescription}
                 onChange={(e) => handleInputChange('addressDescription', e.target.value)}
-                placeholder={isInlineQuantityVariant
+                placeholder={isCodTrustVariant
+                  ? 'Ex: quartier, pharmacie proche, portail bleu, immeuble, boutique à côté'
+                  : isInlineQuantityVariant
                   ? 'Ex: rue, quartier, portail bleu, près de la pharmacie'
                   : 'Ex: Près de l\'université, à côté du bâtiment rouge'}
                 rows={4}
               />
+              {isCodTrustVariant && (
+                <div className="address-assurance-note">
+                  Ajoutez un repère clair. Si le livreur ne trouve pas, nous vous contactons par téléphone ou WhatsApp.
+                </div>
+              )}
               <div className="char-count">{userInfo.addressDescription.length}/200</div>
               {errors.addressDescription && <div className="error-message">{errors.addressDescription}</div>}
             </div>
@@ -1265,8 +1265,8 @@ const PaymentPage = () => {
               </div>
 
               <div className="payment-method">
-                <span className="payment-icon">💰</span>
-                <span>Paiement à la livraison</span>
+                <span className="payment-icon" aria-hidden="true"><FiCreditCard /></span>
+                <span>{isCodTrustVariant ? 'Aucun paiement maintenant. Cash ou Wave à la livraison.' : 'Paiement à la livraison'}</span>
               </div>
             </div>
 

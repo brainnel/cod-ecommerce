@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useLayoutEffect, useMemo } from 'react';
 import { Swiper, SwiperSlide } from 'swiper/react';
-import { Pagination, Navigation } from 'swiper/modules';
+import { Pagination, Navigation, Autoplay } from 'swiper/modules';
 import { useNavigate } from 'react-router-dom';
 import { productAPI } from '../services/api';
 import { trackViewContentEvent, trackAddToCartEvent, getClientInfo } from '../services/facebookConversions';
@@ -8,6 +8,8 @@ import {
   beginCheckoutFunnel,
   buildCheckoutProductProperties,
   getCheckoutQuantityExperiment,
+  isCodTrustCheckoutVariant,
+  isInlineCheckoutVariant,
   trackCheckoutEvent,
   trackProductLandingView
 } from '../services/checkoutFunnelAnalytics';
@@ -17,23 +19,15 @@ import QuantityModal from './QuantityModal';
 import ServiceInfo from './ServiceInfo';
 import ProductVariants from './ProductVariants';
 import logoImage from '../assets/logo.png';
+import {
+  getLocalPreviewBrowserContextParam,
+  syncLocalPreviewBrowserContextFromSearch
+} from '../utils/checkoutBrowserContextPreview';
 
 const PRODUCT_UNAVAILABLE_BACKEND_MESSAGE = '此商品已下架，请查看其它商品';
 const PRODUCT_UNAVAILABLE_MESSAGE_FR = "Ce produit n'est plus disponible. Veuillez consulter d'autres produits.";
 const GENERIC_PRODUCT_FETCH_ERROR_FR = 'Échec de récupération des informations produit';
 const PRODUCT_UNAVAILABLE_REDIRECT_SECONDS = 3;
-
-const getLocalPreviewBrowserContextSearch = () => {
-  if (typeof window === 'undefined') return '';
-  const isLocalPreview = ['localhost', '127.0.0.1'].includes(window.location.hostname);
-  if (!isLocalPreview) return '';
-
-  const params = new URLSearchParams(window.location.search);
-  const previewContext = params.get('browser_context');
-  return previewContext === 'facebook_in_app' || previewContext === 'instagram_in_app'
-    ? `&browser_context=${encodeURIComponent(previewContext)}`
-    : '';
-};
 
 const getBackendErrorDetail = (err) => err?.response?.data?.detail;
 
@@ -82,11 +76,27 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
   const { adId, isLoading: adTrackingLoading } = useAdTrackingContext();
   const viewTrackedProductRef = useRef(null);
   const checkoutQuantityExperiment = useMemo(() => getCheckoutQuantityExperiment(), []);
-  const isCheckoutOptimizationVariant = checkoutQuantityExperiment.checkout_quantity_variant === 'inline_quantity';
+  const isCheckoutOptimizationVariant = isInlineCheckoutVariant(checkoutQuantityExperiment);
+  const isCodTrustVariant = isCodTrustCheckoutVariant(checkoutQuantityExperiment);
+  const galleryImages = Array.isArray(product?.image_url) ? product.image_url : [];
+  const productSwiperModules = isCodTrustVariant
+    ? [Pagination, Navigation, Autoplay]
+    : [Pagination, Navigation];
+  const productGalleryAutoplay = isCodTrustVariant && galleryImages.length > 1
+    ? {
+        delay: 3500,
+        disableOnInteraction: true,
+        pauseOnMouseEnter: true
+      }
+    : false;
 
   useLayoutEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
   }, [productId]);
+
+  useEffect(() => {
+    syncLocalPreviewBrowserContextFromSearch(window.location.search);
+  }, []);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -251,7 +261,7 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
 
   const handleBuyNowClick = () => {
     const quantityExperiment = checkoutQuantityExperiment;
-    const isInlineQuantityVariant = quantityExperiment.checkout_quantity_variant === 'inline_quantity';
+    const isInlineQuantityVariant = isInlineCheckoutVariant(quantityExperiment);
     const defaultQuantity = 1;
     const totalPrice = product.price * defaultQuantity;
     let checkoutSessionId = null;
@@ -293,7 +303,7 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
         console.warn('Facebook AddToCart 事件错误:', fbError);
       }
 
-      navigate(`/payment?step=1${getLocalPreviewBrowserContextSearch()}`, {
+      navigate(`/payment?step=1${getLocalPreviewBrowserContextParam()}`, {
         state: {
           product,
           quantity: defaultQuantity,
@@ -333,14 +343,16 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
         {/* 产品图片轮播 */}
         <div className="product-gallery">
           <Swiper
-            modules={[Pagination, Navigation]}
+            modules={productSwiperModules}
             spaceBetween={0}
             slidesPerView={1}
             pagination={{ clickable: true }}
             navigation={true}
+            autoplay={productGalleryAutoplay}
+            speed={450}
             className="main-swiper"
           >
-            {product.image_url?.map((image, index) => (
+            {galleryImages.map((image, index) => (
               <SwiperSlide key={`${product.product_id}-main-${index}`}>
                 <div className="image-container">
                   <img src={image} alt={`Image produit ${index + 1}`} />
@@ -370,7 +382,7 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
             </div>
 
             {isCheckoutOptimizationVariant && (
-              <ServiceInfo variant="benefits" compact />
+              <ServiceInfo variant={isCodTrustVariant ? 'cod_trust' : 'benefits'} compact />
             )}
 
             {/* 库存信息 */}
@@ -407,8 +419,10 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
           {/* 底部操作按钮 */}
           <div className="bottom-actions">
             {isCheckoutOptimizationVariant && (
-              <div className="cta-trust-note">
-                Aucun paiement maintenant. À la réception, payez par Wave ou en cash.
+              <div className={`cta-trust-note ${isCodTrustVariant ? 'cod-trust' : ''}`}>
+                {isCodTrustVariant
+                  ? 'Aucun paiement maintenant. Recevez le produit, puis payez en cash ou Wave.'
+                  : 'Aucun paiement maintenant. À la réception, payez par Wave ou en cash.'}
               </div>
             )}
             <button

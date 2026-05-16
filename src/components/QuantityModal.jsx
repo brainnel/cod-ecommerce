@@ -9,6 +9,7 @@ import {
   trackCheckoutEvent,
   updateCheckoutContext
 } from '../services/checkoutFunnelAnalytics'
+import { getLocalPreviewBrowserContextParam } from '../utils/checkoutBrowserContextPreview'
 import './QuantityModal.css'
 
 const QuantityModal = ({ isOpen, onClose, product, checkoutQuantityExperiment }) => {
@@ -74,7 +75,7 @@ const QuantityModal = ({ isOpen, onClose, product, checkoutQuantityExperiment })
     }
 
     // 跳转到付款页面，传递产品和数量信息
-    navigate('/payment?step=1', {
+    navigate(`/payment?step=1${getLocalPreviewBrowserContextParam()}`, {
       state: {
         product,
         quantity,

@@ -1,36 +1,38 @@
 import React from 'react';
 import { 
-  FaMoneyBillWave,
-  FaUndo, 
-  FaTruck,
-  FaGift
-} from 'react-icons/fa';
+  FiCreditCard,
+  FiRefreshCcw,
+  FiTruck,
+  FiGift,
+  FiClock
+} from 'react-icons/fi';
 import './ServiceInfo.css';
 
 const ServiceInfo = ({ variant = 'classic', compact = false }) => {
   const isBenefitVariant = variant === 'benefits';
+  const isCodTrustVariant = variant === 'cod_trust';
   const classicServices = [
     {
       id: 1,
-      icon: FaGift,
+      icon: FiGift,
       title: 'Livraison gratuite',
       subtitle: 'à Abidjan'
     },
     {
       id: 2,
-      icon: FaTruck,
+      icon: FiTruck,
       title: 'Livraison 24h',
       subtitle: 'à Abidjan'
     },
     {
       id: 3,
-      icon: FaMoneyBillWave,
+      icon: FiCreditCard,
       title: 'Paiement à réception',
       subtitle: 'cash ou Wave'
     },
     {
       id: 4,
-      icon: FaUndo,
+      icon: FiRefreshCcw,
       title: 'Retour possible',
       subtitle: 'si problème'
     }
@@ -38,41 +40,72 @@ const ServiceInfo = ({ variant = 'classic', compact = false }) => {
   const benefitServices = [
     {
       id: 1,
-      icon: FaGift,
+      icon: FiGift,
       title: 'Livraison gratuite',
       subtitle: 'à Abidjan',
       tone: 'delivery'
     },
     {
       id: 2,
-      icon: FaTruck,
+      icon: FiClock,
       title: 'Livraison 24h',
       subtitle: 'à Abidjan',
       tone: 'payment'
     },
     {
       id: 3,
-      icon: FaMoneyBillWave,
+      icon: FiCreditCard,
       title: 'Paiement à réception',
       subtitle: 'cash ou Wave',
       tone: 'assurance'
     },
     {
       id: 4,
-      icon: FaUndo,
+      icon: FiRefreshCcw,
       title: 'Retour possible',
       subtitle: 'si problème',
       tone: 'support'
     }
   ];
-  const services = isBenefitVariant ? benefitServices : classicServices;
+  const codTrustServices = [
+    {
+      id: 1,
+      icon: FiGift,
+      title: 'Livraison gratuite',
+      subtitle: 'à Abidjan',
+      tone: 'delivery'
+    },
+    {
+      id: 2,
+      icon: FiClock,
+      title: 'Livré sous 24h',
+      subtitle: 'Abidjan',
+      tone: 'payment'
+    },
+    {
+      id: 3,
+      icon: FiCreditCard,
+      title: 'Payez à réception',
+      subtitle: 'cash ou Wave',
+      tone: 'assurance'
+    },
+    {
+      id: 4,
+      icon: FiRefreshCcw,
+      title: 'Retour possible',
+      subtitle: 'si problème',
+      tone: 'support'
+    }
+  ];
+  const services = isCodTrustVariant ? codTrustServices : (isBenefitVariant ? benefitServices : classicServices);
+  const hasBenefitStyle = isBenefitVariant || isCodTrustVariant;
 
   return (
-    <div className={`service-info ${isBenefitVariant ? 'benefit-style' : ''} ${compact ? 'compact-benefits' : ''}`}>
-      {isBenefitVariant && (
+    <div className={`service-info ${hasBenefitStyle ? 'benefit-style' : ''} ${isCodTrustVariant ? 'cod-trust-style' : ''} ${compact ? 'compact-benefits' : ''}`}>
+      {hasBenefitStyle && (
         <div className="service-benefit-header">
           <span className="service-benefit-kicker">Inclus avec votre commande</span>
-          <h3>Vos avantages avec cette commande</h3>
+          <h3>{isCodTrustVariant ? 'Recevez d’abord, payez après' : 'Vos avantages avec cette commande'}</h3>
         </div>
       )}
       <div className="service-grid">

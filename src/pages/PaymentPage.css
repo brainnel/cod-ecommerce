@@ -422,7 +422,13 @@
 }
 
 .badge-icon {
-  font-size: 16px;
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #ff5100;
+  font-size: 15px;
 }
 
 /* 表单样式 */
@@ -488,6 +494,14 @@
   color: #999;
   text-align: right;
   margin-top: 4px;
+}
+
+.address-assurance-note {
+  margin-top: 6px;
+  color: #5f6875;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
 }
 
 /* 电话号码输入组合 */
@@ -606,7 +620,6 @@
 }
 
 .district-icon {
-  font-size: 24px;
   width: 48px;
   height: 48px;
   display: flex;
@@ -616,6 +629,13 @@
   border-radius: 50%;
   margin-right: 12px;
   flex-shrink: 0;
+  color: #ff5100;
+  font-size: 22px;
+}
+
+.district-icon svg,
+.badge-icon svg {
+  display: block;
 }
 
 .district-info {
@@ -874,7 +894,18 @@
 
 /* 支付方式 */
 .payment-method {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   margin-top: 20px;
+  padding: 12px 13px;
+  border: 1px solid #d7eadf;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #f7fff9 0%, #f0fbf4 100%);
+  color: #176936;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.35;
 }
 
 .payment-method h3 {
@@ -902,7 +933,17 @@
 }
 
 .payment-icon {
-  font-size: 18px;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #dff4e6;
+  color: #168246;
+  font-size: 15px;
+  line-height: 1;
+  flex-shrink: 0;
 }
 
 /* 下单按钮 */
@@ -1198,6 +1239,10 @@
     min-height: 42px;
     padding: 9px 12px;
     white-space: normal;
+  }
+
+  .address-assurance-note {
+    font-size: 11.5px;
   }
 
   .map-section {

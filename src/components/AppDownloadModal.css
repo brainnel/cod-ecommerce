@@ -67,10 +67,21 @@
   border-bottom: 1px solid #f0f0f0;
 }
 
-.success-icon {
-  font-size: 48px;
-  margin-bottom: 12px;
-  display: block;
+.download-modal-success-icon {
+  width: 58px;
+  height: 58px;
+  margin: 0 auto 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #e8f8ee;
+  color: #1fa052;
+}
+
+.download-modal-success-icon svg {
+  width: 34px;
+  height: 34px;
 }
 
 .modal-title {
