@@ -1049,7 +1049,7 @@ const PaymentPage = () => {
 
         {/* 步顢2: 地图标记 */}
         {currentStep === 2 && (
-          <div className={`section map-section ${isInlineQuantityVariant ? 'with-location-fallback' : ''}`}>
+          <div className={`section map-section ${isInlineQuantityVariant ? 'with-location-fallback' : ''} ${customMarker ? 'has-selected-marker' : ''}`}>
             {/* 橙色提示条 */}
             <div className={`location-hint ${isMetaInAppBrowser ? 'map-only' : ''}`}>
               <div className="hint-content">

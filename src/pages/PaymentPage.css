@@ -1249,6 +1249,10 @@
     padding-bottom: 96px;
   }
 
+  .map-section.has-selected-marker {
+    padding-bottom: 118px;
+  }
+
   .map-section.with-location-fallback {
     padding-bottom: 132px;
   }
@@ -1359,6 +1363,23 @@
     background: rgba(255, 255, 255, 0.96);
     box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18);
     backdrop-filter: blur(10px);
+  }
+
+  .map-section > .step-actions.has-selected-marker {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px 10px;
+  }
+
+  .map-section > .step-actions.has-selected-marker .map-selected-note {
+    grid-column: 1 / -1;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .map-section > .step-actions.has-selected-marker .prev-btn,
+  .map-section > .step-actions.has-selected-marker .next-btn {
+    width: 100%;
   }
 
   .map-section > .step-actions.with-location-fallback {
