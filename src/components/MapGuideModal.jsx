@@ -4,17 +4,16 @@ import pointImage from '../assets/guide/point.png'
 import mapImage from '../assets/guide/map.png'
 import './MapGuideModal.css'
 
-const MapGuideModal = ({ visible, onClose }) => {
+const MapGuideModal = ({ visible, onClose, autoCloseMs = 2200 }) => {
   useEffect(() => {
-    if (visible) {
-      // 3秒后自动关闭（可选）
-      const timer = setTimeout(() => {
-        // onClose()
-      }, 5000)
-      
-      return () => clearTimeout(timer)
-    }
-  }, [visible])
+    if (!visible) return undefined
+
+    const timer = setTimeout(() => {
+      onClose()
+    }, autoCloseMs)
+
+    return () => clearTimeout(timer)
+  }, [autoCloseMs, onClose, visible])
 
   if (!visible) return null
 

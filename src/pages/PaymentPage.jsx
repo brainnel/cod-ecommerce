@@ -27,6 +27,9 @@ import './PaymentPage.css'
 const GEOLOCATION_CACHE_MAX_AGE_MS = 5 * 60 * 1000
 const GEOLOCATION_MANUAL_HINT_MS = 4000
 const GEOLOCATION_FAST_TIMEOUT_MS = 6000
+const MAP_GUIDE_SEEN_STORAGE_KEY = 'cod_checkout_map_guide_seen_v1'
+const MAP_GUIDE_SHOW_DELAY_MS = 500
+const MAP_GUIDE_AUTO_CLOSE_MS = 2200
 const CHECKOUT_MIN_STEP = 1
 const CHECKOUT_MAX_STEP = 3
 
@@ -44,6 +47,27 @@ const getCheckoutStepFromSearch = (search) => {
 const hasCheckoutStepInSearch = (search) => {
   const params = new URLSearchParams(search)
   return params.has('step')
+}
+
+const hasSeenMapGuide = () => {
+  if (typeof window === 'undefined') return true
+
+  try {
+    return window.localStorage?.getItem(MAP_GUIDE_SEEN_STORAGE_KEY) === '1'
+  } catch (error) {
+    console.warn('读取地图引导状态失败:', error)
+    return false
+  }
+}
+
+const markMapGuideSeen = () => {
+  if (typeof window === 'undefined') return
+
+  try {
+    window.localStorage?.setItem(MAP_GUIDE_SEEN_STORAGE_KEY, '1')
+  } catch (error) {
+    console.warn('写入地图引导状态失败:', error)
+  }
 }
 
 const buildCheckoutStepSearch = (step, currentSearch = '') => {
@@ -626,8 +650,11 @@ const PaymentPage = () => {
     setLocationRequestMessage('')
     
     navigateToCheckoutStep(2)
-    // 显示引导动画
-    setTimeout(() => setShowGuideModal(true), 500)
+
+    if (!hasSeenMapGuide()) {
+      markMapGuideSeen()
+      setTimeout(() => setShowGuideModal(true), MAP_GUIDE_SHOW_DELAY_MS)
+    }
   }
 
   // 地图标记
@@ -1295,7 +1322,11 @@ const PaymentPage = () => {
       </div>
 
       {/* 引导动画Modal */}
-      <MapGuideModal visible={showGuideModal} onClose={() => setShowGuideModal(false)} />
+      <MapGuideModal
+        visible={showGuideModal}
+        onClose={() => setShowGuideModal(false)}
+        autoCloseMs={MAP_GUIDE_AUTO_CLOSE_MS}
+      />
     </div>
   )
 }
