@@ -7,7 +7,7 @@ import {
   beginCheckoutFunnel,
   buildCheckoutProductProperties,
   getCheckoutQuantityExperiment,
-  isCodTrustCheckoutVariant,
+  isCodTrustLandingVariant,
   isInlineCheckoutVariant,
   trackCheckoutEvent,
   trackProductLandingView
@@ -50,8 +50,8 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
   const viewTrackedBundleRef = useRef(null)
   const checkoutQuantityExperiment = useMemo(() => getCheckoutQuantityExperiment(), [])
   const isCheckoutOptimizationVariant = isInlineCheckoutVariant(checkoutQuantityExperiment)
-  const isCodTrustVariant = isCodTrustCheckoutVariant(checkoutQuantityExperiment)
-  const bundleSwiperModules = isCodTrustVariant
+  const isCodTrustLanding = isCodTrustLandingVariant(checkoutQuantityExperiment)
+  const bundleSwiperModules = isCodTrustLanding
     ? [Pagination, Navigation, Autoplay]
     : [Pagination, Navigation]
 
@@ -210,7 +210,7 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
   const detailImages = Array.isArray(bundle.detail_images) ? bundle.detail_images : []
   const items = Array.isArray(bundle.items) ? bundle.items : []
   const galleryImages = bundle.cover_image_url ? [bundle.cover_image_url] : []
-  const bundleGalleryAutoplay = isCodTrustVariant && galleryImages.length > 1
+  const bundleGalleryAutoplay = isCodTrustLanding && galleryImages.length > 1
     ? {
         delay: 3500,
         disableOnInteraction: true,
@@ -277,7 +277,7 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
             </div>
 
             {isCheckoutOptimizationVariant && (
-              <ServiceInfo variant={isCodTrustVariant ? 'cod_trust' : 'benefits'} compact />
+              <ServiceInfo variant={isCodTrustLanding ? 'cod_trust' : 'benefits'} compact />
             )}
 
             {/* 数量选择器 */}
@@ -348,8 +348,8 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
 
           <div className="bottom-actions">
             {isCheckoutOptimizationVariant && (
-              <div className={`cta-trust-note ${isCodTrustVariant ? 'cod-trust' : ''}`}>
-                {isCodTrustVariant
+              <div className={`cta-trust-note ${isCodTrustLanding ? 'cod-trust' : ''}`}>
+                {isCodTrustLanding
                   ? 'Aucun paiement maintenant. Recevez le pack, puis payez en cash ou Wave.'
                   : 'Aucun paiement maintenant. À la réception, payez par Wave ou en cash.'}
               </div>

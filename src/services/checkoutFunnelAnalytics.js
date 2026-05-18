@@ -5,27 +5,31 @@ const DEVICE_ID_STORAGE_KEY = 'cod_checkout_device_id'
 const LANDING_SESSION_ID_STORAGE_KEY = 'cod_landing_session_id'
 const SESSION_ID_STORAGE_KEY = 'cod_checkout_session_id'
 const SESSION_CONTEXT_STORAGE_KEY = 'cod_checkout_context'
-const QUANTITY_EXPERIMENT_STORAGE_KEY = 'cod_checkout_quantity_flow_variant_v2'
+const QUANTITY_EXPERIMENT_STORAGE_KEY = 'cod_checkout_quantity_flow_variant_v3'
 const AD_ID_STORAGE_KEY = 'facebook_ad_id'
 const CHECKOUT_FLOW = 'cod_checkout'
-const QUANTITY_FLOW_EXPERIMENT = 'checkout_reduced_friction_trust_v2'
-const QUANTITY_FLOW_HOLDOUT_PERCENT = 10
-const QUANTITY_FLOW_INLINE_PERCENT = 45
-const QUANTITY_FLOW_TRUST_PERCENT = 45
+const QUANTITY_FLOW_EXPERIMENT = 'checkout_reduced_friction_trust_v3'
+const QUANTITY_FLOW_HOLDOUT_PERCENT = 0
+const QUANTITY_FLOW_INLINE_PERCENT = 65
+const QUANTITY_FLOW_TRUST_PERCENT = 0
+const QUANTITY_FLOW_TRUST_LANDING_PERCENT = 35
 const PENDING_CHECKOUT_REUSE_MS = 10 * 60 * 1000
 
 const QUANTITY_MODAL_VARIANT = 'quantity_modal'
 const INLINE_QUANTITY_VARIANT = 'inline_quantity'
 const COD_TRUST_VARIANT = 'cod_trust'
+const COD_TRUST_LANDING_VARIANT = 'cod_trust_landing'
 const CHECKOUT_QUANTITY_VARIANTS = [
   QUANTITY_MODAL_VARIANT,
   INLINE_QUANTITY_VARIANT,
-  COD_TRUST_VARIANT
+  COD_TRUST_VARIANT,
+  COD_TRUST_LANDING_VARIANT
 ]
 
 const getVariantGroup = (variant) => {
   if (variant === INLINE_QUANTITY_VARIANT) return 'friction'
   if (variant === COD_TRUST_VARIANT) return 'trust'
+  if (variant === COD_TRUST_LANDING_VARIANT) return 'trust_landing'
   return 'holdout'
 }
 
@@ -33,6 +37,7 @@ const normalizeCheckoutQuantityVariant = (value) => {
   const normalized = String(value || '').trim()
   if (CHECKOUT_QUANTITY_VARIANTS.includes(normalized)) return normalized
   if (normalized === 'c' || normalized === 'c_group' || normalized === 'trust_copy') return COD_TRUST_VARIANT
+  if (normalized === 'd' || normalized === 'd_group' || normalized === 'trust_landing') return COD_TRUST_LANDING_VARIANT
   return null
 }
 
@@ -40,7 +45,9 @@ export const isInlineCheckoutVariant = (experimentOrVariant) => {
   const variant = typeof experimentOrVariant === 'string'
     ? experimentOrVariant
     : experimentOrVariant?.checkout_quantity_variant
-  return variant === INLINE_QUANTITY_VARIANT || variant === COD_TRUST_VARIANT
+  return variant === INLINE_QUANTITY_VARIANT
+    || variant === COD_TRUST_VARIANT
+    || variant === COD_TRUST_LANDING_VARIANT
 }
 
 export const isCodTrustCheckoutVariant = (experimentOrVariant) => {
@@ -48,6 +55,13 @@ export const isCodTrustCheckoutVariant = (experimentOrVariant) => {
     ? experimentOrVariant
     : experimentOrVariant?.checkout_quantity_variant
   return variant === COD_TRUST_VARIANT
+}
+
+export const isCodTrustLandingVariant = (experimentOrVariant) => {
+  const variant = typeof experimentOrVariant === 'string'
+    ? experimentOrVariant
+    : experimentOrVariant?.checkout_quantity_variant
+  return variant === COD_TRUST_VARIANT || variant === COD_TRUST_LANDING_VARIANT
 }
 
 const safeGetStorage = (storage, key) => {
@@ -155,7 +169,8 @@ export const getCheckoutQuantityExperiment = () => {
     checkout_quantity_holdout_percent: QUANTITY_FLOW_HOLDOUT_PERCENT,
     checkout_quantity_inline_percent: QUANTITY_FLOW_INLINE_PERCENT,
     checkout_quantity_trust_percent: QUANTITY_FLOW_TRUST_PERCENT,
-    checkout_quantity_split: `${QUANTITY_FLOW_HOLDOUT_PERCENT}/${QUANTITY_FLOW_INLINE_PERCENT}/${QUANTITY_FLOW_TRUST_PERCENT}`
+    checkout_quantity_trust_landing_percent: QUANTITY_FLOW_TRUST_LANDING_PERCENT,
+    checkout_quantity_split: `${QUANTITY_FLOW_HOLDOUT_PERCENT}/${QUANTITY_FLOW_INLINE_PERCENT}/${QUANTITY_FLOW_TRUST_PERCENT}/${QUANTITY_FLOW_TRUST_LANDING_PERCENT}`
   }
 
   if (typeof window === 'undefined') return fallback
@@ -179,12 +194,9 @@ export const getCheckoutQuantityExperiment = () => {
   }
 
   const bucket = hashStringToBucket(getCheckoutDeviceId())
-  let variant = QUANTITY_MODAL_VARIANT
-  if (bucket >= QUANTITY_FLOW_HOLDOUT_PERCENT) {
-    variant = bucket < QUANTITY_FLOW_HOLDOUT_PERCENT + QUANTITY_FLOW_INLINE_PERCENT
-      ? INLINE_QUANTITY_VARIANT
-      : COD_TRUST_VARIANT
-  }
+  const variant = bucket < QUANTITY_FLOW_INLINE_PERCENT
+    ? INLINE_QUANTITY_VARIANT
+    : COD_TRUST_LANDING_VARIANT
   safeSetStorage(window.localStorage, QUANTITY_EXPERIMENT_STORAGE_KEY, variant)
   return {
     ...fallback,
@@ -222,6 +234,7 @@ export const buildCheckoutProductProperties = (product, extra = {}) => {
       checkout_quantity_holdout_percent: extra.checkout_quantity_holdout_percent,
       checkout_quantity_inline_percent: extra.checkout_quantity_inline_percent,
       checkout_quantity_trust_percent: extra.checkout_quantity_trust_percent,
+      checkout_quantity_trust_landing_percent: extra.checkout_quantity_trust_landing_percent,
       checkout_quantity_split: extra.checkout_quantity_split
     }
     : getCheckoutQuantityExperiment()

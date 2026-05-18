@@ -8,7 +8,7 @@ import {
   beginCheckoutFunnel,
   buildCheckoutProductProperties,
   getCheckoutQuantityExperiment,
-  isCodTrustCheckoutVariant,
+  isCodTrustLandingVariant,
   isInlineCheckoutVariant,
   trackCheckoutEvent,
   trackProductLandingView
@@ -77,12 +77,12 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
   const viewTrackedProductRef = useRef(null);
   const checkoutQuantityExperiment = useMemo(() => getCheckoutQuantityExperiment(), []);
   const isCheckoutOptimizationVariant = isInlineCheckoutVariant(checkoutQuantityExperiment);
-  const isCodTrustVariant = isCodTrustCheckoutVariant(checkoutQuantityExperiment);
+  const isCodTrustLanding = isCodTrustLandingVariant(checkoutQuantityExperiment);
   const galleryImages = Array.isArray(product?.image_url) ? product.image_url : [];
-  const productSwiperModules = isCodTrustVariant
+  const productSwiperModules = isCodTrustLanding
     ? [Pagination, Navigation, Autoplay]
     : [Pagination, Navigation];
-  const productGalleryAutoplay = isCodTrustVariant && galleryImages.length > 1
+  const productGalleryAutoplay = isCodTrustLanding && galleryImages.length > 1
     ? {
         delay: 3500,
         disableOnInteraction: true,
@@ -382,7 +382,7 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
             </div>
 
             {isCheckoutOptimizationVariant && (
-              <ServiceInfo variant={isCodTrustVariant ? 'cod_trust' : 'benefits'} compact />
+              <ServiceInfo variant={isCodTrustLanding ? 'cod_trust' : 'benefits'} compact />
             )}
 
             {/* 库存信息 */}
@@ -419,8 +419,8 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
           {/* 底部操作按钮 */}
           <div className="bottom-actions">
             {isCheckoutOptimizationVariant && (
-              <div className={`cta-trust-note ${isCodTrustVariant ? 'cod-trust' : ''}`}>
-                {isCodTrustVariant
+              <div className={`cta-trust-note ${isCodTrustLanding ? 'cod-trust' : ''}`}>
+                {isCodTrustLanding
                   ? 'Aucun paiement maintenant. Recevez le produit, puis payez en cash ou Wave.'
                   : 'Aucun paiement maintenant. À la réception, payez par Wave ou en cash.'}
               </div>

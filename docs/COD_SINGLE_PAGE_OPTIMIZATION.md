@@ -18,7 +18,7 @@
 ## 当前下单流程
 
 1. 商品详情页点击下单，进入 checkout。
-2. A 组旧流程进入 SKU/数量弹窗；B/C 组默认数量 1 并把数量控件放在大区页上方。
+2. A 组旧流程进入 SKU/数量弹窗；B/C/D 组默认数量 1 并把数量控件放在大区页上方。
 3. 大区选择。
 4. 定位选择，默认可以手动点地图，也可以点击“使用当前定位”；FB / Instagram 内置浏览器里隐藏当前定位按钮，直接引导用户在地图上选择收货地址。
 5. 个人信息填写：姓名、电话、WhatsApp、地址描述。
@@ -46,16 +46,16 @@
   - 第 4 次及之后计入 `duplicate_checkout_excluded_sessions`，后台顶部显示“已排除重复点击”，不再污染商品/广告/主漏斗下单尝试数。
   - 这个规则只处理未完成 SKU 数量选择的重复点击；已经进入后续步骤的 session 不会被剔除。
 
-### 下单减摩擦 A/B/C
+### 下单减摩擦 A/B/C/D
 
-- A/B/C 分组不是每次打开页面重新随机，而是设备级固定分流：首次生成 `device_id` 后，对 `device_id` 做 hash，A 组 `quantity_modal` 保留旧流程，B 组 `inline_quantity` 是当前稳定优化版，C 组 `cod_trust` 在 B 组基础上加强 COD 承诺文案。上线前规划为 A 10% / B 45% / C 45%。
-- 本地调试可以用 URL 参数强制分组：`checkout_quantity_variant=quantity_modal`、`checkout_quantity_variant=inline_quantity` 或 `checkout_quantity_variant=cod_trust`。
+- A/B/C/D 分组不是每次打开页面重新随机，而是设备级固定分流：首次生成 `device_id` 后，对 `device_id` 做 hash。当前自然分流只进入 B/D：B 组 `inline_quantity` 是当前稳定 checkout，D 组 `cod_trust_landing` 使用 C 组 COD 承诺落地页 + B 组 checkout。A 组 `quantity_modal` 和 C 组 `cod_trust` 保留为 URL 强制预览和历史数据识别，不再自然分配流量。
+- 本地调试可以用 URL 参数强制分组：`checkout_quantity_variant=quantity_modal`、`checkout_quantity_variant=inline_quantity`、`checkout_quantity_variant=cod_trust` 或 `checkout_quantity_variant=cod_trust_landing`。
 - B 组里“数量已定”和“已选大区”不是同一个动作：点击商品页下单按钮时会默认确认数量 1 件并记录 `quantity_confirmed`；进入大区页后，只有用户点击大区卡片才记录 `district_selected`。
-- 判断默认数量 1 是否值得保留时，不能只看转化率，还要看平均件数。后台 A/B/C 表的“单均件数”主值来自 `order_create_success` 的成功订单平均数量；灰字“确认”来自 `quantity_confirmed` 的数量确认平均值。
-- B/C 组兜底按钮事件是 `location_fallback_used`。点击兜底按钮后会同步记录 `location_selected`，且 `location_method = district_center_fallback`，所以在主漏斗里计入“完成定位”；后台 A/B/C 表单独展示兜底按钮人数和占已选大区比例。
-- 定位方式需要同时看整体和 A/B/C 组内占比：整体“定位方式”会混入不同组，只适合看大盘；判断兜底按钮是否过度使用时，应看“定位方式 A/B/C 对比”里组内的 `district_center_fallback / manual_map / current_location` 分布。
+- 判断默认数量 1 是否值得保留时，不能只看转化率，还要看平均件数。后台 A/B/C/D 表的“单均件数”主值来自 `order_create_success` 的成功订单平均数量；灰字“确认”来自 `quantity_confirmed` 的数量确认平均值。
+- B/C/D 组兜底按钮事件是 `location_fallback_used`。点击兜底按钮后会同步记录 `location_selected`，且 `location_method = district_center_fallback`，所以在主漏斗里计入“完成定位”；后台 A/B/C/D 表单独展示兜底按钮人数和占已选大区比例。
+- 定位方式需要同时看整体和 A/B/C/D 组内占比：整体“定位方式”会混入不同组，只适合看大盘；判断兜底按钮是否过度使用时，应看“定位方式 A/B/C/D 对比”里组内的 `district_center_fallback / manual_map / current_location` 分布。
 - 地图选择引导层保留，但只在同一浏览器本地第一次进入地图页时展示一次，状态写入 `localStorage`；清历史数据、换浏览器或无痕模式会重新展示。引导层自动关闭时间为 2.2 秒，避免长时间挡住地图和底部按钮。
-- 管理端“兜底地址订单质量”用于观察兜底坐标是否影响后续配送结果。统计范围固定从兜底按钮上线时间 `2026-05-15 03:42:42 UTC`（北京时间 05-15 11:42）开始，到当前查询窗口结束；A 组旧流程作为无兜底按钮对照，B/C 组拆分“使用兜底按钮 / 未使用兜底按钮”。该模块按真实派送口径统计：`order_status=3` 为已签收，`order_status=7` 为拒收或配送失败，其他未完成派送状态归入待履约；`order_status IN (4,5,6)` 已取消订单不展示、不进分母，因为没有尝试派送。“已出结果签收率”会排除待履约订单，避免新订单未配送完成时误伤签收率。测试品订单按订单内商品全部 `is_test=1` 判定，会从签收率和待履约分母里排除，并单独展示排除数量。
+- 管理端“兜底地址订单质量”用于观察兜底坐标是否影响后续配送结果。统计范围固定从兜底按钮上线时间 `2026-05-15 03:42:42 UTC`（北京时间 05-15 11:42）开始，到当前查询窗口结束；A 组旧流程作为无兜底按钮对照，B/C/D 组拆分“使用兜底按钮 / 未使用兜底按钮”。该模块按真实派送口径统计：`order_status=3` 为已签收，`order_status=7` 为拒收或配送失败，其他未完成派送状态归入待履约；`order_status IN (4,5,6)` 已取消订单不展示、不进分母，因为没有尝试派送。“已出结果签收率”会排除待履约订单，避免新订单未配送完成时误伤签收率。测试品订单按订单内商品全部 `is_test=1` 判定，会从签收率和待履约分母里排除，并单独展示排除数量。
 
 ### 定位方式
 
@@ -290,6 +290,12 @@
   - 管理端新增“兜底地址订单质量”模块：不只看当前 C 组窗口，而是从 2026-05-15 11:42 北京时间兜底按钮上线开始累计到当前查询结束时间；A 组作为对照，B/C 组拆分是否点击兜底按钮，用真实派送口径观察签收率、已出结果签收率、拒收/配送失败和待履约。测试品订单会直接取消且不派送，已取消订单也没有尝试派送，两者都从该模块签收率计算中排除。
   - 修复 Step 2 地图页底部按钮窄屏挤压：A 组旧流程在用户点完地图后没有 `with-location-fallback` class，绿色“Position marquée”提示会和 `Précédent / Suivant` 同行竞争宽度，部分手机上按钮被挤窄。现在只要已选地图点，底部固定栏统一改成两行布局：第一行提示，第二行两个按钮各占一半；B/C 组也沿用同一保护。清浏览器历史能暂时恢复，通常是因为清掉 localStorage/sessionStorage 后重新分组或重新拿静态资源，但这不是可靠修复。
   - 本地开发可用 `/order-success?preview_order_success=1` 预览订单完成页视觉；该入口仅 `DEV` 环境生效，线上无订单 state 仍会回首页。
+
+- 2026-05-18 checkout 实验进入 B/D 版本：
+  - A 组旧数量弹窗和 C 组完整 COD 承诺 checkout 不再自然分配流量；保留 `quantity_modal` / `cod_trust` 仅用于历史数据和本地强制预览。
+  - 新增 D 组 `cod_trust_landing`：落地页沿用 C 组 COD 承诺表达、权益区和多图自动轮播；进入 checkout 后完全走 B 组稳定流程，不再使用 C 组信息页额外 helper 和订单摘要支付文案。
+  - 新随机 key 改为 `cod_checkout_quantity_flow_variant_v3`，避免老设备 localStorage 继续停留在 A/C；自然分流为 B 65% / D 35%。
+  - 订单完成页视觉升级是全量页面，不按 A/B/C/D 分组区分，因为它发生在下单成功之后，不参与下单前转化率对比。
 
 ## 验证方式
 
