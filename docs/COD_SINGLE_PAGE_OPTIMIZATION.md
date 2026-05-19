@@ -46,14 +46,14 @@
   - 第 4 次及之后计入 `duplicate_checkout_excluded_sessions`，后台顶部显示“已排除重复点击”，不再污染商品/广告/主漏斗下单尝试数。
   - 这个规则只处理未完成 SKU 数量选择的重复点击；已经进入后续步骤的 session 不会被剔除。
 
-### 下单减摩擦 A/B/C/D
+### 下单减摩擦 A/B/C/D/E
 
-- A/B/C/D 分组不是每次打开页面重新随机，而是设备级固定分流：首次生成 `device_id` 后，对 `device_id` 做 hash。当前自然分流只进入 B/D：B 组 `inline_quantity` 是当前稳定 checkout，D 组 `cod_trust_landing` 使用 C 组 COD 承诺落地页 + B 组 checkout。A 组 `quantity_modal` 和 C 组 `cod_trust` 保留为 URL 强制预览和历史数据识别，不再自然分配流量。
-- 本地调试可以用 URL 参数强制分组：`checkout_quantity_variant=quantity_modal`、`checkout_quantity_variant=inline_quantity`、`checkout_quantity_variant=cod_trust` 或 `checkout_quantity_variant=cod_trust_landing`。
+- A/B/C/D/E 分组不是每次打开页面重新随机，而是设备级固定分流：首次生成 `device_id` 后，对 `device_id` 做 hash。当前自然分流只进入 B/E：B 组 `inline_quantity` 是当前稳定 checkout，占 80%；E 组 `address_first` 是地址优先版，占 20%。A 组 `quantity_modal`、C 组 `cod_trust`、D 组 `cod_trust_landing` 保留为 URL 强制预览和历史数据识别，不再自然分配流量。
+- 本地调试可以用 URL 参数强制分组：`checkout_quantity_variant=quantity_modal`、`checkout_quantity_variant=inline_quantity`、`checkout_quantity_variant=cod_trust`、`checkout_quantity_variant=cod_trust_landing` 或 `checkout_quantity_variant=address_first`。
 - B 组里“数量已定”和“已选大区”不是同一个动作：点击商品页下单按钮时会默认确认数量 1 件并记录 `quantity_confirmed`；进入大区页后，只有用户点击大区卡片才记录 `district_selected`。
-- 判断默认数量 1 是否值得保留时，不能只看转化率，还要看平均件数。后台 A/B/C/D 表的“单均件数”主值来自 `order_create_success` 的成功订单平均数量；灰字“确认”来自 `quantity_confirmed` 的数量确认平均值。
-- B/C/D 组兜底按钮事件是 `location_fallback_used`。点击兜底按钮后会同步记录 `location_selected`，且 `location_method = district_center_fallback`，所以在主漏斗里计入“完成定位”；后台 A/B/C/D 表单独展示兜底按钮人数和占已选大区比例。
-- 定位方式需要同时看整体和 A/B/C/D 组内占比：整体“定位方式”会混入不同组，只适合看大盘；判断兜底按钮是否过度使用时，应看“定位方式 A/B/C/D 对比”里组内的 `district_center_fallback / manual_map / current_location` 分布。
+- 判断默认数量 1 是否值得保留时，不能只看转化率，还要看平均件数。后台 A/B/C/D/E 表的“单均件数”主值来自 `order_create_success` 的成功订单平均数量；灰字“确认”来自 `quantity_confirmed` 的数量确认平均值。
+- B/C/D 组兜底按钮事件是 `location_fallback_used`。点击兜底按钮后会同步记录 `location_selected`，且 `location_method = district_center_fallback`，所以在主漏斗里计入“完成定位”；E 组默认跳过地图页，使用 `district_center_auto_skip` 单独区分。
+- 定位方式需要同时看整体和 A/B/C/D/E 组内占比：整体“定位方式”会混入不同组，只适合看大盘；判断兜底按钮或地址优先是否过度使用时，应看组内 `district_center_fallback / district_center_auto_skip / manual_map / current_location` 分布。
 - 地图选择引导层保留，但只在同一浏览器本地第一次进入地图页时展示一次，状态写入 `localStorage`；清历史数据、换浏览器或无痕模式会重新展示。引导层自动关闭时间为 2.2 秒，避免长时间挡住地图和底部按钮。
 - 管理端“兜底地址订单质量”用于观察兜底坐标是否影响后续配送结果。统计范围固定从兜底按钮上线时间 `2026-05-15 03:42:42 UTC`（北京时间 05-15 11:42）开始，到当前查询窗口结束；A 组旧流程作为无兜底按钮对照，B/C/D 组拆分“使用兜底按钮 / 未使用兜底按钮”。该模块按真实派送口径统计：`order_status=3` 为已签收，`order_status=7` 为拒收或配送失败，其他未完成派送状态归入待履约；`order_status IN (4,5,6)` 已取消订单不展示、不进分母，因为没有尝试派送。“已出结果签收率”会排除待履约订单，避免新订单未配送完成时误伤签收率。测试品订单按订单内商品全部 `is_test=1` 判定，会从签收率和待履约分母里排除，并单独展示排除数量。
 
@@ -264,7 +264,7 @@
   - 兜底按钮只在用户尚未点过地图时展示；一旦用户在地图上点了坐标，兜底按钮隐藏，只保留“Suivant”。这样避免“用户已经给了自己的坐标，又被引导走大区中心兜底”的冲突。
   - B 组前端提交订单时按定位来源取坐标：未点地图而使用兜底按钮时提交所选大区中心点；用户点过地图时提交用户最后选择的地图坐标。
   - 注意：订单创建后 `app_backend` 会在后台异步调用 `app_admin` 的 `/address-tool/auto-check-and-fix-orders`。只要订单带经纬度，这个流程就会用 Google 反查 + Gemini 判断地址/大区/坐标是否一致；如果 AI 认为需要修正，会二次更新 `flash_order.latitude` / `flash_order.longitude` 和 `location_status`。因此排查“前端到底提交了哪个坐标”时，要看订单请求体或创建瞬间坐标；最终 DB 坐标可能已经是后端 AI 地址修正后的结果。
-  - B 组表单页地址描述文案改成“Adresse détaillée et repère”，因为兜底路径可能没有精确坐标，不能只要求用户写参考物；placeholder 引导用户写街道/街区/门口颜色/附近药店等信息。校验失败时自动滚到第一个缺失字段。
+  - B 组表单页地址描述文案改成“Adresse détaillée et repère”，因为兜底路径可能没有精确坐标，不能只要求用户写参考物；placeholder 必须引导用户填写“地址范围 + 参照物”，例如区域/街道或小区 + 门口颜色/附近药店，避免用户只写一个参照物。校验失败时自动滚到第一个缺失字段。
   - 这组实验的埋点统一带 `checkout_quantity_experiment=checkout_quantity_flow_v1` 和 `checkout_quantity_variant=inline_quantity/quantity_modal`，后续后台按 variant 拆结果。`product_landing_view` 也会带同一组 variant，因此可以看落地页到点击下单率，也可以看 checkout 后续转化率。
   - 管理端下单漏斗新增版本窗口“下单减摩擦AB”，开始时间为 `2026-05-15 03:42:42 UTC`（北京时间 05-15 11:42）。后台新增 `A/B 分组`筛选和 A/B 对比表，可在同一版本窗口里分别查看 A 组旧流程、B 组优化包，以及整体对比。
   - 管理端 A/B 表新增“兜底按钮”列，后端字段为 `location_fallback_sessions`；比例默认看占已选大区人数，因为兜底按钮出现在大区之后、定位完成之前。
@@ -297,6 +297,14 @@
   - 新随机 key 改为 `cod_checkout_quantity_flow_variant_v3`，避免老设备 localStorage 继续停留在 A/C；自然分流为 B 65% / D 35%。
   - 订单完成页视觉升级是全量页面，不按 A/B/C/D 分组区分，因为它发生在下单成功之后，不参与下单前转化率对比。
   - 管理端 A/B/C/D 对比表新增两列广告校正指标：`校正落地页率` 和 `校正成功率`。口径为只看有足够样本分组共同出现的广告，在广告内部先算转化率，再按共同广告流量加权，减少广告质量差异对 B/D 判断的影响。
+
+- 2026-05-19 地址优先 E 组本地预览：
+  - 新增分组 `address_first` / `e`。初始阶段仅强制预览，确认后进入自然分流：B 组当前稳定版 80%，E 组地址优先版 20%。
+  - 新随机 key 改为 `cod_checkout_quantity_flow_variant_v4`，避免老设备 localStorage 继续停留在 B/D 旧分流。
+  - 逻辑：大区选择后不进入地图页，自动使用所选大区中心坐标并直接进入个人信息页；信息页强化“Adresse détaillée et repère”，要求用户填写“地址范围 + 参照物”。
+  - 信息页的地图入口必须弱化为地址输入框下方的可选项，不能做成顶部大卡片；主路径是填写详细地址和参照物，地图标点只是“想标也可以”的补充入口。
+  - 可选地图入口只展示一个轻量胶囊按钮；如果用户此前已经手动标过点或用当前定位拿到真实坐标，再从信息页回到地图页时必须保留该坐标，不能重置成大区中心。只有默认大区中心占位点才允许在进入地图页时清空。
+  - 埋点区分为 `location_method = district_center_auto_skip`，不要和现有兜底按钮 `district_center_fallback` 混在一起。
 
 ## 验证方式
 

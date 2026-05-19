@@ -8,6 +8,7 @@ import {
   buildCheckoutProductProperties,
   getCheckoutQuantityExperiment,
   getCheckoutSessionId,
+  isAddressFirstCheckoutVariant,
   isCodTrustCheckoutVariant,
   isInlineCheckoutVariant,
   resumeCheckoutSession,
@@ -195,6 +196,7 @@ const PaymentPage = () => {
   const isMetaInAppBrowser = browserContext.is_meta_in_app_browser
   const isInlineQuantityVariant = isInlineCheckoutVariant(checkoutQuantityExperiment)
   const isCodTrustVariant = isCodTrustCheckoutVariant(checkoutQuantityExperiment)
+  const isAddressFirstVariant = isAddressFirstCheckoutVariant(checkoutQuantityExperiment)
 
   // 三步流程：1=选大区, 2=地图标记, 3=填写信息
   const [currentStep, setCurrentStep] = useState(() => getCheckoutStepFromSearch(location.search))
@@ -643,12 +645,28 @@ const PaymentPage = () => {
     }
     setMapCenter(districtCenter)
     setMapZoom(14)  // 大区级别，用更高的缩放
-    setCustomMarker(null)
-    setMarkerSelectionSource('none')
     clearCurrentLocationHintTimer()
     setLocationRequestStatus('idle')
     setLocationRequestMessage('')
-    
+
+    if (isAddressFirstVariant) {
+      currentLocationRequestRef.current += 1
+      setCustomMarker(districtCenter)
+      setMarkerSelectionSource('district_center_auto_skip')
+      const autoSkipProps = {
+        ...getDistrictAnalyticsProps(district),
+        location_method: 'district_center_auto_skip',
+        location_auto_skip_map: true,
+        location_fallback_requires_address_detail: true
+      }
+      trackPaymentEvent('location_selected', autoSkipProps)
+      trackPaymentEvent('location_confirmed', autoSkipProps)
+      navigateToCheckoutStep(3)
+      return
+    }
+
+    setCustomMarker(null)
+    setMarkerSelectionSource('none')
     navigateToCheckoutStep(2)
 
     if (!hasSeenMapGuide()) {
@@ -703,6 +721,38 @@ const PaymentPage = () => {
     trackPaymentEvent('location_selected', fallbackProps)
     trackPaymentEvent('location_confirmed', fallbackProps)
     navigateToCheckoutStep(3)
+  }
+
+  const handleChoosePreciseMapLocation = () => {
+    if (!selectedDistrict) return
+
+    const previousLocationMethod = markerSelectionSourceRef.current
+    const shouldKeepExistingMarker = (
+      (previousLocationMethod === 'manual' || previousLocationMethod === 'current') &&
+      Boolean(customMarker)
+    )
+
+    currentLocationRequestRef.current += 1
+    clearCurrentLocationHintTimer()
+    setLocationRequestStatus('idle')
+    setLocationRequestMessage('')
+
+    if (shouldKeepExistingMarker) {
+      setMapCenter(customMarker)
+      setMapZoom(15)
+    } else {
+      setCustomMarker(null)
+      setMarkerSelectionSource('none')
+      setMapCenter(getDistrictCenterMarker(selectedDistrict))
+      setMapZoom(14)
+    }
+
+    trackPaymentEvent('location_auto_skip_map_requested', {
+      ...getDistrictAnalyticsProps(selectedDistrict),
+      previous_location_method: previousLocationMethod || null,
+      kept_existing_marker: shouldKeepExistingMarker
+    })
+    navigateToCheckoutStep(2)
   }
 
   // 表单输入处理
@@ -1179,7 +1229,7 @@ const PaymentPage = () => {
         {currentStep === 3 && (
           <div className="section info-section">
             <h2 className="section-title">Informations de livraison</h2>
-            
+
             <div className="form-group">
               <label htmlFor="fullName" className="form-label">Nom complet *</label>
               <input
@@ -1249,15 +1299,27 @@ const PaymentPage = () => {
                 value={userInfo.addressDescription}
                 onChange={(e) => handleInputChange('addressDescription', e.target.value)}
                 placeholder={isCodTrustVariant
-                  ? 'Ex: quartier, pharmacie proche, portail bleu, immeuble, boutique à côté'
+                  ? 'Ex: Cocody Riviera 2, rue 12, portail bleu, près de la pharmacie'
                   : isInlineQuantityVariant
-                  ? 'Ex: rue, quartier, portail bleu, près de la pharmacie'
+                  ? 'Ex: Cocody Riviera 2, rue 12, portail bleu, près de la pharmacie'
                   : 'Ex: Près de l\'université, à côté du bâtiment rouge'}
                 rows={4}
               />
               {isCodTrustVariant && (
                 <div className="address-assurance-note">
                   Ajoutez un repère clair. Si le livreur ne trouve pas, nous vous contactons par téléphone ou WhatsApp.
+                </div>
+              )}
+              {isAddressFirstVariant && selectedDistrict && (
+                <div className="address-map-option">
+                  <button
+                    type="button"
+                    className="address-map-option-btn"
+                    onClick={handleChoosePreciseMapLocation}
+                  >
+                    <FiMapPin aria-hidden="true" />
+                    Optionnel : marquer sur la carte
+                  </button>
                 </div>
               )}
               <div className="char-count">{userInfo.addressDescription.length}/200</div>

@@ -504,6 +504,40 @@
   line-height: 1.35;
 }
 
+.address-map-option {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  margin-top: 7px;
+  padding: 0;
+  background: transparent;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.address-map-option-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 30px;
+  padding: 5px 10px;
+  border: 1px dashed #d6dde6;
+  border-radius: 999px;
+  background: #fbfdff;
+  color: #64748b;
+  font-size: 11.5px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.address-map-option-btn:hover {
+  border-color: #b6c0cf;
+  background: #f1f5f9;
+}
+
 /* 电话号码输入组合 */
 .phone-input-group {
   display: flex;
@@ -1243,6 +1277,16 @@
 
   .address-assurance-note {
     font-size: 11.5px;
+  }
+
+  .address-map-option {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .address-map-option-btn {
+    align-self: flex-start;
   }
 
   .map-section {
