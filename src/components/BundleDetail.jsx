@@ -51,9 +51,7 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
   const checkoutQuantityExperiment = useMemo(() => getCheckoutQuantityExperiment(), [])
   const isCheckoutOptimizationVariant = isInlineCheckoutVariant(checkoutQuantityExperiment)
   const isCodTrustLanding = isCodTrustLandingVariant(checkoutQuantityExperiment)
-  const bundleSwiperModules = isCodTrustLanding
-    ? [Pagination, Navigation, Autoplay]
-    : [Pagination, Navigation]
+  const bundleSwiperModules = [Pagination, Navigation, Autoplay]
 
   const bundleProduct = useMemo(() => {
     if (!bundle) return null
@@ -210,7 +208,7 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
   const detailImages = Array.isArray(bundle.detail_images) ? bundle.detail_images : []
   const items = Array.isArray(bundle.items) ? bundle.items : []
   const galleryImages = bundle.cover_image_url ? [bundle.cover_image_url] : []
-  const bundleGalleryAutoplay = isCodTrustLanding && galleryImages.length > 1
+  const bundleGalleryAutoplay = galleryImages.length > 1
     ? {
         delay: 3500,
         disableOnInteraction: true,

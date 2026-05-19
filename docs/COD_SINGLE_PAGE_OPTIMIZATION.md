@@ -1,6 +1,6 @@
 # COD 单页优化维护记录
 
-更新时间：2026-05-16 CST
+更新时间：2026-05-19 CST
 
 这个文档用于维护 COD ecommerce 单页优化的历史轨迹。后续如果对下单页、商品详情页、地图定位、埋点、后台漏斗分析、大区排序等做了重要调整，先把关键结论追加到这里。上下文压缩后，优先读这个文件恢复背景。
 
@@ -54,7 +54,9 @@
 - 判断默认数量 1 是否值得保留时，不能只看转化率，还要看平均件数。后台 A/B/C/D/E 表的“单均件数”主值来自 `order_create_success` 的成功订单平均数量；灰字“确认”来自 `quantity_confirmed` 的数量确认平均值。
 - B/C/D 组兜底按钮事件是 `location_fallback_used`。点击兜底按钮后会同步记录 `location_selected`，且 `location_method = district_center_fallback`，所以在主漏斗里计入“完成定位”；E 组默认跳过地图页，使用 `district_center_auto_skip` 单独区分。
 - 定位方式需要同时看整体和 A/B/C/D/E 组内占比：整体“定位方式”会混入不同组，只适合看大盘；判断兜底按钮或地址优先是否过度使用时，应看组内 `district_center_fallback / district_center_auto_skip / manual_map / current_location` 分布。
+- E 组地址优先版需要额外看“补定位”拆解：`location_selected` 代表完成定位；`location_method = district_center_auto_skip` 且没有 `location_auto_skip_map_requested` 代表没进地图直接用大区中心；`location_auto_skip_map_requested` 代表点过“可选：地图标点”；点过后最终 `manual_map/current_location` 代表真的补了坐标；点过后最终仍是 `district_center_auto_skip` 代表进地图但没标点，最后还是大区中心。
 - 地图选择引导层保留，但只在同一浏览器本地第一次进入地图页时展示一次，状态写入 `localStorage`；清历史数据、换浏览器或无痕模式会重新展示。引导层自动关闭时间为 2.2 秒，避免长时间挡住地图和底部按钮。
+- 商品主图自动轮播已从 C/D 扩展为全量商品页行为：只要主图超过 1 张，就 3.5 秒自动切换；用户手动滑动后停止自动轮播。该改动不改变 CTA 文案和 checkout 流程。
 - 管理端“兜底地址订单质量”用于观察兜底坐标是否影响后续配送结果。统计范围固定从兜底按钮上线时间 `2026-05-15 03:42:42 UTC`（北京时间 05-15 11:42）开始，到当前查询窗口结束；A 组旧流程作为无兜底按钮对照，B/C/D 组拆分“使用兜底按钮 / 未使用兜底按钮”。该模块按真实派送口径统计：`order_status=3` 为已签收，`order_status=7` 为拒收或配送失败，其他未完成派送状态归入待履约；`order_status IN (4,5,6)` 已取消订单不展示、不进分母，因为没有尝试派送。“已出结果签收率”会排除待履约订单，避免新订单未配送完成时误伤签收率。测试品订单按订单内商品全部 `is_test=1` 判定，会从签收率和待履约分母里排除，并单独展示排除数量。
 
 ### 定位方式

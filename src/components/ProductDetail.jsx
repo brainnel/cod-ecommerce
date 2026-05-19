@@ -79,10 +79,8 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
   const isCheckoutOptimizationVariant = isInlineCheckoutVariant(checkoutQuantityExperiment);
   const isCodTrustLanding = isCodTrustLandingVariant(checkoutQuantityExperiment);
   const galleryImages = Array.isArray(product?.image_url) ? product.image_url : [];
-  const productSwiperModules = isCodTrustLanding
-    ? [Pagination, Navigation, Autoplay]
-    : [Pagination, Navigation];
-  const productGalleryAutoplay = isCodTrustLanding && galleryImages.length > 1
+  const productSwiperModules = [Pagination, Navigation, Autoplay];
+  const productGalleryAutoplay = galleryImages.length > 1
     ? {
         delay: 3500,
         disableOnInteraction: true,
