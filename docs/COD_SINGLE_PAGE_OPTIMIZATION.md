@@ -48,7 +48,7 @@
 
 ### 下单减摩擦 A/B/C/D/E
 
-- A/B/C/D/E 分组不是每次打开页面重新随机，而是设备级固定分流：首次生成 `device_id` 后，对 `device_id` 做 hash。当前自然分流只进入 B/E：B 组 `inline_quantity` 是当前稳定 checkout，占 80%；E 组 `address_first` 是地址优先版，占 20%。A 组 `quantity_modal`、C 组 `cod_trust`、D 组 `cod_trust_landing` 保留为 URL 强制预览和历史数据识别，不再自然分配流量。
+- A/B/C/D/E 分组不是每次打开页面重新随机，而是设备级固定分流：首次生成 `device_id` 后，对 `device_id` 做 hash。当前自然分流只进入 B/E：B 组 `inline_quantity` 是当前稳定 checkout，占 65%；E 组 `address_first` 是地址优先版，占 35%。A 组 `quantity_modal`、C 组 `cod_trust`、D 组 `cod_trust_landing` 保留为 URL 强制预览和历史数据识别，不再自然分配流量。
 - 本地调试可以用 URL 参数强制分组：`checkout_quantity_variant=quantity_modal`、`checkout_quantity_variant=inline_quantity`、`checkout_quantity_variant=cod_trust`、`checkout_quantity_variant=cod_trust_landing` 或 `checkout_quantity_variant=address_first`。
 - B 组里“数量已定”和“已选大区”不是同一个动作：点击商品页下单按钮时会默认确认数量 1 件并记录 `quantity_confirmed`；进入大区页后，只有用户点击大区卡片才记录 `district_selected`。
 - 判断默认数量 1 是否值得保留时，不能只看转化率，还要看平均件数。后台 A/B/C/D/E 表的“单均件数”主值来自 `order_create_success` 的成功订单平均数量；灰字“确认”来自 `quantity_confirmed` 的数量确认平均值。
@@ -57,6 +57,8 @@
 - E 组地址优先版需要额外看“补定位”拆解：`location_selected` 代表完成定位；`location_method = district_center_auto_skip` 且没有 `location_auto_skip_map_requested` 代表没进地图直接用大区中心；`location_auto_skip_map_requested` 代表点过“可选：地图标点”；点过后最终 `manual_map/current_location` 代表真的补了坐标；点过后最终仍是 `district_center_auto_skip` 代表进地图但没标点，最后还是大区中心。
 - 地图选择引导层保留，但只在同一浏览器本地第一次进入地图页时展示一次，状态写入 `localStorage`；清历史数据、换浏览器或无痕模式会重新展示。引导层自动关闭时间为 2.2 秒，避免长时间挡住地图和底部按钮。
 - 商品主图自动轮播已从 C/D 扩展为全量商品页行为：只要主图超过 1 张，就 3.5 秒自动切换；用户手动滑动后停止自动轮播。该改动不改变 CTA 文案和 checkout 流程。
+- 落地页新增 `product_landing_engagement` 停留时长埋点：页面隐藏、离开、进入 checkout 或组件卸载时通过 `sendBeacon/fetch keepalive` 旁路上报 `landing_duration_ms`、`landing_max_scroll_percent` 和退出原因，不等待结果，不影响点击下单。
+- 首屏加载优化：商品页保留为主路径同步加载；支付页、订单成功页、组合品页、下载页和地址更新页做路由懒加载；地图组件在进入地图步骤时才加载；非首屏商品/描述图片使用懒加载和异步解码。
 - 管理端“兜底地址订单质量”用于观察兜底坐标是否影响后续配送结果。统计范围固定从兜底按钮上线时间 `2026-05-15 03:42:42 UTC`（北京时间 05-15 11:42）开始，到当前查询窗口结束；A 组旧流程作为无兜底按钮对照，B/C/D 组拆分“使用兜底按钮 / 未使用兜底按钮”。该模块按真实派送口径统计：`order_status=3` 为已签收，`order_status=7` 为拒收或配送失败，其他未完成派送状态归入待履约；`order_status IN (4,5,6)` 已取消订单不展示、不进分母，因为没有尝试派送。“已出结果签收率”会排除待履约订单，避免新订单未配送完成时误伤签收率。测试品订单按订单内商品全部 `is_test=1` 判定，会从签收率和待履约分母里排除，并单独展示排除数量。
 
 ### 定位方式
@@ -307,6 +309,11 @@
   - 信息页的地图入口必须弱化为地址输入框下方的可选项，不能做成顶部大卡片；主路径是填写详细地址和参照物，地图标点只是“想标也可以”的补充入口。
   - 可选地图入口只展示一个轻量胶囊按钮；如果用户此前已经手动标过点或用当前定位拿到真实坐标，再从信息页回到地图页时必须保留该坐标，不能重置成大区中心。只有默认大区中心占位点才允许在进入地图页时清空。
   - 埋点区分为 `location_method = district_center_auto_skip`，不要和现有兜底按钮 `district_center_fallback` 混在一起。
+
+- 2026-05-20 E 组入口提升：
+  - 自然分流调整为 B 组当前稳定版 65%，E 组地址优先版 35%，继续保留 A/C/D 仅用于历史识别和强制预览。
+  - 新随机 key 改为 `cod_checkout_quantity_flow_variant_v5`，避免老设备继续停留在 80/20 的旧分流。
+  - 管理端新增“E组提升到35%”版本窗口，并在落地页转化模块和 A/B/C/D/E 表中展示落地页平均停留、下单前停留、未下单停留和平均滚动比例。
 
 ## 验证方式
 

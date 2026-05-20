@@ -10,6 +10,7 @@ import {
   isCodTrustLandingVariant,
   isInlineCheckoutVariant,
   trackCheckoutEvent,
+  trackProductLandingEngagement,
   trackProductLandingView
 } from '../services/checkoutFunnelAnalytics'
 import { useAdTrackingContext } from '../hooks/useAdTrackingHooks.js'
@@ -48,6 +49,7 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
   const [error, setError] = useState(null)
   const [quantity, setQuantity] = useState(1)
   const viewTrackedBundleRef = useRef(null)
+  const landingEngagementRef = useRef(null)
   const checkoutQuantityExperiment = useMemo(() => getCheckoutQuantityExperiment(), [])
   const isCheckoutOptimizationVariant = isInlineCheckoutVariant(checkoutQuantityExperiment)
   const isCodTrustLanding = isCodTrustLandingVariant(checkoutQuantityExperiment)
@@ -113,15 +115,75 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
     if (viewTrackedBundleRef.current === trackingKey) return
     viewTrackedBundleRef.current = trackingKey
 
+    let cleanupLandingEngagement = null
     try {
-      trackProductLandingView(bundleProduct, {
+      const landingSessionId = trackProductLandingView(bundleProduct, {
         ad_id: adId,
         product_type: 'bundle',
         bundle_id: String(bundle.id)
       })
+      const startedAt = typeof performance !== 'undefined' ? performance.now() : Date.now()
+      landingEngagementRef.current = {
+        landingSessionId,
+        startedAt,
+        maxScrollPercent: 0,
+        sent: false
+      }
+
+      const updateMaxScrollPercent = () => {
+        if (typeof window === 'undefined' || typeof document === 'undefined') return
+        const state = landingEngagementRef.current
+        if (!state) return
+        const doc = document.documentElement
+        const scrollable = Math.max(doc.scrollHeight - window.innerHeight, 1)
+        const current = Math.min(Math.max((window.scrollY / scrollable) * 100, 0), 100)
+        state.maxScrollPercent = Math.max(
+          state.maxScrollPercent,
+          current
+        )
+      }
+
+      const sendLandingEngagement = (reason) => {
+        const state = landingEngagementRef.current
+        if (!state?.landingSessionId || state.sent) return
+        updateMaxScrollPercent()
+        state.sent = true
+        const now = typeof performance !== 'undefined' ? performance.now() : Date.now()
+        trackProductLandingEngagement(bundleProduct, {
+          ad_id: adId,
+          product_type: 'bundle',
+          bundle_id: String(bundle.id),
+          landing_session_id: state.landingSessionId,
+          landing_duration_ms: now - state.startedAt,
+          landing_max_scroll_percent: state.maxScrollPercent,
+          landing_exit_reason: reason
+        })
+      }
+
+      landingEngagementRef.current.send = sendLandingEngagement
+
+      const handleVisibilityChange = () => {
+        if (document.visibilityState === 'hidden') {
+          sendLandingEngagement('visibility_hidden')
+        }
+      }
+      const handlePageHide = () => sendLandingEngagement('pagehide')
+
+      window.addEventListener('scroll', updateMaxScrollPercent, { passive: true })
+      document.addEventListener('visibilitychange', handleVisibilityChange)
+      window.addEventListener('pagehide', handlePageHide)
+
+      cleanupLandingEngagement = () => {
+        window.removeEventListener('scroll', updateMaxScrollPercent)
+        document.removeEventListener('visibilitychange', handleVisibilityChange)
+        window.removeEventListener('pagehide', handlePageHide)
+        sendLandingEngagement('unmount')
+      }
     } catch (landingError) {
       console.warn('bundle product_landing_view 埋点失败:', landingError)
     }
+
+    return cleanupLandingEngagement || undefined
   }, [adId, adTrackingLoading, bundle?.id, bundleProduct])
 
   if (loading) {
@@ -162,6 +224,8 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
   }
 
   const handleBuyNow = () => {
+    landingEngagementRef.current?.send?.('checkout_click')
+
     let checkoutSessionId = null
     try {
       checkoutSessionId = beginCheckoutFunnel(bundleProduct, {
@@ -254,7 +318,13 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
               {galleryImages.map((image, index) => (
                 <SwiperSlide key={`bundle-${bundle.id}-cover-${index}`}>
                   <div className="image-container">
-                    <img src={image} alt={bundle.title_fr || `Pack ${bundle.id}`} />
+                    <img
+                      src={image}
+                      alt={bundle.title_fr || `Pack ${bundle.id}`}
+                      loading={index === 0 ? 'eager' : 'lazy'}
+                      fetchPriority={index === 0 ? 'high' : 'auto'}
+                      decoding="async"
+                    />
                   </div>
                 </SwiperSlide>
               ))}

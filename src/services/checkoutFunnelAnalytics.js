@@ -5,15 +5,15 @@ const DEVICE_ID_STORAGE_KEY = 'cod_checkout_device_id'
 const LANDING_SESSION_ID_STORAGE_KEY = 'cod_landing_session_id'
 const SESSION_ID_STORAGE_KEY = 'cod_checkout_session_id'
 const SESSION_CONTEXT_STORAGE_KEY = 'cod_checkout_context'
-const QUANTITY_EXPERIMENT_STORAGE_KEY = 'cod_checkout_quantity_flow_variant_v4'
+const QUANTITY_EXPERIMENT_STORAGE_KEY = 'cod_checkout_quantity_flow_variant_v5'
 const AD_ID_STORAGE_KEY = 'facebook_ad_id'
 const CHECKOUT_FLOW = 'cod_checkout'
-const QUANTITY_FLOW_EXPERIMENT = 'checkout_reduced_friction_address_first_v4'
+const QUANTITY_FLOW_EXPERIMENT = 'checkout_reduced_friction_address_first_v5'
 const QUANTITY_FLOW_HOLDOUT_PERCENT = 0
-const QUANTITY_FLOW_INLINE_PERCENT = 80
+const QUANTITY_FLOW_INLINE_PERCENT = 65
 const QUANTITY_FLOW_TRUST_PERCENT = 0
 const QUANTITY_FLOW_TRUST_LANDING_PERCENT = 0
-const QUANTITY_FLOW_ADDRESS_FIRST_PERCENT = 20
+const QUANTITY_FLOW_ADDRESS_FIRST_PERCENT = 35
 const PENDING_CHECKOUT_REUSE_MS = 10 * 60 * 1000
 
 const QUANTITY_MODAL_VARIANT = 'quantity_modal'
@@ -421,6 +421,41 @@ export const trackProductLandingView = (product, extra = {}) => {
     events: [
       {
         event_name: 'product_landing_view',
+        session_id: landingSessionId,
+        timestamp: new Date().toISOString(),
+        properties: eventProperties
+      }
+    ]
+  })
+
+  return landingSessionId
+}
+
+export const trackProductLandingEngagement = (product, extra = {}) => {
+  const landingSessionId = extra.landing_session_id || getLandingSessionId()
+  if (!landingSessionId) return null
+
+  const eventProperties = {
+    ...buildCheckoutProductProperties(product, {
+      ...extra,
+      landing_session_id: landingSessionId
+    }),
+    checkout_flow: CHECKOUT_FLOW,
+    event_id: createId('event'),
+    landing_session_id: landingSessionId,
+    landing_duration_ms: Math.max(0, Math.round(Number(extra.landing_duration_ms || 0))),
+    landing_max_scroll_percent: Math.min(Math.max(Number(extra.landing_max_scroll_percent || 0), 0), 100),
+    landing_exit_reason: extra.landing_exit_reason || 'unknown',
+    ...getPageProperties()
+  }
+
+  sendAnalyticsPayload({
+    device_id: getCheckoutDeviceId(),
+    platform: 'web',
+    app_version: 'cod-ecommerce-web',
+    events: [
+      {
+        event_name: 'product_landing_engagement',
         session_id: landingSessionId,
         timestamp: new Date().toISOString(),
         properties: eventProperties

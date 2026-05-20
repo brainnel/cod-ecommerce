@@ -197,6 +197,8 @@ const OrderSuccessPage = () => {
               src={product.image_url?.[0]} 
               alt={product.name_fr} 
               className="item-image"
+              loading="lazy"
+              decoding="async"
             />
             <div className="item-details">
               <div className="item-name">{product.name_fr}</div>

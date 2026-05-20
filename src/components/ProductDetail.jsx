@@ -11,6 +11,7 @@ import {
   isCodTrustLandingVariant,
   isInlineCheckoutVariant,
   trackCheckoutEvent,
+  trackProductLandingEngagement,
   trackProductLandingView
 } from '../services/checkoutFunnelAnalytics';
 import { useAdTrackingContext } from '../hooks/useAdTrackingHooks.js';
@@ -75,6 +76,7 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
   const navigate = useNavigate();
   const { adId, isLoading: adTrackingLoading } = useAdTrackingContext();
   const viewTrackedProductRef = useRef(null);
+  const landingEngagementRef = useRef(null);
   const checkoutQuantityExperiment = useMemo(() => getCheckoutQuantityExperiment(), []);
   const isCheckoutOptimizationVariant = isInlineCheckoutVariant(checkoutQuantityExperiment);
   const isCodTrustLanding = isCodTrustLandingVariant(checkoutQuantityExperiment);
@@ -180,12 +182,70 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
     if (viewTrackedProductRef.current === trackingKey) return;
     viewTrackedProductRef.current = trackingKey;
 
+    let cleanupLandingEngagement = null;
     try {
-      trackProductLandingView(product, {
+      const landingSessionId = trackProductLandingView(product, {
         ad_id: adId,
         category_id: product.category_id,
         product_type: 'product'
       });
+      const startedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      landingEngagementRef.current = {
+        landingSessionId,
+        startedAt,
+        maxScrollPercent: 0,
+        sent: false
+      };
+
+      const updateMaxScrollPercent = () => {
+        if (typeof window === 'undefined' || typeof document === 'undefined') return;
+        const state = landingEngagementRef.current;
+        if (!state) return;
+        const doc = document.documentElement;
+        const scrollable = Math.max(doc.scrollHeight - window.innerHeight, 1);
+        const current = Math.min(Math.max((window.scrollY / scrollable) * 100, 0), 100);
+        state.maxScrollPercent = Math.max(
+          state.maxScrollPercent,
+          current
+        );
+      };
+
+      const sendLandingEngagement = (reason) => {
+        const state = landingEngagementRef.current;
+        if (!state?.landingSessionId || state.sent) return;
+        updateMaxScrollPercent();
+        state.sent = true;
+        const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+        trackProductLandingEngagement(product, {
+          ad_id: adId,
+          category_id: product.category_id,
+          product_type: 'product',
+          landing_session_id: state.landingSessionId,
+          landing_duration_ms: now - state.startedAt,
+          landing_max_scroll_percent: state.maxScrollPercent,
+          landing_exit_reason: reason
+        });
+      };
+
+      landingEngagementRef.current.send = sendLandingEngagement;
+
+      const handleVisibilityChange = () => {
+        if (document.visibilityState === 'hidden') {
+          sendLandingEngagement('visibility_hidden');
+        }
+      };
+      const handlePageHide = () => sendLandingEngagement('pagehide');
+
+      window.addEventListener('scroll', updateMaxScrollPercent, { passive: true });
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      window.addEventListener('pagehide', handlePageHide);
+
+      cleanupLandingEngagement = () => {
+        window.removeEventListener('scroll', updateMaxScrollPercent);
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+        window.removeEventListener('pagehide', handlePageHide);
+        sendLandingEngagement('unmount');
+      };
     } catch (landingError) {
       console.warn('product_landing_view 埋点失败:', landingError);
     }
@@ -200,6 +260,8 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
     } catch (fbError) {
       console.warn('Facebook ViewContent 事件错误:', fbError);
     }
+
+    return cleanupLandingEngagement || undefined;
   }, [adId, adTrackingLoading, product, product?.product_id, product?.price]);
 
   if (loading) {
@@ -258,6 +320,8 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
   };
 
   const handleBuyNowClick = () => {
+    landingEngagementRef.current?.send?.('checkout_click');
+
     const quantityExperiment = checkoutQuantityExperiment;
     const isInlineQuantityVariant = isInlineCheckoutVariant(quantityExperiment);
     const defaultQuantity = 1;
@@ -353,7 +417,13 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
             {galleryImages.map((image, index) => (
               <SwiperSlide key={`${product.product_id}-main-${index}`}>
                 <div className="image-container">
-                  <img src={image} alt={`Image produit ${index + 1}`} />
+                  <img
+                    src={image}
+                    alt={`Image produit ${index + 1}`}
+                    loading={index === 0 ? 'eager' : 'lazy'}
+                    fetchPriority={index === 0 ? 'high' : 'auto'}
+                    decoding="async"
+                  />
                   {index === 0 && product.off > 0 && (
                     <div className="discount-badge">
                       -{formatDiscount(product.off)}%
@@ -449,7 +519,13 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
         {product.description_fr && product.description_fr.length > 0 && (
           <div className="description-images">
             {product.description_fr.map((image, index) => (
-              <img key={`${product.product_id}-desc-${index}`} src={image} alt={`Détails produit ${index + 1}`} />
+              <img
+                key={`${product.product_id}-desc-${index}`}
+                src={image}
+                alt={`Détails produit ${index + 1}`}
+                loading="lazy"
+                decoding="async"
+              />
             ))}
           </div>
         )}

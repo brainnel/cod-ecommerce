@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { lazy, Suspense, useState, useEffect, useMemo, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { FiCreditCard, FiMapPin } from 'react-icons/fi'
 import { districtAPI, orderAPI, bundleAPI } from '../services/api'
@@ -16,7 +16,6 @@ import {
   trackCheckoutEvent,
   updateCheckoutContext
 } from '../services/checkoutFunnelAnalytics'
-import MapSelector from '../components/MapSelector'
 import MapGuideModal from '../components/MapGuideModal'
 import { DISTRICT_CENTERS, DEFAULT_CENTER, DEFAULT_ZOOM } from '../constants/districtCenters'
 import {
@@ -33,6 +32,7 @@ const MAP_GUIDE_SHOW_DELAY_MS = 500
 const MAP_GUIDE_AUTO_CLOSE_MS = 2200
 const CHECKOUT_MIN_STEP = 1
 const CHECKOUT_MAX_STEP = 3
+const MapSelector = lazy(() => import('../components/MapSelector'))
 
 const clampCheckoutStep = (step) => {
   const parsedStep = Number(step)
@@ -1053,6 +1053,8 @@ const PaymentPage = () => {
                   src={product.image_url?.[0]}
                   alt={product.name_fr}
                   className="inline-quantity-image"
+                  loading="lazy"
+                  decoding="async"
                 />
                 <div className="inline-quantity-info">
                   <div className="inline-quantity-title">{product.name_fr}</div>
@@ -1168,13 +1170,15 @@ const PaymentPage = () => {
             )}
             
             <div className="map-container">
-              <MapSelector
-                center={mapCenter}
-                zoom={mapZoom}
-                onMarkerSet={handleMapClick}
-                customMarker={customMarker}
-                userLocation={userLocation}
-              />
+              <Suspense fallback={<div className="map-lazy-loading">Chargement de la carte...</div>}>
+                <MapSelector
+                  center={mapCenter}
+                  zoom={mapZoom}
+                  onMarkerSet={handleMapClick}
+                  customMarker={customMarker}
+                  userLocation={userLocation}
+                />
+              </Suspense>
             </div>
 
             {selectedDistrict && (
@@ -1330,7 +1334,13 @@ const PaymentPage = () => {
             <div className="order-summary">
               <h3>Récapitulatif</h3>
               <div className="order-item">
-                <img src={product.image_url?.[0]} alt={product.name_fr} className="order-item-image" />
+                <img
+                  src={product.image_url?.[0]}
+                  alt={product.name_fr}
+                  className="order-item-image"
+                  loading="lazy"
+                  decoding="async"
+                />
                 <div className="order-item-details">
                   <div className="order-item-name">{product.name_fr}</div>
                   <div className="order-item-price">{product.price} FCFA × {quantity}</div>

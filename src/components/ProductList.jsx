@@ -174,6 +174,7 @@ const ProductList = ({ categoryId }) => {
                   alt={product.name_fr}
                   className="product-image"
                   loading="lazy"
+                  decoding="async"
                 />
                 {product.off > 0 && (
                   <div className="discount-badge">
