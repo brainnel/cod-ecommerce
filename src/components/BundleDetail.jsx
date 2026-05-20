@@ -21,6 +21,7 @@ import {
   getLocalPreviewBrowserContextParam,
   syncLocalPreviewBrowserContextFromSearch
 } from '../utils/checkoutBrowserContextPreview'
+import { preloadPaymentPage, schedulePaymentPagePreload } from '../utils/preloadRoutes'
 
 import 'swiper/css'
 import 'swiper/css/pagination'
@@ -77,6 +78,11 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
   useEffect(() => {
     syncLocalPreviewBrowserContextFromSearch(window.location.search)
   }, [])
+
+  useEffect(() => {
+    if (!bundle || error) return undefined
+    return schedulePaymentPagePreload()
+  }, [bundle?.id, error])
 
   useEffect(() => {
     let cancelled = false
@@ -226,6 +232,7 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
   }
 
   const handleBuyNow = () => {
+    preloadPaymentPage()
     landingEngagementRef.current?.send?.('checkout_click')
 
     let checkoutSessionId = null

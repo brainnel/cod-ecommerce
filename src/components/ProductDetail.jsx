@@ -25,6 +25,7 @@ import {
   getLocalPreviewBrowserContextParam,
   syncLocalPreviewBrowserContextFromSearch
 } from '../utils/checkoutBrowserContextPreview';
+import { preloadPaymentPage, schedulePaymentPagePreload } from '../utils/preloadRoutes';
 
 const PRODUCT_UNAVAILABLE_BACKEND_MESSAGE = '此商品已下架，请查看其它商品';
 const PRODUCT_UNAVAILABLE_MESSAGE_FR = "Ce produit n'est plus disponible. Veuillez consulter d'autres produits.";
@@ -99,6 +100,11 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
   useEffect(() => {
     syncLocalPreviewBrowserContextFromSearch(window.location.search);
   }, []);
+
+  useEffect(() => {
+    if (!product || error) return undefined;
+    return schedulePaymentPagePreload();
+  }, [error, product?.product_id]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -322,6 +328,7 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
   };
 
   const handleBuyNowClick = () => {
+    preloadPaymentPage();
     landingEngagementRef.current?.send?.('checkout_click');
 
     const quantityExperiment = checkoutQuantityExperiment;
