@@ -22,6 +22,10 @@ import {
   getLocalPreviewBrowserContext as getPreviewBrowserContext,
   syncLocalPreviewBrowserContextFromSearch
 } from '../utils/checkoutBrowserContextPreview'
+import {
+  loadCheckoutCustomerInfo,
+  saveCheckoutCustomerInfo
+} from '../utils/checkoutCustomerInfoCache'
 import './PaymentPage.css'
 
 const GEOLOCATION_CACHE_MAX_AGE_MS = 5 * 60 * 1000
@@ -227,7 +231,9 @@ const PaymentPage = () => {
   const currentLocationTrackedRequestRef = useRef(null)
   const currentLocationHintTimerRef = useRef(null)
   const markerSelectionSourceRef = useRef('none')
+  const cachedFieldCompletionTrackedRef = useRef(false)
   const browserContext = useMemo(() => getBrowserContext(), [])
+  const cachedCustomerInfo = useMemo(() => loadCheckoutCustomerInfo(), [])
   const useMapOnlyLocationFlow = true
   const isInlineQuantityVariant = isInlineCheckoutVariant(checkoutQuantityExperiment)
   const isCodTrustVariant = isCodTrustCheckoutVariant(checkoutQuantityExperiment)
@@ -253,13 +259,15 @@ const PaymentPage = () => {
   const [showGuideModal, setShowGuideModal] = useState(false)
 
   // 步骤3：用户信息
-  const [userInfo, setUserInfo] = useState({
-    fullName: '',
-    phone: '',
-    whatsapp: '',
-    addressDescription: ''
-  })
-  const [whatsappSameAsPhone, setWhatsappSameAsPhone] = useState(true)
+  const [userInfo, setUserInfo] = useState(() => ({
+    fullName: cachedCustomerInfo?.fullName || '',
+    phone: cachedCustomerInfo?.phone || '',
+    whatsapp: cachedCustomerInfo?.whatsapp || cachedCustomerInfo?.phone || '',
+    addressDescription: cachedCustomerInfo?.addressDescription || ''
+  }))
+  const [whatsappSameAsPhone, setWhatsappSameAsPhone] = useState(() => (
+    cachedCustomerInfo?.whatsappSameAsPhone ?? true
+  ))
   const [errors, setErrors] = useState({})
   const [isPlacingOrder, setIsPlacingOrder] = useState(false)
   const [clientInfo, setClientInfo] = useState({})
@@ -353,6 +361,13 @@ const PaymentPage = () => {
       sessionId: checkoutSessionId
     })
   }
+
+  useEffect(() => {
+    saveCheckoutCustomerInfo({
+      ...userInfo,
+      whatsappSameAsPhone
+    })
+  }, [userInfo, whatsappSameAsPhone])
 
   const handleInlineQuantityChange = (nextQuantity) => {
     const normalizedQuantity = clampQuantity(nextQuantity, product)
@@ -858,6 +873,41 @@ const PaymentPage = () => {
     }
   }
 
+  useEffect(() => {
+    if (currentStep !== 3 || cachedFieldCompletionTrackedRef.current || !cachedCustomerInfo) return
+
+    cachedFieldCompletionTrackedRef.current = true
+
+    if (userInfo.fullName.trim().length > 0) {
+      trackFieldCompletedOnce('fullName', { field_fill_method: 'local_cache' })
+    }
+    if (userInfo.phone.length === 10) {
+      trackFieldCompletedOnce('phone', { field_fill_method: 'local_cache' })
+    }
+    if (whatsappSameAsPhone && userInfo.phone.length === 10) {
+      trackFieldCompletedOnce('whatsapp', {
+        field_fill_method: 'local_cache',
+        whatsapp_same_as_phone: true
+      })
+    } else if (!whatsappSameAsPhone && userInfo.whatsapp.length === 10) {
+      trackFieldCompletedOnce('whatsapp', {
+        field_fill_method: 'local_cache',
+        whatsapp_same_as_phone: false
+      })
+    }
+    if (userInfo.addressDescription.trim().length >= 5) {
+      trackFieldCompletedOnce('addressDescription', { field_fill_method: 'local_cache' })
+    }
+  }, [
+    cachedCustomerInfo,
+    currentStep,
+    userInfo.addressDescription,
+    userInfo.fullName,
+    userInfo.phone,
+    userInfo.whatsapp,
+    whatsappSameAsPhone
+  ])
+
   const scrollToFirstMissingField = (missingFields) => {
     if (!isInlineQuantityVariant || missingFields.length === 0) return
 
@@ -937,6 +987,11 @@ const PaymentPage = () => {
       scrollToFirstMissingField(missingFields)
       return
     }
+
+    saveCheckoutCustomerInfo({
+      ...effectiveUserInfo,
+      whatsappSameAsPhone
+    })
     
     trackPaymentEvent('submit_order_click', {
       ...getDistrictAnalyticsProps(),
@@ -1280,6 +1335,7 @@ const PaymentPage = () => {
                 value={userInfo.fullName}
                 onChange={(e) => handleInputChange('fullName', e.target.value)}
                 placeholder="Entrez votre nom complet"
+                autoComplete="name"
               />
               {errors.fullName && <div className="error-message">{errors.fullName}</div>}
             </div>
@@ -1296,6 +1352,7 @@ const PaymentPage = () => {
                   value={userInfo.phone}
                   onChange={(e) => handleInputChange('phone', e.target.value)}
                   placeholder="XXXXXXXX"
+                  autoComplete="tel"
                 />
               </div>
               {errors.phone && <div className="error-message">{errors.phone}</div>}
@@ -1322,6 +1379,7 @@ const PaymentPage = () => {
                     value={userInfo.whatsapp}
                     onChange={(e) => handleInputChange('whatsapp', e.target.value)}
                     placeholder="XXXXXXXX"
+                    autoComplete="tel"
                   />
                 </div>
               )}
@@ -1343,6 +1401,7 @@ const PaymentPage = () => {
                   : isInlineQuantityVariant
                   ? 'Ex: Cocody Riviera 2, rue 12, portail bleu, près de la pharmacie'
                   : 'Ex: Près de l\'université, à côté du bâtiment rouge'}
+                autoComplete="street-address"
                 rows={4}
               />
               {isCodTrustVariant && (

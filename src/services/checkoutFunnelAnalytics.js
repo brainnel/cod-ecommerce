@@ -169,7 +169,7 @@ const getDevelopmentQuantityVariantOverride = () => {
   try {
     const params = new URLSearchParams(window.location.search)
     return normalizeCheckoutQuantityVariant(params.get('checkout_quantity_variant'))
-  } catch (error) {
+  } catch {
     return null
   }
 }
@@ -285,7 +285,7 @@ export const buildCheckoutProductProperties = (product, extra = {}) => {
   }
 }
 
-export const startLandingSession = (product, extra = {}) => {
+export const startLandingSession = () => {
   const landingSessionId = createId('landing')
 
   if (typeof window !== 'undefined') {
