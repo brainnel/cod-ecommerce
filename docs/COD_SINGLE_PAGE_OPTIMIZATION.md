@@ -20,7 +20,7 @@
 1. 商品详情页点击下单，进入 checkout。
 2. A 组旧流程进入 SKU/数量弹窗；B/C/D 组默认数量 1 并把数量控件放在大区页上方。
 3. 大区选择。
-4. 定位选择，默认可以手动点地图，也可以点击“使用当前定位”；FB / Instagram 内置浏览器里隐藏当前定位按钮，直接引导用户在地图上选择收货地址。
+4. 定位选择，所有浏览器环境都不再展示“使用当前定位”按钮，统一直接引导用户在地图上选择收货地址或走地址优先流程。
 5. 个人信息填写：姓名、电话、WhatsApp、地址描述。
 6. 点击最终下单，创建 COD 订单。
 
@@ -58,7 +58,7 @@
 - 地图选择引导层保留，但只在同一浏览器本地第一次进入地图页时展示一次，状态写入 `localStorage`；清历史数据、换浏览器或无痕模式会重新展示。引导层自动关闭时间为 2.2 秒，避免长时间挡住地图和底部按钮。
 - 商品主图自动轮播已从 C/D 扩展为全量商品页行为：只要主图超过 1 张，就 3.5 秒自动切换；用户手动滑动后停止自动轮播。该改动不改变 CTA 文案和 checkout 流程。
 - 落地页新增 `product_landing_engagement` 停留时长埋点：页面隐藏、离开、进入 checkout 或组件卸载时通过 `sendBeacon/fetch keepalive` 旁路上报 `landing_duration_ms`、`landing_max_scroll_percent` 和退出原因，不等待结果，不影响点击下单。
-- 管理端落地页模块除全体平均滚动外，也展示“点下单平均滚动”，口径是有 `product_landing_engagement` 的落地页 session 中，后续触发 `checkout_start` 的用户平均 `landing_max_scroll_percent`。
+- 管理端落地页模块除全体平均滚动外，也展示“下单前停留 / 点下单平均滚动”。2026-05-20 起，这两个点击前指标只统计 `landing_exit_reason = checkout_click` 的 `product_landing_engagement`，避免页面隐藏、切后台或组件卸载事件混入口径；全体平均停留和未下单停留仍看所有 engagement 原因。
 - 首屏加载优化：商品页保留为主路径同步加载；支付页、订单成功页、组合品页、下载页和地址更新页做路由懒加载；地图组件在进入地图步骤时才加载；非首屏商品/描述图片使用懒加载和异步解码。
 - E 组地址优先版的商品页/组合品页首屏权益从 4 个短卡片改为 3 条完整承诺：24-48h 免费送货且不额外收费、付款前可检查包裹且骑手到前电话联系、产品不合适或有问题可退。B/D 等其它组继续保留原权益展示，避免影响稳定组。
 - 管理端“兜底地址订单质量”用于观察兜底坐标是否影响后续配送结果。统计范围固定从兜底按钮上线时间 `2026-05-15 03:42:42 UTC`（北京时间 05-15 11:42）开始，到当前查询窗口结束；A 组旧流程作为无兜底按钮对照，B/C/D 组拆分“使用兜底按钮 / 未使用兜底按钮”。该模块按真实派送口径统计：`order_status=3` 为已签收，`order_status=7` 为拒收或配送失败，其他未完成派送状态归入待履约；`order_status IN (4,5,6)` 已取消订单不展示、不进分母，因为没有尝试派送。“已出结果签收率”会排除待履约订单，避免新订单未配送完成时误伤签收率。测试品订单按订单内商品全部 `is_test=1` 判定，会从签收率和待履约分母里排除，并单独展示排除数量。
@@ -87,12 +87,10 @@
 
 当前前台策略：
 
-- 点击“使用当前定位”后，只发起一次低精度浏览器定位：`enableHighAccuracy: false`，`timeout: 6000`，`maximumAge: 5min`。
-- 4 秒还没返回时，页面提示用户可以手动在地图上选，不阻塞页面。
-- 不再发起第二次 `enableHighAccuracy: true` 高精度定位请求；历史数据看高精度二次补救贡献很小，且会让失败口径变复杂。
-- FB / Instagram 内置浏览器通过 UA 特征识别为 `facebook_in_app` / `instagram_in_app` 后，Step 2 隐藏“Utiliser ma position”按钮，提示改为“Veuillez choisir votre adresse de livraison sur la carte.”，避免把用户引到大概率失败的浏览器定位路径。
-- FB / Instagram 内置浏览器和普通浏览器的 Step 2 不是同一套体验：内置浏览器默认只引导手动点地图；普通浏览器可以展示“Utiliser ma position”。以后改定位页时必须同时检查这两种环境，不要只按普通 Chrome 体验判断。
-- 本地预览 FB / Instagram 定位页：`localhost` / `127.0.0.1` 下可在商品页或支付页 URL 追加 `browser_context=facebook_in_app` 或 `browser_context=instagram_in_app`，用于预览内置浏览器 UI。该预览参数仅本地生效，线上仍按真实 UA 识别；商品页进入 checkout、A 组数量弹窗进入 checkout、支付页 step 切换都必须保留该参数，避免预览到一半变回普通浏览器版本。
+- 2026-05-20 起，Step 2 全量隐藏“Utiliser ma position”按钮，提示统一为“Veuillez choisir votre adresse de livraison sur la carte.”。不再按 FB / Instagram 内置浏览器和普通浏览器分体验，因为普通浏览器的当前定位成功率也偏低。
+- `browser_context` / `is_meta_in_app_browser` 仍作为被动埋点字段保留，用于事后分析来源环境，但不再决定定位页 UI。
+- 历史“使用当前定位”低精度 6 秒逻辑保留在代码里但不再出现在当前 checkout UI；除非未来重新打开入口，否则不再产生新的当前定位按钮尝试数据。
+- 本地 `browser_context=facebook_in_app` / `instagram_in_app` 预览参数可继续用于回放历史内置浏览器样式，但当前全量 UI 已一致，不再依赖该参数切换定位页体验。
 - 手机端地图页必须防止“单指拖地图后页面滑不下去”的旧问题复发：关键继续按钮必须固定在地图下方的底部操作区，不能依赖用户继续向下滚动才能看到。
 - checkout 埋点属性会携带 `browser_context` 和 `is_meta_in_app_browser`，方便后续拆分内置浏览器和普通浏览器的定位/下单表现。
 - `location_selected` / `location_current_failed` 会记录 `geolocation_duration_ms`、`geolocation_timeout_ms`、`geolocation_enable_high_accuracy`；成功时记录 `geolocation_accuracy_m`，失败时记录 `error_code` 和截断后的 `error_message`。
@@ -105,17 +103,18 @@
 
 1. Cocody
 2. Yopougon
-3. Marcory
-4. Abobo
-5. Koumassi
-6. Bingerville
-7. Adjamé
-8. Treichville
-9. Port-Bouet
-10. Le Plateau
-11. Anyama
-12. Grand-Bassam
-13. Songon
+3. Attécoubé（前端展示 alias，点击后仍按 Yopougon 的 `district_id` 和后台统计处理；地图中心使用 Attécoubé 坐标）
+4. Marcory
+5. Abobo
+6. Koumassi
+7. Bingerville
+8. Adjamé
+9. Treichville
+10. Port-Bouet
+11. Le Plateau
+12. Anyama
+13. Grand-Bassam
+14. Songon
 
 ### 表单校验失败
 

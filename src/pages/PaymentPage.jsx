@@ -33,6 +33,41 @@ const MAP_GUIDE_AUTO_CLOSE_MS = 2200
 const CHECKOUT_MIN_STEP = 1
 const CHECKOUT_MAX_STEP = 3
 const MapSelector = lazy(() => import('../components/MapSelector'))
+const ATTECOUBE_CENTER = { lat: 5.3362, lng: -4.0414 }
+
+const normalizeDistrictLabel = (value) => (
+  String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+)
+
+const getDistrictDisplayName = (district) => (
+  district?.display_name || district?.name || ''
+)
+
+const addDistrictDisplayAliases = (districts) => {
+  const hasAttecoube = districts.some((district) => (
+    normalizeDistrictLabel(getDistrictDisplayName(district)) === 'attecoube'
+  ))
+  if (hasAttecoube) return districts
+
+  return districts.flatMap((district) => {
+    if (normalizeDistrictLabel(district.name) !== 'yopougon') return [district]
+
+    return [
+      district,
+      {
+        ...district,
+        display_name: 'Attécoubé',
+        display_alias_for: district.name,
+        display_alias_key: `${district.id || 'yopougon'}-attecoube`,
+        latitude: ATTECOUBE_CENTER.lat,
+        longitude: ATTECOUBE_CENTER.lng
+      }
+    ]
+  })
+}
 
 const clampCheckoutStep = (step) => {
   const parsedStep = Number(step)
@@ -193,7 +228,7 @@ const PaymentPage = () => {
   const currentLocationHintTimerRef = useRef(null)
   const markerSelectionSourceRef = useRef('none')
   const browserContext = useMemo(() => getBrowserContext(), [])
-  const isMetaInAppBrowser = browserContext.is_meta_in_app_browser
+  const useMapOnlyLocationFlow = true
   const isInlineQuantityVariant = isInlineCheckoutVariant(checkoutQuantityExperiment)
   const isCodTrustVariant = isCodTrustCheckoutVariant(checkoutQuantityExperiment)
   const isAddressFirstVariant = isAddressFirstCheckoutVariant(checkoutQuantityExperiment)
@@ -303,7 +338,8 @@ const PaymentPage = () => {
         ...checkoutQuantityExperiment
       }),
       browser_context: browserContext.browser_context,
-      is_meta_in_app_browser: isMetaInAppBrowser,
+      is_meta_in_app_browser: browserContext.is_meta_in_app_browser,
+      location_entry_mode: useMapOnlyLocationFlow ? 'map_only' : 'browser_location_optional',
       ...getDistrictAnalyticsProps(),
       ...extra
     }
@@ -463,7 +499,7 @@ const PaymentPage = () => {
           }
         })
         
-        setDistricts(allDistricts)
+        setDistricts(addDistrictDisplayAliases(allDistricts))
       } catch (err) {
         console.error('获取大区列表失败:', err)
         alert('Impossible de charger la liste des districts')
@@ -1107,7 +1143,7 @@ const PaymentPage = () => {
               <div className="district-list">
                 {districts.map((district) => (
                   <div
-                    key={district.id}
+                    key={district.display_alias_key || district.id}
                     className="district-card"
                     onClick={() => handleSelectDistrict(district)}
                     role="button"
@@ -1115,7 +1151,7 @@ const PaymentPage = () => {
                   >
                     <div className="district-icon"><FiMapPin aria-hidden="true" /></div>
                     <div className="district-info">
-                      <div className="district-name">{district.name}</div>
+                      <div className="district-name">{getDistrictDisplayName(district)}</div>
                       <div className="district-city">{district.city_name}</div>
                     </div>
                     <div className="district-arrow">›</div>
@@ -1130,15 +1166,15 @@ const PaymentPage = () => {
         {currentStep === 2 && (
           <div className={`section map-section ${isInlineQuantityVariant ? 'with-location-fallback' : ''} ${customMarker ? 'has-selected-marker' : ''}`}>
             {/* 橙色提示条 */}
-            <div className={`location-hint ${isMetaInAppBrowser ? 'map-only' : ''}`}>
+            <div className={`location-hint ${useMapOnlyLocationFlow ? 'map-only' : ''}`}>
               <div className="hint-content">
                 <span className="hint-text">
-                  {isMetaInAppBrowser
+                  {useMapOnlyLocationFlow
                     ? 'Veuillez choisir votre adresse de livraison sur la carte.'
                     : 'Si vous êtes à l’adresse de livraison, appuyez sur « Utiliser ma position ». Sinon, choisissez l’adresse sur la carte.'}
                 </span>
               </div>
-              {!isMetaInAppBrowser && (
+              {!useMapOnlyLocationFlow && (
                 <button
                   className={`use-location-btn ${locationRequestStatus === 'locating' || locationRequestStatus === 'slow' ? 'loading' : ''}`}
                   onClick={handleUseCurrentLocation}
@@ -1184,7 +1220,7 @@ const PaymentPage = () => {
             {selectedDistrict && (
               <div className="map-district-note">
                 <span className="badge-icon"><FiMapPin aria-hidden="true" /></span>
-                <span>{selectedDistrict.name} - {selectedDistrict.city_name}</span>
+                <span>{getDistrictDisplayName(selectedDistrict)} - {selectedDistrict.city_name}</span>
               </div>
             )}
 
