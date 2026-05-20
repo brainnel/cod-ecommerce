@@ -22,21 +22,12 @@
 }
 
 .service-info.compact-benefits.cod-trust-style {
-  position: relative;
-  padding: 9px;
-  overflow: hidden;
-  border: 1px solid #edf0f4;
-  border-radius: 14px;
-  background: linear-gradient(180deg, #ffffff 0%, #fbfcfd 100%);
-  box-shadow: 0 8px 24px rgba(25, 32, 45, 0.07);
+  padding: 0;
+  background: transparent;
 }
 
 .service-info.compact-benefits.cod-trust-style::before {
-  content: '';
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 3px;
-  background: #ff5a1f;
+  content: none;
 }
 
 .service-benefit-header {
@@ -90,6 +81,58 @@
 
 .service-info.compact-benefits .service-grid {
   gap: 7px;
+}
+
+.service-promise-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 10px 12px;
+  border: 1px solid #e8ebef;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #ffffff 0%, #fdfdfc 100%);
+  box-shadow: 0 8px 22px rgba(17, 24, 39, 0.055);
+}
+
+.service-promise-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 9px 0;
+  border-bottom: 1px solid #eef0f3;
+  background: transparent;
+}
+
+.service-promise-item:last-child {
+  border-bottom: 0;
+}
+
+.service-promise-icon {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 90, 31, 0.22);
+  background: #fff;
+  color: #ff5a1f;
+  font-size: 13px;
+  margin-top: 1px;
+}
+
+.service-promise-item p {
+  margin: 0;
+  color: #313946;
+  font-size: 12.6px;
+  font-weight: 600;
+  line-height: 1.38;
+}
+
+.service-promise-item strong {
+  color: #161b22;
+  font-weight: 850;
 }
 
 .service-item {
@@ -218,6 +261,36 @@
   color: #7554a6;
 }
 
+.service-info.benefit-style .service-promise-item.service-tone-delivery {
+  background: transparent;
+  border-color: #eef0f3;
+}
+
+.service-info.benefit-style .service-promise-item.service-tone-delivery .service-promise-icon {
+  background: #fff;
+  color: #ff5a1f;
+}
+
+.service-info.benefit-style .service-promise-item.service-tone-assurance {
+  background: transparent;
+  border-color: #eef0f3;
+}
+
+.service-info.benefit-style .service-promise-item.service-tone-assurance .service-promise-icon {
+  background: #fff;
+  color: #ff5a1f;
+}
+
+.service-info.benefit-style .service-promise-item.service-tone-support {
+  background: transparent;
+  border-color: #eef0f3;
+}
+
+.service-info.benefit-style .service-promise-item.service-tone-support .service-promise-icon {
+  background: #fff;
+  color: #ff5a1f;
+}
+
 .service-content {
   flex: 1;
   min-width: 0;
@@ -283,7 +356,7 @@
   }
 
   .service-info.compact-benefits.cod-trust-style {
-    padding: 8px;
+    padding: 0;
   }
 
   .service-benefit-header h3 {
@@ -300,6 +373,20 @@
 
   .service-info.compact-benefits .service-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .service-promise-list {
+    padding: 9px 11px;
+  }
+
+  .service-promise-item {
+    gap: 9px;
+    padding: 8px 0;
+  }
+
+  .service-promise-item p {
+    font-size: 12.2px;
+    line-height: 1.34;
   }
   
   .service-item {
@@ -350,6 +437,20 @@
 
   .service-info.compact-benefits .service-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .service-promise-item {
+    padding: 7px 0;
+  }
+
+  .service-promise-icon {
+    width: 24px;
+    height: 24px;
+    font-size: 12px;
+  }
+
+  .service-promise-item p {
+    font-size: 11.6px;
   }
   
   .service-item {

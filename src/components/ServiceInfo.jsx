@@ -11,6 +11,8 @@ import './ServiceInfo.css';
 const ServiceInfo = ({ variant = 'classic', compact = false }) => {
   const isBenefitVariant = variant === 'benefits';
   const isCodTrustVariant = variant === 'cod_trust';
+  const isAddressFirstVariant = variant === 'address_first';
+  const hasBenefitStyle = isBenefitVariant || isCodTrustVariant || isAddressFirstVariant;
   const classicServices = [
     {
       id: 1,
@@ -98,7 +100,38 @@ const ServiceInfo = ({ variant = 'classic', compact = false }) => {
     }
   ];
   const services = isCodTrustVariant ? codTrustServices : (isBenefitVariant ? benefitServices : classicServices);
-  const hasBenefitStyle = isBenefitVariant || isCodTrustVariant;
+  const promiseServices = [
+    {
+      id: 'delivery',
+      icon: FiTruck,
+      text: (
+        <>
+          <strong>Livraison gratuite à domicile</strong> à Abidjan sous <strong>24-48h</strong>, sans frais supplémentaires.
+        </>
+      ),
+      tone: 'delivery'
+    },
+    {
+      id: 'pay-after-check',
+      icon: FiCreditCard,
+      text: (
+        <>
+          Vous pouvez <strong>vérifier le colis avant de payer</strong>. Le livreur vous appelle avant de passer.
+        </>
+      ),
+      tone: 'assurance'
+    },
+    {
+      id: 'return',
+      icon: FiRefreshCcw,
+      text: (
+        <>
+          <strong>Retour possible</strong> si le produit ne vous convient pas ou s'il y a un problème.
+        </>
+      ),
+      tone: 'support'
+    }
+  ];
 
   return (
     <div className={`service-info ${hasBenefitStyle ? 'benefit-style' : ''} ${isCodTrustVariant ? 'cod-trust-style' : ''} ${compact ? 'compact-benefits' : ''}`}>
@@ -108,22 +141,38 @@ const ServiceInfo = ({ variant = 'classic', compact = false }) => {
           <h3>{isCodTrustVariant ? 'Recevez d’abord, payez après' : 'Vos avantages avec cette commande'}</h3>
         </div>
       )}
-      <div className="service-grid">
-        {services.map((service) => {
-          const Icon = service.icon;
-          return (
-            <div key={service.id} className={`service-item ${service.tone ? `service-tone-${service.tone}` : ''}`}>
-              <div className="service-icon">
-                <Icon />
+      {isAddressFirstVariant && compact ? (
+        <div className="service-promise-list">
+          {promiseServices.map((service) => {
+            const Icon = service.icon;
+            return (
+              <div key={service.id} className={`service-promise-item service-tone-${service.tone}`}>
+                <div className="service-promise-icon">
+                  <Icon />
+                </div>
+                <p>{service.text}</p>
               </div>
-              <div className="service-content">
-                <h4 className="service-title">{service.title}</h4>
-                {service.subtitle && <p className="service-subtitle">{service.subtitle}</p>}
+            );
+          })}
+        </div>
+      ) : (
+        <div className="service-grid">
+          {services.map((service) => {
+            const Icon = service.icon;
+            return (
+              <div key={service.id} className={`service-item ${service.tone ? `service-tone-${service.tone}` : ''}`}>
+                <div className="service-icon">
+                  <Icon />
+                </div>
+                <div className="service-content">
+                  <h4 className="service-title">{service.title}</h4>
+                  {service.subtitle && <p className="service-subtitle">{service.subtitle}</p>}
+                </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };

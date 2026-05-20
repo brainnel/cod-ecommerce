@@ -7,6 +7,7 @@ import {
   beginCheckoutFunnel,
   buildCheckoutProductProperties,
   getCheckoutQuantityExperiment,
+  isAddressFirstCheckoutVariant,
   isCodTrustLandingVariant,
   isInlineCheckoutVariant,
   trackCheckoutEvent,
@@ -53,6 +54,7 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
   const checkoutQuantityExperiment = useMemo(() => getCheckoutQuantityExperiment(), [])
   const isCheckoutOptimizationVariant = isInlineCheckoutVariant(checkoutQuantityExperiment)
   const isCodTrustLanding = isCodTrustLandingVariant(checkoutQuantityExperiment)
+  const isAddressFirstLanding = isAddressFirstCheckoutVariant(checkoutQuantityExperiment)
   const bundleSwiperModules = [Pagination, Navigation, Autoplay]
 
   const bundleProduct = useMemo(() => {
@@ -345,7 +347,7 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
             </div>
 
             {isCheckoutOptimizationVariant && (
-              <ServiceInfo variant={isCodTrustLanding ? 'cod_trust' : 'benefits'} compact />
+              <ServiceInfo variant={isAddressFirstLanding ? 'address_first' : (isCodTrustLanding ? 'cod_trust' : 'benefits')} compact />
             )}
 
             {/* 数量选择器 */}

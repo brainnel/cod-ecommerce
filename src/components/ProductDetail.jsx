@@ -8,6 +8,7 @@ import {
   beginCheckoutFunnel,
   buildCheckoutProductProperties,
   getCheckoutQuantityExperiment,
+  isAddressFirstCheckoutVariant,
   isCodTrustLandingVariant,
   isInlineCheckoutVariant,
   trackCheckoutEvent,
@@ -80,6 +81,7 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
   const checkoutQuantityExperiment = useMemo(() => getCheckoutQuantityExperiment(), []);
   const isCheckoutOptimizationVariant = isInlineCheckoutVariant(checkoutQuantityExperiment);
   const isCodTrustLanding = isCodTrustLandingVariant(checkoutQuantityExperiment);
+  const isAddressFirstLanding = isAddressFirstCheckoutVariant(checkoutQuantityExperiment);
   const galleryImages = Array.isArray(product?.image_url) ? product.image_url : [];
   const productSwiperModules = [Pagination, Navigation, Autoplay];
   const productGalleryAutoplay = galleryImages.length > 1
@@ -450,7 +452,7 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
             </div>
 
             {isCheckoutOptimizationVariant && (
-              <ServiceInfo variant={isCodTrustLanding ? 'cod_trust' : 'benefits'} compact />
+              <ServiceInfo variant={isAddressFirstLanding ? 'address_first' : (isCodTrustLanding ? 'cod_trust' : 'benefits')} compact />
             )}
 
             {/* 库存信息 */}
