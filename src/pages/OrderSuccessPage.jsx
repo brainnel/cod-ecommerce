@@ -176,7 +176,7 @@ const OrderSuccessPage = () => {
           </div>
           <h2 className="success-title">Commande confirmée !</h2>
           <p className="success-subtitle">
-            Nous vous contacterons dans les 24 heures via WhatsApp ou par téléphone pour convenir d'un horaire de livraison.
+            Nous vous livrerons dans les prochaines 24 à 48 heures. Le livreur vous contactera à l'avance par téléphone ou WhatsApp.
           </p>
           <div className="success-promise-grid">
             <div className="success-promise-item">
