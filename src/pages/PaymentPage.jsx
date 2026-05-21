@@ -26,6 +26,13 @@ import {
   loadCheckoutCustomerInfo,
   saveCheckoutCustomerInfo
 } from '../utils/checkoutCustomerInfoCache'
+import {
+  buildCheckoutDistrictCacheEntry,
+  getCachedManualMarkerForDistrict,
+  isSameCheckoutDistrict,
+  loadCheckoutLocationMemory,
+  saveCheckoutLocationMemory
+} from '../utils/checkoutLocationCache'
 import './PaymentPage.css'
 
 const GEOLOCATION_CACHE_MAX_AGE_MS = 5 * 60 * 1000
@@ -48,6 +55,17 @@ const normalizeDistrictLabel = (value) => (
 
 const getDistrictDisplayName = (district) => (
   district?.display_name || district?.name || ''
+)
+
+const buildDistrictMemoryEntry = (district) => (
+  buildCheckoutDistrictCacheEntry({
+    ...district,
+    districtId: district?.id,
+    districtName: district?.name,
+    displayName: getDistrictDisplayName(district),
+    cityId: district?.city_id,
+    cityName: district?.city_name
+  })
 )
 
 const addDistrictDisplayAliases = (districts) => {
@@ -234,6 +252,7 @@ const PaymentPage = () => {
   const cachedFieldCompletionTrackedRef = useRef(false)
   const browserContext = useMemo(() => getBrowserContext(), [])
   const cachedCustomerInfo = useMemo(() => loadCheckoutCustomerInfo(), [])
+  const [cachedLocationMemory, setCachedLocationMemory] = useState(() => loadCheckoutLocationMemory())
   const useMapOnlyLocationFlow = true
   const isInlineQuantityVariant = isInlineCheckoutVariant(checkoutQuantityExperiment)
   const isCodTrustVariant = isCodTrustCheckoutVariant(checkoutQuantityExperiment)
@@ -274,12 +293,55 @@ const PaymentPage = () => {
 
   const mapSelectedNoteText = markerSelectionSource === 'district_center_fallback'
     ? 'Adresse prise en compte. Appuyez sur Suivant.'
-    : 'Position marquée. Appuyez sur Suivant.'
+    : markerSelectionSource === 'manual_cached'
+      ? 'Position choisie la dernière fois. Vous pouvez la modifier.'
+      : 'Position marquée. Appuyez sur Suivant.'
+
+  const getLocationMethodForMarkerSource = (source) => {
+    if (source === 'manual') return 'manual_map'
+    if (source === 'manual_cached') return 'manual_map_cached'
+    if (source === 'current') return 'current_location'
+    if (source === 'district_center_fallback') return 'district_center_fallback'
+    if (source === 'district_center_auto_skip') return 'district_center_auto_skip'
+    return source || null
+  }
 
   const setMarkerSelectionSource = (source) => {
     markerSelectionSourceRef.current = source
     setMarkerSelectionSourceState(source)
   }
+
+  const rememberCheckoutLocation = (locationMemory) => {
+    const saved = saveCheckoutLocationMemory(locationMemory)
+    if (saved) {
+      setCachedLocationMemory(loadCheckoutLocationMemory())
+    }
+    return saved
+  }
+
+  const getCachedManualMarker = (district) => (
+    getCachedManualMarkerForDistrict(buildDistrictMemoryEntry(district), cachedLocationMemory)
+  )
+
+  const districtsForDisplay = useMemo(() => {
+    const lastDistrict = cachedLocationMemory?.lastDistrict
+    if (!lastDistrict || districts.length === 0) return districts
+
+    const lastIndex = districts.findIndex((district) => (
+      isSameCheckoutDistrict(buildDistrictMemoryEntry(district), lastDistrict)
+    ))
+    if (lastIndex <= 0) return districts
+
+    const lastDistrictItem = districts[lastIndex]
+    return [
+      lastDistrictItem,
+      ...districts.filter((_, index) => index !== lastIndex)
+    ]
+  }, [cachedLocationMemory, districts])
+
+  const isLastSelectedDistrict = (district) => (
+    isSameCheckoutDistrict(buildDistrictMemoryEntry(district), cachedLocationMemory?.lastDistrict)
+  )
 
   const ensureCheckoutSession = () => {
     if (checkoutSessionIdRef.current) return checkoutSessionIdRef.current
@@ -679,6 +741,11 @@ const PaymentPage = () => {
 
   // 选择大区
   const handleSelectDistrict = (district) => {
+    const districtMemoryEntry = buildDistrictMemoryEntry(district)
+    if (districtMemoryEntry) {
+      rememberCheckoutLocation({ lastDistrict: districtMemoryEntry })
+    }
+
     setSelectedDistrict(district)
     updateCheckoutContext(product, {
       quantity,
@@ -716,8 +783,21 @@ const PaymentPage = () => {
       return
     }
 
-    setCustomMarker(null)
-    setMarkerSelectionSource('none')
+    const cachedManualMarker = getCachedManualMarker(district)
+    if (cachedManualMarker) {
+      setCustomMarker(cachedManualMarker)
+      setMarkerSelectionSource('manual_cached')
+      setMapCenter(cachedManualMarker)
+      setMapZoom(15)
+      trackPaymentEvent('location_selected', {
+        ...getDistrictAnalyticsProps(district),
+        location_method: 'manual_map_cached',
+        location_cache_used: true
+      })
+    } else {
+      setCustomMarker(null)
+      setMarkerSelectionSource('none')
+    }
     navigateToCheckoutStep(2)
 
     if (!hasSeenMapGuide()) {
@@ -733,6 +813,17 @@ const PaymentPage = () => {
     setLocationRequestStatus('idle')
     setLocationRequestMessage('')
     setCustomMarker(marker)
+    const districtMemoryEntry = buildDistrictMemoryEntry(selectedDistrict)
+    if (districtMemoryEntry) {
+      rememberCheckoutLocation({
+        lastDistrict: districtMemoryEntry,
+        manualMarker: {
+          ...marker,
+          source: 'manual',
+          district: districtMemoryEntry
+        }
+      })
+    }
     trackPaymentEvent('location_selected', {
       ...getDistrictAnalyticsProps(),
       location_method: 'manual_map'
@@ -745,7 +836,11 @@ const PaymentPage = () => {
       alert('Veuillez cliquer sur la carte pour choisir un emplacement')
       return
     }
-    trackPaymentEvent('location_confirmed', getDistrictAnalyticsProps())
+    trackPaymentEvent('location_confirmed', {
+      ...getDistrictAnalyticsProps(),
+      location_method: getLocationMethodForMarkerSource(markerSelectionSourceRef.current),
+      location_cache_used: markerSelectionSourceRef.current === 'manual_cached'
+    })
     navigateToCheckoutStep(3)
   }
 
@@ -792,10 +887,24 @@ const PaymentPage = () => {
       setMapCenter(customMarker)
       setMapZoom(15)
     } else {
-      setCustomMarker(null)
-      setMarkerSelectionSource('none')
-      setMapCenter(getDistrictCenterMarker(selectedDistrict))
-      setMapZoom(14)
+      const cachedManualMarker = getCachedManualMarker(selectedDistrict)
+      if (cachedManualMarker) {
+        setCustomMarker(cachedManualMarker)
+        setMarkerSelectionSource('manual_cached')
+        setMapCenter(cachedManualMarker)
+        setMapZoom(15)
+        trackPaymentEvent('location_selected', {
+          ...getDistrictAnalyticsProps(selectedDistrict),
+          location_method: 'manual_map_cached',
+          location_cache_used: true,
+          location_auto_skip_map_requested: true
+        })
+      } else {
+        setCustomMarker(null)
+        setMarkerSelectionSource('none')
+        setMapCenter(getDistrictCenterMarker(selectedDistrict))
+        setMapZoom(14)
+      }
     }
 
     trackPaymentEvent('location_auto_skip_map_requested', {
@@ -1196,10 +1305,12 @@ const PaymentPage = () => {
               </div>
             ) : (
               <div className="district-list">
-                {districts.map((district) => (
+                {districtsForDisplay.map((district) => {
+                  const isLastSelected = isLastSelectedDistrict(district)
+                  return (
                   <div
                     key={district.display_alias_key || district.id}
-                    className="district-card"
+                    className={`district-card ${isLastSelected ? 'last-selected' : ''}`}
                     onClick={() => handleSelectDistrict(district)}
                     role="button"
                     tabIndex={0}
@@ -1208,10 +1319,14 @@ const PaymentPage = () => {
                     <div className="district-info">
                       <div className="district-name">{getDistrictDisplayName(district)}</div>
                       <div className="district-city">{district.city_name}</div>
+                      {isLastSelected && (
+                        <div className="district-last-note">Choisi la dernière fois</div>
+                      )}
                     </div>
                     <div className="district-arrow">›</div>
                   </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </div>

@@ -653,6 +653,17 @@
   box-shadow: 0 4px 12px rgba(255, 81, 0, 0.15);
 }
 
+.district-card.last-selected {
+  border-color: #ff8a4a;
+  background: linear-gradient(180deg, #fff8f4 0%, #fffefe 100%);
+  box-shadow: 0 3px 12px rgba(255, 81, 0, 0.12);
+}
+
+.district-card.last-selected .district-icon {
+  background: #ff5100;
+  color: white;
+}
+
 .district-icon {
   width: 48px;
   height: 48px;
@@ -686,6 +697,13 @@
 .district-city {
   font-size: 13px;
   color: #666;
+}
+
+.district-last-note {
+  margin-top: 3px;
+  color: #ff5100;
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .district-arrow {
