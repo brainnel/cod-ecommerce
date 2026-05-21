@@ -176,8 +176,8 @@ const hashStringToBucket = (value) => {
   return Math.abs(hash) % 100
 }
 
-const getDevelopmentQuantityVariantOverride = () => {
-  if (!import.meta.env.DEV || typeof window === 'undefined') return null
+const getUrlQuantityVariantOverride = () => {
+  if (typeof window === 'undefined') return null
 
   try {
     const params = new URLSearchParams(window.location.search)
@@ -203,12 +203,12 @@ export const getCheckoutQuantityExperiment = () => {
 
   if (typeof window === 'undefined') return fallback
 
-  const developmentOverride = getDevelopmentQuantityVariantOverride()
-  if (developmentOverride) {
+  const urlOverride = getUrlQuantityVariantOverride()
+  if (urlOverride) {
     return {
       ...fallback,
-      checkout_quantity_variant: developmentOverride,
-      checkout_quantity_ab_group: getVariantGroup(developmentOverride)
+      checkout_quantity_variant: urlOverride,
+      checkout_quantity_ab_group: getVariantGroup(urlOverride)
     }
   }
 
