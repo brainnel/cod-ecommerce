@@ -1451,6 +1451,7 @@ const PaymentPage = () => {
                 onChange={(e) => handleInputChange('fullName', e.target.value)}
                 placeholder="Entrez votre nom complet"
                 autoComplete="name"
+                maxLength={50}
               />
               {errors.fullName && <div className="error-message">{errors.fullName}</div>}
             </div>

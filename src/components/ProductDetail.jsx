@@ -31,6 +31,7 @@ const PRODUCT_UNAVAILABLE_BACKEND_MESSAGE = '此商品已下架，请查看其�
 const PRODUCT_UNAVAILABLE_MESSAGE_FR = "Ce produit n'est plus disponible. Veuillez consulter d'autres produits.";
 const GENERIC_PRODUCT_FETCH_ERROR_FR = 'Échec de récupération des informations produit';
 const PRODUCT_UNAVAILABLE_REDIRECT_SECONDS = 3;
+const MAX_PROMOTED_DETAIL_IMAGES = 4;
 
 const getBackendErrorDetail = (err) => err?.response?.data?.detail;
 
@@ -62,6 +63,14 @@ const getProductFetchErrorMessage = (err) => {
   return GENERIC_PRODUCT_FETCH_ERROR_FR;
 };
 
+const normalizeImageList = (value) => {
+  if (Array.isArray(value)) {
+    return value.filter(Boolean);
+  }
+
+  return value ? [value] : [];
+};
+
 // Import Swiper styles
 import 'swiper/css';
 import 'swiper/css/pagination';
@@ -83,7 +92,15 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
   const isCheckoutOptimizationVariant = isInlineCheckoutVariant(checkoutQuantityExperiment);
   const isCodTrustLanding = isCodTrustLandingVariant(checkoutQuantityExperiment);
   const isAddressFirstLanding = isAddressFirstCheckoutVariant(checkoutQuantityExperiment);
-  const galleryImages = Array.isArray(product?.image_url) ? product.image_url : [];
+  const productMainImages = normalizeImageList(product?.image_url);
+  const productDetailImages = normalizeImageList(product?.description_fr);
+  const promotedDetailImages = productMainImages.length === 1
+    ? productDetailImages.slice(0, MAX_PROMOTED_DETAIL_IMAGES)
+    : [];
+  const galleryImages = [...productMainImages, ...promotedDetailImages];
+  const descriptionImages = promotedDetailImages.length > 0
+    ? productDetailImages.slice(promotedDetailImages.length)
+    : productDetailImages;
   const productSwiperModules = [Pagination, Navigation, Autoplay];
   const productGalleryAutoplay = galleryImages.length > 1
     ? {
@@ -525,9 +542,9 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
         </div>
 
         {/* 产品描述图片 */}
-        {product.description_fr && product.description_fr.length > 0 && (
+        {descriptionImages.length > 0 && (
           <div className="description-images">
-            {product.description_fr.map((image, index) => (
+            {descriptionImages.map((image, index) => (
               <img
                 key={`${product.product_id}-desc-${index}`}
                 src={image}
