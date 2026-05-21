@@ -57,7 +57,7 @@
 - E 组地址优先版需要额外看“补定位”拆解：`location_selected` 代表完成定位；`location_method = district_center_auto_skip` 且没有 `location_auto_skip_map_requested` 代表没进地图直接用大区中心；`location_auto_skip_map_requested` 代表点过“可选：地图标点”；点过后最终 `manual_map/current_location` 代表真的补了坐标；点过后最终仍是 `district_center_auto_skip` 代表进地图但没标点，最后还是大区中心。
 - 地图选择引导层保留，但只在同一浏览器本地第一次进入地图页时展示一次，状态写入 `localStorage`；清历史数据、换浏览器或无痕模式会重新展示。引导层自动关闭时间为 2.2 秒，避免长时间挡住地图和底部按钮。
 - 商品主图自动轮播已从 C/D 扩展为全量商品页行为：只要主图超过 1 张，就 3.5 秒自动切换；用户手动滑动后停止自动轮播。该改动不改变 CTA 文案和 checkout 流程。
-- 2026-05-21 起，如果商品主图只有 1 张，会把前 4 张详情图提升到主图轮播中；这些图片复用原详情图 URL，且已提升的详情图不在详情区重复渲染，避免首屏只有单图但不额外增加图片资源。
+- 2026-05-21 起，如果商品主图只有 1 张，会把前 4 张详情图提升到主图轮播中；这些图片复用原详情图 URL，详情区仍完整展示全部详情图，避免用户下滑看详情时缺图。
 - 落地页新增 `product_landing_engagement` 停留时长埋点：页面隐藏、离开、进入 checkout 或组件卸载时通过 `sendBeacon/fetch keepalive` 旁路上报 `landing_duration_ms`、`landing_max_scroll_percent` 和退出原因，不等待结果，不影响点击下单。
 - 管理端落地页模块除全体平均滚动外，也展示“下单前停留 / 点下单平均滚动”。2026-05-20 起，这两个点击前指标只统计 `landing_exit_reason = checkout_click` 的 `product_landing_engagement`，避免页面隐藏、切后台或组件卸载事件混入口径；全体平均停留和未下单停留仍看所有 engagement 原因。
 - 分析落地页停留和滚动时，不要只看平均值：

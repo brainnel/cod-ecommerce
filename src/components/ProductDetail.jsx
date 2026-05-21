@@ -98,9 +98,6 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
     ? productDetailImages.slice(0, MAX_PROMOTED_DETAIL_IMAGES)
     : [];
   const galleryImages = [...productMainImages, ...promotedDetailImages];
-  const descriptionImages = promotedDetailImages.length > 0
-    ? productDetailImages.slice(promotedDetailImages.length)
-    : productDetailImages;
   const productSwiperModules = [Pagination, Navigation, Autoplay];
   const productGalleryAutoplay = galleryImages.length > 1
     ? {
@@ -542,9 +539,9 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
         </div>
 
         {/* 产品描述图片 */}
-        {descriptionImages.length > 0 && (
+        {productDetailImages.length > 0 && (
           <div className="description-images">
-            {descriptionImages.map((image, index) => (
+            {productDetailImages.map((image, index) => (
               <img
                 key={`${product.product_id}-desc-${index}`}
                 src={image}
