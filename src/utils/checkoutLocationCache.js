@@ -30,6 +30,8 @@ const normalizeCoordinate = (value) => {
   return Number.isFinite(parsed) ? parsed : null
 }
 
+const normalizeMarkerLabel = (value) => normalizeText(value).slice(0, 120)
+
 const isValidMarker = (marker) => {
   if (!marker || typeof marker !== 'object') return false
   const lat = normalizeCoordinate(marker.lat)
@@ -127,6 +129,8 @@ const normalizeManualMarkerEntry = (entry) => {
     source: 'manual',
     lat: normalizeCoordinate(entry.lat),
     lng: normalizeCoordinate(entry.lng),
+    label: normalizeMarkerLabel(entry.label),
+    placeId: normalizeText(entry.placeId),
     district,
     updatedAt: normalizeText(entry.updatedAt)
   }
@@ -172,6 +176,8 @@ export const saveCheckoutLocationMemory = (locationMemory, storage = getDefaultS
         source: 'manual',
         lat: normalizeCoordinate(marker.lat),
         lng: normalizeCoordinate(marker.lng),
+        label: normalizeMarkerLabel(marker.label),
+        placeId: normalizeText(marker.placeId),
         district,
         updatedAt: now
       }
@@ -201,7 +207,9 @@ export const getCachedManualMarkerForDistrict = (district, locationMemory) => {
 
   return {
     lat: manualMarker.lat,
-    lng: manualMarker.lng
+    lng: manualMarker.lng,
+    label: manualMarker.label || '',
+    placeId: manualMarker.placeId || ''
   }
 }
 

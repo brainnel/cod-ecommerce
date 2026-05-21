@@ -1,6 +1,6 @@
 import { lazy, Suspense, useState, useEffect, useMemo, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { FiCreditCard, FiMapPin } from 'react-icons/fi'
+import { FiCreditCard, FiMapPin, FiSearch, FiX } from 'react-icons/fi'
 import { districtAPI, orderAPI, bundleAPI } from '../services/api'
 import { useAdId } from '../hooks/useAdTrackingHooks.js'
 import { trackPurchaseEvent, getClientInfo } from '../services/facebookConversions'
@@ -11,12 +11,12 @@ import {
   isAddressFirstCheckoutVariant,
   isCodTrustCheckoutVariant,
   isInlineCheckoutVariant,
+  isInlineMapSearchCheckoutVariant,
   resumeCheckoutSession,
   startCheckoutSession,
   trackCheckoutEvent,
   updateCheckoutContext
 } from '../services/checkoutFunnelAnalytics'
-import MapGuideModal from '../components/MapGuideModal'
 import { DISTRICT_CENTERS, DEFAULT_CENTER, DEFAULT_ZOOM } from '../constants/districtCenters'
 import {
   getLocalPreviewBrowserContext as getPreviewBrowserContext,
@@ -40,13 +40,17 @@ import {
 } from '../utils/checkoutPaymentStateCache'
 import './PaymentPage.css'
 
-const MAP_GUIDE_SEEN_STORAGE_KEY = 'cod_checkout_map_guide_seen_v1'
-const MAP_GUIDE_SHOW_DELAY_MS = 500
-const MAP_GUIDE_AUTO_CLOSE_MS = 2200
 const CHECKOUT_MIN_STEP = 1
 const CHECKOUT_MAX_STEP = 3
 const MapSelector = lazy(() => import('../components/MapSelector'))
 const ATTECOUBE_CENTER = { lat: 5.3362, lng: -4.0414 }
+const LOCATION_SEARCH_SCOPE_TEXT = 'Abidjan, Côte d’Ivoire'
+const LOCATION_SEARCH_GENERIC_LABELS = new Set([
+  'abidjan',
+  'cote divoire',
+  'cote d ivoire',
+  'cote d ivoire abidjan'
+])
 
 const normalizeDistrictLabel = (value) => (
   String(value || '')
@@ -58,6 +62,22 @@ const normalizeDistrictLabel = (value) => (
 const getDistrictDisplayName = (district) => (
   district?.display_name || district?.name || ''
 )
+
+const normalizeLocationSearchText = (value) => (
+  String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[’']/g, ' ')
+    .replace(/[^a-zA-Z0-9]+/g, ' ')
+    .trim()
+    .toLowerCase()
+)
+
+const isGenericLocationPrediction = (result) => {
+  const primaryText = normalizeLocationSearchText(result.primaryText || result.label)
+  const label = normalizeLocationSearchText(result.label)
+  return LOCATION_SEARCH_GENERIC_LABELS.has(primaryText) || LOCATION_SEARCH_GENERIC_LABELS.has(label)
+}
 
 const buildDistrictMemoryEntry = (district) => (
   buildCheckoutDistrictCacheEntry({
@@ -107,27 +127,6 @@ const getCheckoutStepFromSearch = (search) => {
 const hasCheckoutStepInSearch = (search) => {
   const params = new URLSearchParams(search)
   return params.has('step')
-}
-
-const hasSeenMapGuide = () => {
-  if (typeof window === 'undefined') return true
-
-  try {
-    return window.localStorage?.getItem(MAP_GUIDE_SEEN_STORAGE_KEY) === '1'
-  } catch (error) {
-    console.warn('读取地图引导状态失败:', error)
-    return false
-  }
-}
-
-const markMapGuideSeen = () => {
-  if (typeof window === 'undefined') return
-
-  try {
-    window.localStorage?.setItem(MAP_GUIDE_SEEN_STORAGE_KEY, '1')
-  } catch (error) {
-    console.warn('写入地图引导状态失败:', error)
-  }
 }
 
 const buildCheckoutStepSearch = (step, currentSearch = '') => {
@@ -261,6 +260,7 @@ const PaymentPage = () => {
   const isInlineQuantityVariant = isInlineCheckoutVariant(checkoutQuantityExperiment)
   const isCodTrustVariant = isCodTrustCheckoutVariant(checkoutQuantityExperiment)
   const isAddressFirstVariant = isAddressFirstCheckoutVariant(checkoutQuantityExperiment)
+  const isMapSearchVariant = isInlineMapSearchCheckoutVariant(checkoutQuantityExperiment)
 
   // 三步流程：1=选大区, 2=地图标记, 3=填写信息
   const [currentStep, setCurrentStep] = useState(() => getCheckoutStepFromSearch(location.search))
@@ -276,7 +276,22 @@ const PaymentPage = () => {
   const [mapZoom, setMapZoom] = useState(() => paymentRouteState.mapZoom || (paymentRouteState.customMarker ? 15 : DEFAULT_ZOOM))
   const [customMarker, setCustomMarker] = useState(() => paymentRouteState.customMarker || null)
   const [markerSelectionSource, setMarkerSelectionSourceState] = useState(initialMarkerSelectionSource)
-  const [showGuideModal, setShowGuideModal] = useState(false)
+  const [locationSearchQuery, setLocationSearchQuery] = useState(() => (
+    paymentRouteState.locationSearchQuery || paymentRouteState.customMarker?.label || ''
+  ))
+  const [locationSearchResults, setLocationSearchResults] = useState([])
+  const [locationSearchStatus, setLocationSearchStatus] = useState(() => (
+    paymentRouteState.locationSearchQuery || paymentRouteState.customMarker?.label ? 'selected' : 'idle'
+  ))
+  const [locationSearchMessage, setLocationSearchMessage] = useState(() => (
+    paymentRouteState.locationSearchQuery || paymentRouteState.customMarker?.label
+      ? 'Position choisie. Vous pouvez ajuster sur la carte.'
+      : ''
+  ))
+  const locationSearchDebounceRef = useRef(null)
+  const locationSearchRequestRef = useRef(0)
+  const locationAutocompleteSessionRef = useRef(null)
+  const locationSearchLabelRestoreSuppressedRef = useRef(false)
 
   // 步骤3：用户信息
   const [userInfo, setUserInfo] = useState(() => ({
@@ -319,9 +334,78 @@ const PaymentPage = () => {
     return saved
   }
 
+  const persistManualMarkerSelection = (marker, options = {}) => {
+    if (!marker) return
+
+    const district = options.district || selectedDistrict
+    const districtMemoryEntry = buildDistrictMemoryEntry(district)
+    const markerSource = options.markerSelectionSource || 'manual'
+    const nextMapCenter = options.mapCenter || marker
+    const nextMapZoom = options.mapZoom || mapZoom
+    const markerLabel = options.markerLabel || marker.label || ''
+    const markerPlaceId = options.placeId || marker.placeId || ''
+
+    if (districtMemoryEntry) {
+      rememberCheckoutLocation({
+        lastDistrict: districtMemoryEntry,
+        manualMarker: {
+          ...marker,
+          source: 'manual',
+          label: markerLabel,
+          placeId: markerPlaceId,
+          district: districtMemoryEntry
+        }
+      })
+    }
+
+    saveCheckoutPaymentState(getPaymentNavigationState({
+      selectedDistrict: district,
+      customMarker: {
+        ...marker,
+        label: markerLabel,
+        placeId: markerPlaceId
+      },
+      markerSelectionSource: markerSource,
+      mapCenter: nextMapCenter,
+      mapZoom: nextMapZoom,
+      locationSearchQuery: markerLabel,
+      locationSearchStatus: markerLabel ? 'selected' : 'idle'
+    }))
+  }
+
   const getCachedManualMarker = (district) => (
     getCachedManualMarkerForDistrict(buildDistrictMemoryEntry(district), cachedLocationMemory)
   )
+
+  const getCustomMarkerForPaymentState = (overrides = {}) => {
+    const resolvedMarker = 'customMarker' in overrides ? overrides.customMarker : customMarker
+    if (!resolvedMarker) return resolvedMarker
+
+    const resolvedMarkerSource = overrides.markerSelectionSource || markerSelectionSource
+    const isManualMarker = resolvedMarkerSource === 'manual' || resolvedMarkerSource === 'manual_cached'
+    if (!isManualMarker) return resolvedMarker
+
+    const resolvedDistrict = 'selectedDistrict' in overrides ? overrides.selectedDistrict : selectedDistrict
+    const resolvedSearchStatus = overrides.locationSearchStatus || locationSearchStatus
+    const resolvedSearchQuery = (
+      'locationSearchQuery' in overrides
+        ? overrides.locationSearchQuery
+        : locationSearchQuery
+    )
+    const cachedManualMarker = getCachedManualMarker(resolvedDistrict)
+    const cachedLabel = cachedManualMarker?.label || ''
+    const selectedSearchLabel = resolvedSearchStatus === 'selected' ? resolvedSearchQuery : ''
+    const markerLabel = resolvedMarker.label || cachedLabel || selectedSearchLabel
+    const markerPlaceId = resolvedMarker.placeId || cachedManualMarker?.placeId || ''
+
+    if (!markerLabel && !markerPlaceId) return resolvedMarker
+
+    return {
+      ...resolvedMarker,
+      label: markerLabel,
+      placeId: markerPlaceId
+    }
+  }
 
   const districtsForDisplay = useMemo(() => {
     const lastDistrict = cachedLocationMemory?.lastDistrict
@@ -453,22 +537,30 @@ const PaymentPage = () => {
     })
   }
 
-  const getPaymentNavigationState = (overrides = {}) => ({
-    ...paymentRouteState,
-    product: productFromState,
-    bundle: bundleFromState,
-    quantity,
-    productType: productTypeFromState,
-    checkoutSessionId: checkoutSessionIdRef.current || routeCheckoutSessionId || getCheckoutSessionId(),
-    checkoutQuantityExperiment,
-    quantityConfirmed: inlineQuantityConfirmedRef.current,
-    selectedDistrict,
-    customMarker,
-    markerSelectionSource,
-    mapCenter,
-    mapZoom,
-    ...overrides
-  })
+  const getPaymentNavigationState = (overrides = {}) => {
+    const nextState = {
+      ...paymentRouteState,
+      product: productFromState,
+      bundle: bundleFromState,
+      quantity,
+      productType: productTypeFromState,
+      checkoutSessionId: checkoutSessionIdRef.current || routeCheckoutSessionId || getCheckoutSessionId(),
+      checkoutQuantityExperiment,
+      quantityConfirmed: inlineQuantityConfirmedRef.current,
+      selectedDistrict,
+      markerSelectionSource,
+      mapCenter,
+      mapZoom,
+      locationSearchQuery,
+      locationSearchStatus,
+      ...overrides
+    }
+
+    return {
+      ...nextState,
+      customMarker: getCustomMarkerForPaymentState(overrides)
+    }
+  }
 
   const navigateToCheckoutStep = (step, options = {}) => {
     const nextStep = clampCheckoutStep(step)
@@ -507,7 +599,9 @@ const PaymentPage = () => {
     customMarker,
     markerSelectionSource,
     mapCenter,
-    mapZoom
+    mapZoom,
+    locationSearchQuery,
+    locationSearchStatus
   ])
 
   useEffect(() => {
@@ -679,33 +773,436 @@ const PaymentPage = () => {
         mapZoom: cachedManualMarker ? 15 : 14
       }
     })
-
-    if (!hasSeenMapGuide()) {
-      markMapGuideSeen()
-      setTimeout(() => setShowGuideModal(true), MAP_GUIDE_SHOW_DELAY_MS)
-    }
   }
 
   // 地图标记
   const handleMapClick = (marker) => {
     setMarkerSelectionSource('manual')
     setCustomMarker(marker)
-    const districtMemoryEntry = buildDistrictMemoryEntry(selectedDistrict)
-    if (districtMemoryEntry) {
-      rememberCheckoutLocation({
-        lastDistrict: districtMemoryEntry,
-        manualMarker: {
-          ...marker,
-          source: 'manual',
-          district: districtMemoryEntry
-        }
-      })
-    }
+    setMapCenter(marker)
+    persistManualMarkerSelection(marker, {
+      markerSelectionSource: 'manual',
+      mapCenter: marker
+    })
     trackPaymentEvent('location_selected', {
       ...getDistrictAnalyticsProps(),
       location_method: 'manual_map'
     })
   }
+
+  const getLocationSearchScopeText = () => LOCATION_SEARCH_SCOPE_TEXT
+
+  const buildLocationSearchInput = (query) => query.trim()
+
+  const buildLocationScopedQueryInput = (query) => `${query.trim()}, ${getLocationSearchScopeText()}`
+
+  const getLocationAutocompleteSessionToken = () => {
+    if (!window.google?.maps?.places?.AutocompleteSessionToken) return null
+    if (!locationAutocompleteSessionRef.current) {
+      locationAutocompleteSessionRef.current = new window.google.maps.places.AutocompleteSessionToken()
+    }
+    return locationAutocompleteSessionRef.current
+  }
+
+  const handleLocationSearchClear = () => {
+    locationSearchLabelRestoreSuppressedRef.current = true
+    setLocationSearchQuery('')
+    setLocationSearchResults([])
+    setLocationSearchStatus('idle')
+    setLocationSearchMessage('')
+    locationSearchRequestRef.current += 1
+  }
+
+  const handleLocationSearchInputChange = (event) => {
+    locationSearchLabelRestoreSuppressedRef.current = true
+    setLocationSearchQuery(event.target.value)
+    if (locationSearchStatus === 'selected') {
+      setLocationSearchResults([])
+      setLocationSearchStatus('idle')
+      setLocationSearchMessage('')
+    }
+  }
+
+  const normalizeLocationPredictions = (predictions, source) => (
+    (predictions || []).map((prediction) => {
+      const formatting = prediction.structured_formatting || {}
+      return {
+        id: prediction.place_id || `${source}:${prediction.description}`,
+        placeId: prediction.place_id || null,
+        label: prediction.description,
+        primaryText: formatting.main_text || prediction.description,
+        secondaryText: formatting.secondary_text || '',
+        source
+      }
+    }).filter((result) => result.label && !isGenericLocationPrediction(result))
+  )
+
+  const mergeLocationSearchResults = (resultGroups) => {
+    const seen = new Set()
+    return resultGroups.flat().filter((result) => {
+      const key = result.placeId || normalizeLocationSearchText(result.label)
+      if (!key || seen.has(key)) return false
+      seen.add(key)
+      return true
+    }).slice(0, 5)
+  }
+
+  const getPlacePredictions = (autocompleteService, request) => (
+    new Promise((resolve) => {
+      autocompleteService.getPlacePredictions(request, (predictions, status) => {
+        resolve({ predictions, status })
+      })
+    })
+  )
+
+  const getQueryPredictions = (autocompleteService, request) => (
+    new Promise((resolve) => {
+      autocompleteService.getQueryPredictions(request, (predictions, status) => {
+        resolve({ predictions, status })
+      })
+    })
+  )
+
+  const getPlaceDetails = (placeId) => (
+    new Promise((resolve) => {
+      if (!placeId || !window.google?.maps?.places?.PlacesService) {
+        resolve({ place: null, status: 'NO_PLACE_ID' })
+        return
+      }
+
+      const detailsService = new window.google.maps.places.PlacesService(document.createElement('div'))
+      detailsService.getDetails({
+        placeId,
+        fields: ['geometry', 'name', 'formatted_address', 'place_id']
+      }, (place, status) => {
+        resolve({ place, status })
+      })
+    })
+  )
+
+  const geocodeLocationSearchResult = (result) => (
+    new Promise((resolve) => {
+      const geocoder = new window.google.maps.Geocoder()
+      const geocodeRequest = result.placeId
+        ? { placeId: result.placeId, region: 'CI' }
+        : { address: buildLocationScopedQueryInput(result.label), region: 'CI' }
+
+      geocoder.geocode(geocodeRequest, (details, status) => {
+        resolve({ details, status })
+      })
+    })
+  )
+
+  const fetchLocationSearchPredictions = async (query, trigger = 'type') => {
+    if (query.length < 2) {
+      setLocationSearchResults([])
+      setLocationSearchStatus('error')
+      setLocationSearchMessage('Entrez au moins 2 lettres.')
+      return
+    }
+
+    if (typeof window === 'undefined' || !window.google?.maps?.places?.AutocompleteService) {
+      setLocationSearchStatus('error')
+      setLocationSearchMessage('La recherche sera disponible après le chargement de la carte.')
+      if (trigger === 'submit') {
+        trackPaymentEvent('location_search_failed', {
+          ...getDistrictAnalyticsProps(),
+          location_search_error: 'maps_not_loaded',
+          location_search_query_length: query.length
+        })
+      }
+      return
+    }
+
+    const requestId = locationSearchRequestRef.current + 1
+    locationSearchRequestRef.current = requestId
+    setLocationSearchStatus('searching')
+    setLocationSearchMessage('')
+
+    if (trigger === 'submit') {
+      trackPaymentEvent('location_search_submit', {
+        ...getDistrictAnalyticsProps(),
+        location_search_query_length: query.length
+      })
+    }
+
+    const locationBiasRequest = {
+      input: buildLocationSearchInput(query),
+      componentRestrictions: { country: 'ci' },
+      sessionToken: getLocationAutocompleteSessionToken()
+    }
+
+    const districtCenter = getDistrictCenterMarker(selectedDistrict)
+    if (Number.isFinite(districtCenter.lat) && Number.isFinite(districtCenter.lng) && window.google?.maps?.LatLng) {
+      locationBiasRequest.location = new window.google.maps.LatLng(districtCenter.lat, districtCenter.lng)
+      locationBiasRequest.radius = 25000
+    }
+
+    const autocompleteService = new window.google.maps.places.AutocompleteService()
+    const placeResponse = await getPlacePredictions(autocompleteService, locationBiasRequest)
+    if (requestId !== locationSearchRequestRef.current) return
+
+    const placeResults = normalizeLocationPredictions(placeResponse.predictions, 'place')
+    const shouldUseQueryFallback = placeResults.length < 3 || trigger === 'submit'
+    let queryResults = []
+
+    if (shouldUseQueryFallback) {
+      const queryResponse = await getQueryPredictions(autocompleteService, {
+        input: buildLocationScopedQueryInput(query)
+      })
+      if (requestId !== locationSearchRequestRef.current) return
+      queryResults = normalizeLocationPredictions(queryResponse.predictions, 'query')
+    }
+
+    const nextResults = mergeLocationSearchResults([placeResults, queryResults])
+    if (nextResults.length === 0) {
+      setLocationSearchStatus('error')
+      setLocationSearchMessage('Aucun résultat clair. Essayez un repère proche.')
+      if (trigger === 'submit') {
+        trackPaymentEvent('location_search_failed', {
+          ...getDistrictAnalyticsProps(),
+          location_search_error: placeResponse.status || 'no_result',
+          location_search_query_length: query.length
+        })
+      }
+      return
+    }
+
+    setLocationSearchResults(nextResults)
+    setLocationSearchStatus('results')
+    setLocationSearchMessage('')
+    if (trigger === 'submit') {
+      trackPaymentEvent('location_search_results', {
+        ...getDistrictAnalyticsProps(),
+        location_search_query_length: query.length,
+        location_search_result_count: nextResults.length
+      })
+    }
+  }
+
+  const handleLocationSearchSubmit = (event) => {
+    event.preventDefault()
+    const query = locationSearchQuery.trim()
+    fetchLocationSearchPredictions(query, 'submit')
+  }
+
+  const handleLocationSearchResultSelect = (result, index) => {
+    if (typeof window === 'undefined' || !window.google?.maps?.Geocoder) {
+      setLocationSearchStatus('error')
+      setLocationSearchMessage('Impossible de placer ce résultat. Touchez la carte directement.')
+      return
+    }
+
+    const requestId = locationSearchRequestRef.current + 1
+    locationSearchRequestRef.current = requestId
+    setLocationSearchStatus('searching')
+    setLocationSearchMessage('')
+
+    Promise.resolve()
+      .then(async () => {
+        const okStatus = window.google?.maps?.places?.PlacesServiceStatus?.OK || 'OK'
+        const placeDetail = await getPlaceDetails(result.placeId)
+        if (placeDetail.status === okStatus && placeDetail.place?.geometry?.location) {
+          return {
+            detail: placeDetail.place,
+            status: placeDetail.status,
+            label: placeDetail.place.name || result.primaryText || result.label,
+            formattedAddress: placeDetail.place.formatted_address || result.secondaryText || ''
+          }
+        }
+
+        const geocodeDetail = await geocodeLocationSearchResult(result)
+        return {
+          detail: Array.isArray(geocodeDetail.details) ? geocodeDetail.details[0] : null,
+          status: geocodeDetail.status,
+          label: result.primaryText || result.label,
+          formattedAddress: result.secondaryText || ''
+        }
+      })
+      .then(({ detail, status, label }) => {
+        if (requestId !== locationSearchRequestRef.current) return
+
+        const locationPoint = detail?.geometry?.location
+      const marker = {
+        lat: typeof locationPoint?.lat === 'function' ? locationPoint.lat() : null,
+        lng: typeof locationPoint?.lng === 'function' ? locationPoint.lng() : null,
+        label,
+        placeId: result.placeId || detail?.place_id || ''
+      }
+
+      if (status !== 'OK' || !Number.isFinite(marker.lat) || !Number.isFinite(marker.lng)) {
+        setLocationSearchStatus('error')
+        setLocationSearchMessage('Impossible de placer ce résultat. Touchez la carte directement.')
+        trackPaymentEvent('location_search_failed', {
+          ...getDistrictAnalyticsProps(),
+          location_search_error: status || 'place_detail_failed',
+          location_search_query_length: locationSearchQuery.trim().length
+        })
+        return
+      }
+
+      setMarkerSelectionSource('manual')
+      setCustomMarker(marker)
+      setMapCenter(marker)
+      setMapZoom(16)
+      locationSearchLabelRestoreSuppressedRef.current = false
+      setLocationSearchQuery(label)
+      setLocationSearchResults([])
+      setLocationSearchStatus('selected')
+      setLocationSearchMessage('Position proposée. Vous pouvez ajuster sur la carte.')
+      locationAutocompleteSessionRef.current = null
+      persistManualMarkerSelection(marker, {
+        markerSelectionSource: 'manual',
+        mapCenter: marker,
+        mapZoom: 16,
+        markerLabel: label,
+        placeId: marker.placeId
+      })
+
+      trackPaymentEvent('location_search_selected', {
+        ...getDistrictAnalyticsProps(),
+        location_search_result_index: index + 1,
+        location_search_result_count: locationSearchResults.length
+      })
+      trackPaymentEvent('location_selected', {
+        ...getDistrictAnalyticsProps(),
+        location_method: 'manual_map',
+        location_selection_source: 'search_result'
+      })
+      })
+      .catch((error) => {
+        console.warn('地图搜索结果落点失败:', error)
+        setLocationSearchStatus('error')
+        setLocationSearchMessage('Impossible de placer ce résultat. Touchez la carte directement.')
+      })
+  }
+
+  useEffect(() => {
+    if (!isMapSearchVariant || currentStep !== 2) return undefined
+    if (locationSearchStatus === 'selected') return undefined
+
+    const query = locationSearchQuery.trim()
+    if (query.length === 0) {
+      setLocationSearchResults([])
+      setLocationSearchStatus('idle')
+      setLocationSearchMessage('')
+      return undefined
+    }
+
+    if (query.length < 2) {
+      setLocationSearchResults([])
+      setLocationSearchStatus('idle')
+      setLocationSearchMessage('')
+      return undefined
+    }
+
+    if (locationSearchDebounceRef.current) {
+      clearTimeout(locationSearchDebounceRef.current)
+    }
+
+    locationSearchDebounceRef.current = setTimeout(() => {
+      fetchLocationSearchPredictions(query, 'type')
+    }, 320)
+
+    return () => {
+      if (locationSearchDebounceRef.current) {
+        clearTimeout(locationSearchDebounceRef.current)
+        locationSearchDebounceRef.current = null
+      }
+    }
+  }, [locationSearchQuery, isMapSearchVariant, currentStep, selectedDistrict?.id])
+
+  useEffect(() => {
+    if (!isMapSearchVariant) return
+    if (locationSearchDebounceRef.current) {
+      clearTimeout(locationSearchDebounceRef.current)
+      locationSearchDebounceRef.current = null
+    }
+    locationSearchRequestRef.current += 1
+    const restoredSearchQuery = customMarker?.label || (
+      locationSearchStatus === 'selected' ? locationSearchQuery : ''
+    )
+    if (restoredSearchQuery) {
+      setLocationSearchQuery(restoredSearchQuery)
+      setLocationSearchResults([])
+      setLocationSearchStatus('selected')
+      setLocationSearchMessage(
+        markerSelectionSourceRef.current === 'manual_cached'
+          ? 'Position choisie la dernière fois. Vous pouvez la modifier.'
+          : 'Position choisie. Vous pouvez ajuster sur la carte.'
+      )
+      return
+    }
+    setLocationSearchQuery('')
+    setLocationSearchResults([])
+    setLocationSearchStatus('idle')
+    setLocationSearchMessage('')
+  }, [isMapSearchVariant, selectedDistrict?.id])
+
+  useEffect(() => {
+    if (currentStep !== 2 || !selectedDistrict) return
+    const cachedManualMarker = getCachedManualMarker(selectedDistrict)
+    if (
+      customMarker &&
+      (markerSelectionSourceRef.current === 'manual' || markerSelectionSourceRef.current === 'manual_cached')
+    ) {
+      const shouldRestoreCachedMarker = Boolean(cachedManualMarker?.label && !customMarker.label)
+      const restoredMarker = shouldRestoreCachedMarker
+        ? cachedManualMarker
+        : customMarker
+      const restoredLabel = restoredMarker.label || ''
+
+      if (shouldRestoreCachedMarker) {
+        setCustomMarker(restoredMarker)
+        setMapCenter(restoredMarker)
+      }
+
+      const shouldRestoreSearchLabel = (
+        restoredLabel &&
+        locationSearchQuery !== restoredLabel &&
+        !locationSearchLabelRestoreSuppressedRef.current
+      )
+
+      if (shouldRestoreSearchLabel) {
+        setLocationSearchQuery(restoredLabel)
+        setLocationSearchStatus('selected')
+        setLocationSearchMessage(
+          markerSelectionSourceRef.current === 'manual_cached'
+            ? 'Position choisie la dernière fois. Vous pouvez la modifier.'
+            : 'Position choisie. Vous pouvez ajuster sur la carte.'
+        )
+      }
+      if (shouldRestoreCachedMarker || shouldRestoreSearchLabel) {
+        saveCheckoutPaymentState(getPaymentNavigationState({
+          customMarker: restoredMarker,
+          mapCenter: shouldRestoreCachedMarker ? restoredMarker : mapCenter,
+          locationSearchQuery: restoredLabel || locationSearchQuery,
+          locationSearchStatus: restoredLabel ? 'selected' : locationSearchStatus
+        }))
+      }
+      return
+    }
+
+    if (!cachedManualMarker) return
+
+    setCustomMarker(cachedManualMarker)
+    setMarkerSelectionSource('manual_cached')
+    setMapCenter(cachedManualMarker)
+    setMapZoom(15)
+    if (cachedManualMarker.label) {
+      setLocationSearchQuery(cachedManualMarker.label)
+      setLocationSearchStatus('selected')
+      setLocationSearchMessage('Position choisie la dernière fois. Vous pouvez la modifier.')
+    }
+    saveCheckoutPaymentState(getPaymentNavigationState({
+      customMarker: cachedManualMarker,
+      markerSelectionSource: 'manual_cached',
+      mapCenter: cachedManualMarker,
+      mapZoom: 15,
+      locationSearchQuery: cachedManualMarker.label || locationSearchQuery,
+      locationSearchStatus: cachedManualMarker.label || locationSearchQuery ? 'selected' : 'idle'
+    }))
+  }, [currentStep, selectedDistrict, customMarker, markerSelectionSource, cachedLocationMemory, locationSearchQuery])
 
   // 确认标记，进入步骤3
   const handleConfirmMarker = () => {
@@ -1247,6 +1744,64 @@ const PaymentPage = () => {
             </div>
             
             <div className="map-container">
+              {isMapSearchVariant && (
+                <div className="location-search-overlay" aria-label="Recherche de position">
+                  <form className="location-search-form" onSubmit={handleLocationSearchSubmit}>
+                    <FiSearch className="location-search-icon" aria-hidden="true" />
+                    <input
+                      type="search"
+                      className="location-search-input"
+                      value={locationSearchQuery}
+                      onChange={handleLocationSearchInputChange}
+                      placeholder="Rechercher une adresse ou un repère"
+                      aria-label="Rechercher une adresse ou un repère"
+                      enterKeyHint="search"
+                    />
+                    {locationSearchQuery && (
+                      <button
+                        type="button"
+                        className="location-search-clear"
+                        onClick={handleLocationSearchClear}
+                        aria-label="Effacer la recherche"
+                      >
+                        <FiX aria-hidden="true" />
+                      </button>
+                    )}
+                    <button
+                      type="submit"
+                      className="location-search-submit"
+                      disabled={locationSearchStatus === 'searching'}
+                    >
+                      {locationSearchStatus === 'searching' ? '...' : 'OK'}
+                    </button>
+                  </form>
+                  {(locationSearchResults.length > 0 || (locationSearchMessage && locationSearchStatus !== 'selected')) && (
+                    <div className="location-search-results">
+                      {locationSearchResults.map((result, index) => (
+                        <button
+                          type="button"
+                          key={result.id}
+                          className="location-search-result"
+                          onClick={() => handleLocationSearchResultSelect(result, index)}
+                        >
+                          <span className="location-search-result-icon"><FiMapPin aria-hidden="true" /></span>
+                          <span className="location-search-result-text">
+                            <span className="location-search-result-primary">{result.primaryText}</span>
+                            {result.secondaryText && (
+                              <span className="location-search-result-secondary">{result.secondaryText}</span>
+                            )}
+                          </span>
+                        </button>
+                      ))}
+                      {locationSearchMessage && locationSearchStatus !== 'selected' && (
+                        <div className={`location-search-message ${locationSearchStatus}`}>
+                          {locationSearchMessage}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
               <Suspense fallback={<div className="map-lazy-loading">Chargement de la carte...</div>}>
                 <MapSelector
                   center={mapCenter}
@@ -1260,7 +1815,14 @@ const PaymentPage = () => {
             {selectedDistrict && (
               <div className="map-district-note">
                 <span className="badge-icon"><FiMapPin aria-hidden="true" /></span>
-                <span>{getDistrictDisplayName(selectedDistrict)} - {selectedDistrict.city_name}</span>
+                <span className="map-district-note-text">
+                  <span>{customMarker?.label || `${getDistrictDisplayName(selectedDistrict)} - ${selectedDistrict.city_name}`}</span>
+                  {customMarker?.label && (
+                    <span className="map-district-note-secondary">
+                      {getDistrictDisplayName(selectedDistrict)} - {selectedDistrict.city_name}
+                    </span>
+                  )}
+                </span>
               </div>
             )}
 
@@ -1473,13 +2035,6 @@ const PaymentPage = () => {
           </div>
         )}
       </div>
-
-      {/* 引导动画Modal */}
-      <MapGuideModal
-        visible={showGuideModal}
-        onClose={() => setShowGuideModal(false)}
-        autoCloseMs={MAP_GUIDE_AUTO_CLOSE_MS}
-      />
     </div>
   )
 }
