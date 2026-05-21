@@ -119,9 +119,6 @@
 }
 
 .bundle-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
   padding-bottom: 12px;
   border-bottom: 1px solid #f5f5f5;
 }
@@ -129,6 +126,29 @@
 .bundle-item:last-child {
   border-bottom: none;
   padding-bottom: 0;
+}
+
+.bundle-item-link {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.bundle-item-link:hover .bundle-item-name,
+.bundle-item-link:focus-visible .bundle-item-name {
+  color: #ff6b35;
+}
+
+.bundle-item-link:focus-visible {
+  outline: 2px solid rgba(255, 107, 53, 0.45);
+  outline-offset: 4px;
+  border-radius: 6px;
 }
 
 .bundle-item-image {

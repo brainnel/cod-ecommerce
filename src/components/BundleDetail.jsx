@@ -22,6 +22,7 @@ import {
   syncLocalPreviewBrowserContextFromSearch
 } from '../utils/checkoutBrowserContextPreview'
 import { preloadPaymentPage, schedulePaymentPagePreload } from '../utils/preloadRoutes'
+import Countdown from './Countdown'
 
 import 'swiper/css'
 import 'swiper/css/pagination'
@@ -30,6 +31,9 @@ import './BundleDetail.css'
 
 const BUNDLE_UNAVAILABLE_FR = "Ce pack n'est plus disponible. Veuillez consulter d'autres produits."
 const GENERIC_BUNDLE_FETCH_ERROR_FR = 'Échec de récupération des informations du pack'
+const MAX_PROMOTED_DETAIL_IMAGES = 4
+const BUNDLE_FAKE_DISCOUNT_MIN = 52
+const BUNDLE_FAKE_DISCOUNT_RANGE = 17
 
 const getBundleFetchErrorMessage = (err) => {
   if (err?.response?.status === 404) {
@@ -42,6 +46,35 @@ const formatFcfa = (value) => {
   const num = Number(value || 0)
   return num.toLocaleString('fr-FR')
 }
+
+const hashString = (value) => {
+  const text = String(value || '')
+  let hash = 0
+  for (let i = 0; i < text.length; i += 1) {
+    hash = ((hash << 5) - hash + text.charCodeAt(i)) | 0
+  }
+  return Math.abs(hash)
+}
+
+const getBundleDisplayDiscount = (bundleId) => (
+  BUNDLE_FAKE_DISCOUNT_MIN + (hashString(bundleId) % BUNDLE_FAKE_DISCOUNT_RANGE)
+)
+
+const getBundleDisplayOriginalPrice = (price, discountPercent) => {
+  const bundlePrice = Number(price || 0)
+  const discountRate = Number(discountPercent || 0) / 100
+  if (!bundlePrice || discountRate <= 0 || discountRate >= 1) return null
+  return Math.round(bundlePrice / (1 - discountRate))
+}
+
+const getBundleItemDisplayName = (item) => (
+  item?.product_name_fr
+  || item?.product_name_cn
+  || item?.title_fr
+  || item?.name_fr
+  || item?.name_cn
+  || `Produit ${item?.product_id || ''}`.trim()
+)
 
 const BundleDetail = ({ bundleId, initialBundle = null }) => {
   const navigate = useNavigate()
@@ -280,7 +313,13 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
   const totalPrice = (bundle.cfa_price || 0) * quantity
   const detailImages = Array.isArray(bundle.detail_images) ? bundle.detail_images : []
   const items = Array.isArray(bundle.items) ? bundle.items : []
-  const galleryImages = bundle.cover_image_url ? [bundle.cover_image_url] : []
+  const coverImages = bundle.cover_image_url ? [bundle.cover_image_url] : []
+  const promotedDetailImages = coverImages.length <= 1
+    ? detailImages.slice(0, MAX_PROMOTED_DETAIL_IMAGES)
+    : []
+  const galleryImages = [...coverImages, ...promotedDetailImages]
+  const displayDiscount = getBundleDisplayDiscount(bundle.id)
+  const displayOriginalPrice = getBundleDisplayOriginalPrice(bundle.cfa_price, displayDiscount)
   const bundleGalleryAutoplay = galleryImages.length > 1
     ? {
         delay: 3500,
@@ -288,6 +327,34 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
         pauseOnMouseEnter: true
       }
     : false
+  const renderBundleItem = (item, index) => {
+    const itemDisplayName = getBundleItemDisplayName(item)
+    return (
+      <li key={`bundle-item-${item.product_id}-${index}`} className="bundle-item">
+        <button
+          type="button"
+          className="bundle-item-link"
+          onClick={() => navigate(`/product/${item.product_id}${getLocalPreviewBrowserContextParam('', '?')}`)}
+          aria-label={`Voir ${itemDisplayName}`}
+        >
+          {item.cover_image_url ? (
+            <img
+              className="bundle-item-image"
+              src={item.cover_image_url}
+              alt={itemDisplayName}
+              loading="lazy"
+            />
+          ) : (
+            <div className="bundle-item-image bundle-item-image-placeholder" />
+          )}
+          <div className="bundle-item-meta">
+            <div className="bundle-item-name">{itemDisplayName}</div>
+            <div className="bundle-item-qty">×{item.quantity || 1}</div>
+          </div>
+        </button>
+      </li>
+    )
+  }
 
   return (
     <div className="product-detail bundle-detail">
@@ -334,6 +401,11 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
                       fetchPriority={index === 0 ? 'high' : 'auto'}
                       decoding="async"
                     />
+                    {index === 0 && displayDiscount > 0 && (
+                      <div className="discount-badge">
+                        -{displayDiscount}%
+                      </div>
+                    )}
                   </div>
                 </SwiperSlide>
               ))}
@@ -351,6 +423,10 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
 
             <div className="price-section">
               <div className="current-price">{formatFcfa(bundle.cfa_price)} FCFA</div>
+              {displayOriginalPrice && displayOriginalPrice > Number(bundle.cfa_price || 0) && (
+                <div className="original-price">{formatFcfa(displayOriginalPrice)} FCFA</div>
+              )}
+              <Countdown />
             </div>
 
             {isCheckoutOptimizationVariant && (
@@ -401,24 +477,7 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
             <div className="bundle-items-section">
               <h3 className="bundle-items-title">Produits inclus</h3>
               <ul className="bundle-items-list">
-                {items.map((item, index) => (
-                  <li key={`bundle-item-${item.product_id}-${index}`} className="bundle-item">
-                    {item.cover_image_url ? (
-                      <img
-                        className="bundle-item-image"
-                        src={item.cover_image_url}
-                        alt={item.product_name_fr || ''}
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div className="bundle-item-image bundle-item-image-placeholder" />
-                    )}
-                    <div className="bundle-item-meta">
-                      <div className="bundle-item-name">{item.product_name_fr || item.internal_no}</div>
-                      <div className="bundle-item-qty">×{item.quantity || 1}</div>
-                    </div>
-                  </li>
-                ))}
+                {items.map(renderBundleItem)}
               </ul>
             </div>
           )}
