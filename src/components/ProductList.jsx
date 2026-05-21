@@ -41,14 +41,6 @@ const ProductList = ({ categoryId }) => {
       }
 
       const data = await productAPI.getProductList(params)
-      
-      // 调试日志
-      console.log('=== 产品列表数据 ===')
-      console.log('页码:', pageNum)
-      console.log('分类ID:', categoryId)
-      console.log('返回数据:', data)
-      console.log('产品数量:', data?.items?.length || data?.results?.length || data?.length || 0)
-      console.log('==================')
 
       // 处理不同的数据结构
       const productList = data?.items || data?.results || data || []

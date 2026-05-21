@@ -33,11 +33,13 @@ import {
   loadCheckoutLocationMemory,
   saveCheckoutLocationMemory
 } from '../utils/checkoutLocationCache'
+import {
+  clearCheckoutPaymentState,
+  loadCheckoutPaymentState,
+  saveCheckoutPaymentState
+} from '../utils/checkoutPaymentStateCache'
 import './PaymentPage.css'
 
-const GEOLOCATION_CACHE_MAX_AGE_MS = 5 * 60 * 1000
-const GEOLOCATION_MANUAL_HINT_MS = 4000
-const GEOLOCATION_FAST_TIMEOUT_MS = 6000
 const MAP_GUIDE_SEEN_STORAGE_KEY = 'cod_checkout_map_guide_seen_v1'
 const MAP_GUIDE_SHOW_DELAY_MS = 500
 const MAP_GUIDE_AUTO_CLOSE_MS = 2200
@@ -203,6 +205,11 @@ const getBrowserContext = () => {
 const PaymentPage = () => {
   const location = useLocation()
   const navigate = useNavigate()
+  const paymentRouteState = useMemo(() => {
+    const routeState = location.state || {}
+    if (routeState.product || routeState.bundle) return routeState
+    return loadCheckoutPaymentState() || {}
+  }, [location.state])
   const {
     product: productFromState,
     bundle: bundleFromState,
@@ -211,7 +218,7 @@ const PaymentPage = () => {
     checkoutSessionId: routeCheckoutSessionId,
     checkoutQuantityExperiment: routeCheckoutQuantityExperiment,
     quantityConfirmed: routeQuantityConfirmed
-  } = location.state || {}
+  } = paymentRouteState
 
   // Detect flow: 'bundle' or 'product' (default).
   const productType = productTypeFromState || (bundleFromState ? 'bundle' : 'product')
@@ -245,15 +252,12 @@ const PaymentPage = () => {
   const infoStepTrackedRef = useRef(false)
   const completedFieldsRef = useRef(new Set())
   const fieldRefs = useRef({})
-  const currentLocationRequestRef = useRef(0)
-  const currentLocationTrackedRequestRef = useRef(null)
-  const currentLocationHintTimerRef = useRef(null)
-  const markerSelectionSourceRef = useRef('none')
+  const initialMarkerSelectionSource = paymentRouteState.markerSelectionSource || 'none'
+  const markerSelectionSourceRef = useRef(initialMarkerSelectionSource)
   const cachedFieldCompletionTrackedRef = useRef(false)
   const browserContext = useMemo(() => getBrowserContext(), [])
   const cachedCustomerInfo = useMemo(() => loadCheckoutCustomerInfo(), [])
   const [cachedLocationMemory, setCachedLocationMemory] = useState(() => loadCheckoutLocationMemory())
-  const useMapOnlyLocationFlow = true
   const isInlineQuantityVariant = isInlineCheckoutVariant(checkoutQuantityExperiment)
   const isCodTrustVariant = isCodTrustCheckoutVariant(checkoutQuantityExperiment)
   const isAddressFirstVariant = isAddressFirstCheckoutVariant(checkoutQuantityExperiment)
@@ -265,16 +269,13 @@ const PaymentPage = () => {
 
   // 步顢1：大区选择
   const [districts, setDistricts] = useState([])
-  const [selectedDistrict, setSelectedDistrict] = useState(null)
+  const [selectedDistrict, setSelectedDistrict] = useState(() => paymentRouteState.selectedDistrict || null)
 
   // 步顢2：地图标记
-  const [mapCenter, setMapCenter] = useState(DEFAULT_CENTER)
-  const [mapZoom, setMapZoom] = useState(DEFAULT_ZOOM)
-  const [customMarker, setCustomMarker] = useState(null)
-  const [userLocation, setUserLocation] = useState(null)  // 用户当前位置
-  const [markerSelectionSource, setMarkerSelectionSourceState] = useState('none')
-  const [locationRequestStatus, setLocationRequestStatus] = useState('idle')
-  const [locationRequestMessage, setLocationRequestMessage] = useState('')
+  const [mapCenter, setMapCenter] = useState(() => paymentRouteState.mapCenter || paymentRouteState.customMarker || DEFAULT_CENTER)
+  const [mapZoom, setMapZoom] = useState(() => paymentRouteState.mapZoom || (paymentRouteState.customMarker ? 15 : DEFAULT_ZOOM))
+  const [customMarker, setCustomMarker] = useState(() => paymentRouteState.customMarker || null)
+  const [markerSelectionSource, setMarkerSelectionSourceState] = useState(initialMarkerSelectionSource)
   const [showGuideModal, setShowGuideModal] = useState(false)
 
   // 步骤3：用户信息
@@ -300,7 +301,6 @@ const PaymentPage = () => {
   const getLocationMethodForMarkerSource = (source) => {
     if (source === 'manual') return 'manual_map'
     if (source === 'manual_cached') return 'manual_map_cached'
-    if (source === 'current') return 'current_location'
     if (source === 'district_center_fallback') return 'district_center_fallback'
     if (source === 'district_center_auto_skip') return 'district_center_auto_skip'
     return source || null
@@ -409,7 +409,7 @@ const PaymentPage = () => {
       }),
       browser_context: browserContext.browser_context,
       is_meta_in_app_browser: browserContext.is_meta_in_app_browser,
-      location_entry_mode: useMapOnlyLocationFlow ? 'map_only' : 'browser_location_optional',
+      location_entry_mode: 'map_only',
       ...getDistrictAnalyticsProps(),
       ...extra
     }
@@ -453,15 +453,21 @@ const PaymentPage = () => {
     })
   }
 
-  const getPaymentNavigationState = () => ({
-    ...(location.state || {}),
+  const getPaymentNavigationState = (overrides = {}) => ({
+    ...paymentRouteState,
     product: productFromState,
     bundle: bundleFromState,
     quantity,
     productType: productTypeFromState,
     checkoutSessionId: checkoutSessionIdRef.current || routeCheckoutSessionId || getCheckoutSessionId(),
     checkoutQuantityExperiment,
-    quantityConfirmed: inlineQuantityConfirmedRef.current
+    quantityConfirmed: inlineQuantityConfirmedRef.current,
+    selectedDistrict,
+    customMarker,
+    markerSelectionSource,
+    mapCenter,
+    mapZoom,
+    ...overrides
   })
 
   const navigateToCheckoutStep = (step, options = {}) => {
@@ -479,10 +485,30 @@ const PaymentPage = () => {
       },
       {
         replace: Boolean(options.replace),
-        state: getPaymentNavigationState()
+        state: getPaymentNavigationState(options.stateOverrides)
       }
     )
   }
+
+  useEffect(() => {
+    if (!product || !quantity) return
+    saveCheckoutPaymentState(getPaymentNavigationState())
+  }, [
+    paymentRouteState,
+    product,
+    productFromState,
+    bundleFromState,
+    quantity,
+    productTypeFromState,
+    routeCheckoutSessionId,
+    routeQuantityConfirmed,
+    checkoutQuantityExperiment,
+    selectedDistrict,
+    customMarker,
+    markerSelectionSource,
+    mapCenter,
+    mapZoom
+  ])
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
@@ -491,12 +517,6 @@ const PaymentPage = () => {
   useEffect(() => {
     syncLocalPreviewBrowserContextFromSearch(location.search)
   }, [location.search])
-
-  useEffect(() => () => {
-    if (currentLocationHintTimerRef.current) {
-      clearTimeout(currentLocationHintTimerRef.current)
-    }
-  }, [])
 
   // 重定向检查
   useEffect(() => {
@@ -587,158 +607,6 @@ const PaymentPage = () => {
     fetchDistricts()
   }, [])
 
-  const requestBrowserLocation = (options) => (
-    new Promise((resolve, reject) => {
-      if (!navigator.geolocation) {
-        reject({ code: 2, message: 'Geolocation is not supported' })
-        return
-      }
-
-      navigator.geolocation.getCurrentPosition(resolve, reject, options)
-    })
-  )
-
-  const positionToMarker = (position) => ({
-    lat: position.coords.latitude,
-    lng: position.coords.longitude,
-    accuracy: typeof position.coords.accuracy === 'number' ? position.coords.accuracy : null
-  })
-
-  const getMonotonicNow = () => {
-    if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
-      return performance.now()
-    }
-    return Date.now()
-  }
-
-  const getLocationDurationMs = (startedAtMs) => {
-    if (!startedAtMs) return 0
-    return Math.max(0, Math.round(getMonotonicNow() - startedAtMs))
-  }
-
-  const clearCurrentLocationHintTimer = () => {
-    if (!currentLocationHintTimerRef.current) return
-    clearTimeout(currentLocationHintTimerRef.current)
-    currentLocationHintTimerRef.current = null
-  }
-
-  const buildPositionAnalyticsProps = (position, startedAtMs, stage) => ({
-    geolocation_stage: stage,
-    geolocation_duration_ms: getLocationDurationMs(startedAtMs),
-    geolocation_accuracy_m: typeof position?.coords?.accuracy === 'number'
-      ? Math.round(position.coords.accuracy)
-      : null,
-    geolocation_timeout_ms: stage === 'cached' ? 0 : GEOLOCATION_FAST_TIMEOUT_MS,
-    geolocation_enable_high_accuracy: false,
-    geolocation_position_age_ms: typeof position?.timestamp === 'number'
-      ? Math.max(0, Date.now() - position.timestamp)
-      : null
-  })
-
-  const buildLocationErrorAnalyticsProps = (error, startedAtMs, stage) => ({
-    error_code: error?.code || 2,
-    error_message: error?.message ? String(error.message).slice(0, 160) : '',
-    geolocation_stage: stage,
-    geolocation_duration_ms: getLocationDurationMs(startedAtMs),
-    geolocation_timeout_ms: GEOLOCATION_FAST_TIMEOUT_MS,
-    geolocation_enable_high_accuracy: false
-  })
-
-  const applyCurrentLocation = (position, requestId, stage, startedAtMs) => {
-    if (requestId !== currentLocationRequestRef.current) return false
-    clearCurrentLocationHintTimer()
-
-    const userPos = positionToMarker(position)
-    setUserLocation(userPos)
-
-    if (markerSelectionSourceRef.current === 'manual') {
-      console.log('用户已手动选择位置，跳过自动覆盖:', userPos)
-      return false
-    }
-
-    setMarkerSelectionSource('current')
-    setCustomMarker(userPos)
-    setMapCenter(userPos)
-    setLocationRequestStatus('success')
-    setLocationRequestMessage('Position trouvée. Vous pouvez ajuster sur la carte si nécessaire.')
-
-    if (currentLocationTrackedRequestRef.current !== requestId) {
-      currentLocationTrackedRequestRef.current = requestId
-      trackPaymentEvent('location_selected', {
-        ...getDistrictAnalyticsProps(),
-        location_method: 'current_location',
-        ...buildPositionAnalyticsProps(position, startedAtMs, stage)
-      })
-    }
-
-    console.log('用户位置:', userPos)
-    return true
-  }
-
-  const trackCurrentLocationFailure = (error, requestId, stage, startedAtMs) => {
-    if (requestId !== currentLocationRequestRef.current) return
-    if (currentLocationTrackedRequestRef.current === requestId) return
-
-    trackPaymentEvent('location_current_failed', {
-      ...getDistrictAnalyticsProps(),
-      ...buildLocationErrorAnalyticsProps(error, startedAtMs, stage)
-    })
-  }
-
-  const handleUseCurrentLocation = () => {
-    const requestId = currentLocationRequestRef.current + 1
-    currentLocationRequestRef.current = requestId
-    currentLocationTrackedRequestRef.current = null
-    setMarkerSelectionSource('current_pending')
-    clearCurrentLocationHintTimer()
-    setLocationRequestStatus('locating')
-    setLocationRequestMessage('Recherche de votre position...')
-    trackPaymentEvent('location_current_attempt', getDistrictAnalyticsProps())
-
-    const startedAtMs = getMonotonicNow()
-
-    if (userLocation) {
-      applyCurrentLocation({
-        coords: {
-          latitude: userLocation.lat,
-          longitude: userLocation.lng,
-          accuracy: userLocation.accuracy ?? null
-        }
-      }, requestId, 'cached', startedAtMs)
-      return
-    }
-
-    currentLocationHintTimerRef.current = setTimeout(() => {
-      if (
-        requestId === currentLocationRequestRef.current &&
-        currentLocationTrackedRequestRef.current !== requestId &&
-        markerSelectionSourceRef.current !== 'manual'
-      ) {
-        setLocationRequestStatus('slow')
-        setLocationRequestMessage('La localisation prend plus de temps. Vous pouvez sélectionner votre position sur la carte.')
-      }
-    }, GEOLOCATION_MANUAL_HINT_MS)
-
-    requestBrowserLocation({
-      enableHighAccuracy: false,
-      timeout: GEOLOCATION_FAST_TIMEOUT_MS,
-      maximumAge: GEOLOCATION_CACHE_MAX_AGE_MS
-    })
-      .then((position) => {
-        applyCurrentLocation(position, requestId, 'fast', startedAtMs)
-      })
-      .catch((error) => {
-        console.log('快速定位失败:', error.message)
-        if (requestId !== currentLocationRequestRef.current) return
-        clearCurrentLocationHintTimer()
-        trackCurrentLocationFailure(error, requestId, 'fast', startedAtMs)
-        if (markerSelectionSourceRef.current !== 'manual') {
-          setLocationRequestStatus('failed')
-          setLocationRequestMessage('Impossible d’obtenir votre position. Veuillez sélectionner votre position sur la carte.')
-        }
-      })
-  }
-
   // 选择大区
   const handleSelectDistrict = (district) => {
     const districtMemoryEntry = buildDistrictMemoryEntry(district)
@@ -763,12 +631,8 @@ const PaymentPage = () => {
     }
     setMapCenter(districtCenter)
     setMapZoom(14)  // 大区级别，用更高的缩放
-    clearCurrentLocationHintTimer()
-    setLocationRequestStatus('idle')
-    setLocationRequestMessage('')
 
     if (isAddressFirstVariant) {
-      currentLocationRequestRef.current += 1
       setCustomMarker(districtCenter)
       setMarkerSelectionSource('district_center_auto_skip')
       const autoSkipProps = {
@@ -779,7 +643,15 @@ const PaymentPage = () => {
       }
       trackPaymentEvent('location_selected', autoSkipProps)
       trackPaymentEvent('location_confirmed', autoSkipProps)
-      navigateToCheckoutStep(3)
+      navigateToCheckoutStep(3, {
+        stateOverrides: {
+          selectedDistrict: district,
+          customMarker: districtCenter,
+          markerSelectionSource: 'district_center_auto_skip',
+          mapCenter: districtCenter,
+          mapZoom: 14
+        }
+      })
       return
     }
 
@@ -798,7 +670,15 @@ const PaymentPage = () => {
       setCustomMarker(null)
       setMarkerSelectionSource('none')
     }
-    navigateToCheckoutStep(2)
+    navigateToCheckoutStep(2, {
+      stateOverrides: {
+        selectedDistrict: district,
+        customMarker: cachedManualMarker || null,
+        markerSelectionSource: cachedManualMarker ? 'manual_cached' : 'none',
+        mapCenter: cachedManualMarker || districtCenter,
+        mapZoom: cachedManualMarker ? 15 : 14
+      }
+    })
 
     if (!hasSeenMapGuide()) {
       markMapGuideSeen()
@@ -809,9 +689,6 @@ const PaymentPage = () => {
   // 地图标记
   const handleMapClick = (marker) => {
     setMarkerSelectionSource('manual')
-    clearCurrentLocationHintTimer()
-    setLocationRequestStatus('idle')
-    setLocationRequestMessage('')
     setCustomMarker(marker)
     const districtMemoryEntry = buildDistrictMemoryEntry(selectedDistrict)
     if (districtMemoryEntry) {
@@ -841,21 +718,24 @@ const PaymentPage = () => {
       location_method: getLocationMethodForMarkerSource(markerSelectionSourceRef.current),
       location_cache_used: markerSelectionSourceRef.current === 'manual_cached'
     })
-    navigateToCheckoutStep(3)
+    navigateToCheckoutStep(3, {
+      stateOverrides: {
+        customMarker,
+        markerSelectionSource,
+        mapCenter,
+        mapZoom
+      }
+    })
   }
 
   const handleUseDistrictCenterFallback = () => {
     if (!selectedDistrict) return
 
     const hadManualMapSelection = markerSelectionSourceRef.current === 'manual' || Boolean(customMarker)
-    currentLocationRequestRef.current += 1
-    clearCurrentLocationHintTimer()
     const fallbackMarker = getDistrictCenterMarker(selectedDistrict)
     setMarkerSelectionSource('district_center_fallback')
     setCustomMarker(fallbackMarker)
     setMapCenter(fallbackMarker)
-    setLocationRequestStatus('idle')
-    setLocationRequestMessage('')
 
     const fallbackProps = {
       ...getDistrictAnalyticsProps(selectedDistrict),
@@ -866,7 +746,14 @@ const PaymentPage = () => {
     trackPaymentEvent('location_fallback_used', fallbackProps)
     trackPaymentEvent('location_selected', fallbackProps)
     trackPaymentEvent('location_confirmed', fallbackProps)
-    navigateToCheckoutStep(3)
+    navigateToCheckoutStep(3, {
+      stateOverrides: {
+        customMarker: fallbackMarker,
+        markerSelectionSource: 'district_center_fallback',
+        mapCenter: fallbackMarker,
+        mapZoom
+      }
+    })
   }
 
   const handleChoosePreciseMapLocation = () => {
@@ -874,18 +761,19 @@ const PaymentPage = () => {
 
     const previousLocationMethod = markerSelectionSourceRef.current
     const shouldKeepExistingMarker = (
-      (previousLocationMethod === 'manual' || previousLocationMethod === 'current') &&
+      previousLocationMethod === 'manual' &&
       Boolean(customMarker)
     )
-
-    currentLocationRequestRef.current += 1
-    clearCurrentLocationHintTimer()
-    setLocationRequestStatus('idle')
-    setLocationRequestMessage('')
+    let nextMarker = customMarker
+    let nextMarkerSource = markerSelectionSource
+    let nextMapCenter = mapCenter
+    let nextMapZoom = mapZoom
 
     if (shouldKeepExistingMarker) {
       setMapCenter(customMarker)
       setMapZoom(15)
+      nextMapCenter = customMarker
+      nextMapZoom = 15
     } else {
       const cachedManualMarker = getCachedManualMarker(selectedDistrict)
       if (cachedManualMarker) {
@@ -893,6 +781,10 @@ const PaymentPage = () => {
         setMarkerSelectionSource('manual_cached')
         setMapCenter(cachedManualMarker)
         setMapZoom(15)
+        nextMarker = cachedManualMarker
+        nextMarkerSource = 'manual_cached'
+        nextMapCenter = cachedManualMarker
+        nextMapZoom = 15
         trackPaymentEvent('location_selected', {
           ...getDistrictAnalyticsProps(selectedDistrict),
           location_method: 'manual_map_cached',
@@ -900,10 +792,15 @@ const PaymentPage = () => {
           location_auto_skip_map_requested: true
         })
       } else {
+        const districtCenter = getDistrictCenterMarker(selectedDistrict)
         setCustomMarker(null)
         setMarkerSelectionSource('none')
-        setMapCenter(getDistrictCenterMarker(selectedDistrict))
+        setMapCenter(districtCenter)
         setMapZoom(14)
+        nextMarker = null
+        nextMarkerSource = 'none'
+        nextMapCenter = districtCenter
+        nextMapZoom = 14
       }
     }
 
@@ -912,7 +809,14 @@ const PaymentPage = () => {
       previous_location_method: previousLocationMethod || null,
       kept_existing_marker: shouldKeepExistingMarker
     })
-    navigateToCheckoutStep(2)
+    navigateToCheckoutStep(2, {
+      stateOverrides: {
+        customMarker: nextMarker,
+        markerSelectionSource: nextMarkerSource,
+        mapCenter: nextMapCenter,
+        mapZoom: nextMapZoom
+      }
+    })
   }
 
   // 表单输入处理
@@ -1131,7 +1035,6 @@ const PaymentPage = () => {
           quantity,
           ad_id: adId
         }
-        console.log('提交组合产品订单:', bundleOrderData)
         response = await bundleAPI.createBundleOrder(bundle.id, bundleOrderData)
       } else {
         const orderData = {
@@ -1158,10 +1061,8 @@ const PaymentPage = () => {
           ad_id: adId
         }
 
-        console.log('提交订单:', orderData)
         response = await orderAPI.createOrder(orderData)
       }
-      console.log('订单响应:', response)
 
       // 发送Facebook购买事件
       if (response?.data && response.status >= 200 && response.status < 300) {
@@ -1186,6 +1087,7 @@ const PaymentPage = () => {
       }
 
       // 跳转到订单成功页面
+      clearCheckoutPaymentState()
       navigate('/order-success', {
         state: {
           product,
@@ -1336,44 +1238,13 @@ const PaymentPage = () => {
         {currentStep === 2 && (
           <div className={`section map-section ${isInlineQuantityVariant ? 'with-location-fallback' : ''} ${customMarker ? 'has-selected-marker' : ''}`}>
             {/* 橙色提示条 */}
-            <div className={`location-hint ${useMapOnlyLocationFlow ? 'map-only' : ''}`}>
+            <div className="location-hint map-only">
               <div className="hint-content">
                 <span className="hint-text">
-                  {useMapOnlyLocationFlow
-                    ? 'Veuillez choisir votre adresse de livraison sur la carte.'
-                    : 'Si vous êtes à l’adresse de livraison, appuyez sur « Utiliser ma position ». Sinon, choisissez l’adresse sur la carte.'}
+                  Veuillez choisir votre adresse de livraison sur la carte.
                 </span>
               </div>
-              {!useMapOnlyLocationFlow && (
-                <button
-                  className={`use-location-btn ${locationRequestStatus === 'locating' || locationRequestStatus === 'slow' ? 'loading' : ''}`}
-                  onClick={handleUseCurrentLocation}
-                  disabled={locationRequestStatus === 'locating' || locationRequestStatus === 'slow'}
-                  type="button"
-                  title="Utiliser ma position actuelle"
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <circle cx="12" cy="12" r="10"/>
-                    <circle cx="12" cy="12" r="3"/>
-                    <line x1="12" y1="2" x2="12" y2="4"/>
-                    <line x1="12" y1="20" x2="12" y2="22"/>
-                    <line x1="2" y1="12" x2="4" y2="12"/>
-                    <line x1="20" y1="12" x2="22" y2="12"/>
-                  </svg>
-                  <span>
-                    {locationRequestStatus === 'locating' || locationRequestStatus === 'slow'
-                      ? 'Recherche...'
-                      : 'Utiliser ma position'}
-                  </span>
-                </button>
-              )}
             </div>
-
-            {locationRequestMessage && (
-              <div className={`location-status ${locationRequestStatus}`}>
-                {locationRequestMessage}
-              </div>
-            )}
             
             <div className="map-container">
               <Suspense fallback={<div className="map-lazy-loading">Chargement de la carte...</div>}>
@@ -1382,7 +1253,6 @@ const PaymentPage = () => {
                   zoom={mapZoom}
                   onMarkerSet={handleMapClick}
                   customMarker={customMarker}
-                  userLocation={userLocation}
                 />
               </Suspense>
             </div>

@@ -321,7 +321,6 @@ export default function UpdateAddress() {
                 new_longitude: selectedLng
               })
             });
-            console.log('骑手通知已发送');
           } catch (notifyError) {
             // 静默处理通知失败,不影响主流程
             console.warn('通知骑手失败:', notifyError);

@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { GoogleMap, Marker } from '@react-google-maps/api'
 import { useGoogleMaps } from '../hooks/useGoogleMaps'
 
-const MapSelector = ({ center, zoom = 13, onMarkerSet, customMarker, userLocation }) => {
+const MapSelector = ({ center, zoom = 13, onMarkerSet, customMarker }) => {
   const { isLoaded, loadError } = useGoogleMaps()
   const [map, setMap] = useState(null)
   const [currentZoom, setCurrentZoom] = useState(zoom)
@@ -35,8 +35,6 @@ const MapSelector = ({ center, zoom = 13, onMarkerSet, customMarker, userLocatio
   const handleMapClick = useCallback((event) => {
     const lat = event.latLng.lat()
     const lng = event.latLng.lng()
-    
-    console.log('地图点击:', { lat, lng })
     
     if (onMarkerSet) {
       onMarkerSet({ lat, lng })
@@ -78,22 +76,6 @@ const MapSelector = ({ center, zoom = 13, onMarkerSet, customMarker, userLocatio
       onClick={handleMapClick}
       options={defaultOptions}
     >
-      {/* 用户当前位置标记（蓝色圆点） */}
-      {userLocation && (
-        <Marker
-          position={{ lat: userLocation.lat, lng: userLocation.lng }}
-          icon={{
-            path: window.google.maps.SymbolPath.CIRCLE,
-            scale: 8,
-            fillColor: '#4285F4',
-            fillOpacity: 1,
-            strokeColor: '#ffffff',
-            strokeWeight: 2
-          }}
-          title="Votre position actuelle"
-        />
-      )}
-      
       {/* 用户选择的位置标记（红色图钉） */}
       {customMarker && (
         <Marker

@@ -21,11 +21,6 @@ const CategoryTabs = ({ onCategoryChange, selectedCategoryId }) => {
           ...data
         ]
         setCategories(allCategories)
-        
-        // 调试日志
-        console.log('=== 分类数据 ===')
-        console.log('分类列表:', allCategories)
-        console.log('===============')
       } catch (err) {
         setError('Échec de récupération des catégories')
         console.error('Error fetching categories:', err)

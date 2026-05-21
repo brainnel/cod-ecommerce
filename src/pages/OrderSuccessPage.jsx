@@ -68,21 +68,8 @@ const OrderSuccessPage = () => {
   useEffect(() => {
     if (!product || !quantity || !userInfo || !selectedLocation) {
       navigate('/')
-      return
     }
-    
-    // 打印后端返回的订单数据
-    if (orderResponse) {
-      console.log('=== 订单成功页面 - 后端返回数据 ===')
-      console.log('完整订单响应:', orderResponse)
-      console.log('订单号:', orderResponse.order_no)
-      console.log('订单ID:', orderResponse.order_id)
-      console.log('取件码:', orderResponse.verification_code)
-      console.log('用户ID:', orderResponse.user_id)
-      console.log('格式化订单数据:', JSON.stringify(orderResponse, null, 2))
-      console.log('=====================================')
-    }
-  }, [product, quantity, userInfo, selectedLocation, navigate, orderResponse])
+  }, [product, quantity, userInfo, selectedLocation, navigate])
 
   const formatPrice = (price) => {
     return price.toString()

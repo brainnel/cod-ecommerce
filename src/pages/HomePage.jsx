@@ -28,11 +28,6 @@ const HomePage = () => {
     } else {
       setSearchParams({})
     }
-    
-    // 调试日志
-    console.log('=== 分类切换 ===')
-    console.log('选择的分类ID:', categoryId)
-    console.log('===============')
   }
 
   return (

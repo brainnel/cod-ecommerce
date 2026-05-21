@@ -21,6 +21,7 @@ import {
   getLocalPreviewBrowserContextParam,
   syncLocalPreviewBrowserContextFromSearch
 } from '../utils/checkoutBrowserContextPreview'
+import { saveCheckoutPaymentState } from '../utils/checkoutPaymentStateCache'
 import { preloadPaymentPage, schedulePaymentPagePreload } from '../utils/preloadRoutes'
 import Countdown from './Countdown'
 
@@ -168,7 +169,8 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
         landingSessionId,
         startedAt,
         maxScrollPercent: 0,
-        sent: false
+        passiveSent: false,
+        checkoutClickSent: false
       }
 
       const updateMaxScrollPercent = () => {
@@ -186,9 +188,16 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
 
       const sendLandingEngagement = (reason) => {
         const state = landingEngagementRef.current
-        if (!state?.landingSessionId || state.sent) return
+        if (!state?.landingSessionId) return
+        const isCheckoutClick = reason === 'checkout_click'
+        if (isCheckoutClick && state.checkoutClickSent) return
+        if (!isCheckoutClick && (state.passiveSent || state.checkoutClickSent)) return
         updateMaxScrollPercent()
-        state.sent = true
+        if (isCheckoutClick) {
+          state.checkoutClickSent = true
+        } else {
+          state.passiveSent = true
+        }
         const now = typeof performance !== 'undefined' ? performance.now() : Date.now()
         trackProductLandingEngagement(bundleProduct, {
           ad_id: adId,
@@ -298,15 +307,17 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
       }
     }
 
+    const paymentState = {
+      bundle,
+      quantity,
+      productType: 'bundle',
+      checkoutSessionId,
+      checkoutQuantityExperiment,
+      quantityConfirmed: true
+    }
+    saveCheckoutPaymentState(paymentState)
     navigate(`/payment?step=1${getLocalPreviewBrowserContextParam()}`, {
-      state: {
-        bundle,
-        quantity,
-        productType: 'bundle',
-        checkoutSessionId,
-        checkoutQuantityExperiment,
-        quantityConfirmed: true
-      }
+      state: paymentState
     })
   }
 
@@ -317,7 +328,10 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
   const promotedDetailImages = coverImages.length <= 1
     ? detailImages.slice(0, MAX_PROMOTED_DETAIL_IMAGES)
     : []
-  const galleryImages = [...coverImages, ...promotedDetailImages]
+  const galleryImages = [
+    ...coverImages.map((src) => ({ src, type: 'main' })),
+    ...promotedDetailImages.map((src) => ({ src, type: 'detail-preview' }))
+  ]
   const displayDiscount = getBundleDisplayDiscount(bundle.id)
   const displayOriginalPrice = getBundleDisplayOriginalPrice(bundle.cfa_price, displayDiscount)
   const bundleGalleryAutoplay = galleryImages.length > 1
@@ -393,9 +407,9 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
             >
               {galleryImages.map((image, index) => (
                 <SwiperSlide key={`bundle-${bundle.id}-cover-${index}`}>
-                  <div className="image-container">
+                  <div className={`image-container ${image.type === 'detail-preview' ? 'detail-preview-image' : ''}`}>
                     <img
-                      src={image}
+                      src={image.src}
                       alt={bundle.title_fr || `Pack ${bundle.id}`}
                       loading={index === 0 ? 'eager' : 'lazy'}
                       fetchPriority={index === 0 ? 'high' : 'auto'}
