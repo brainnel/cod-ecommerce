@@ -869,6 +869,17 @@
   /* 继承通用 section 样式 */
 }
 
+.optional-map-section .location-hint {
+  background: #fff7f2;
+  border: 1px solid #ffd6c2;
+  box-shadow: none;
+}
+
+.optional-map-section .hint-text {
+  color: #d9480f;
+  font-weight: 800;
+}
+
 .guide-bar {
   display: flex;
   align-items: center;
@@ -1649,6 +1660,11 @@
     padding-bottom: 132px;
   }
 
+  .optional-map-section,
+  .optional-map-section.has-selected-marker {
+    padding-bottom: 90px;
+  }
+
   .info-section {
     padding-bottom: 112px;
   }
@@ -1665,9 +1681,29 @@
     margin-bottom: 0;
   }
 
+  .optional-map-section .location-hint {
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    border-radius: 12px;
+  }
+
+  .optional-map-section .hint-text {
+    color: #c2410c;
+    font-size: 12.5px;
+    line-height: 1.3;
+  }
+
+  .optional-map-section .map-container {
+    height: clamp(310px, calc(100dvh - 285px), 430px);
+  }
+
   .map-district-note {
     margin: 7px 2px 86px;
     font-size: 12px;
+  }
+
+  .optional-map-section .map-district-note {
+    margin-bottom: 72px;
   }
 
   .map-section .marker-info {
@@ -1696,6 +1732,10 @@
   @supports (height: 100dvh) {
     .map-container {
       height: clamp(280px, calc(100dvh - 365px), 420px);
+    }
+
+    .optional-map-section .map-container {
+      height: clamp(310px, calc(100dvh - 285px), 430px);
     }
   }
   
@@ -1772,6 +1812,19 @@
   .map-section > .step-actions.has-selected-marker .prev-btn,
   .map-section > .step-actions.has-selected-marker .next-btn {
     width: 100%;
+  }
+
+  .map-section > .step-actions.optional-map-actions,
+  .map-section > .step-actions.optional-map-actions.has-selected-marker {
+    display: grid;
+    grid-template-columns: minmax(0, 0.78fr) minmax(0, 1.22fr);
+    gap: 8px 10px;
+  }
+
+  .map-section > .step-actions.optional-map-actions .map-selected-note {
+    grid-column: 1 / -1;
+    min-height: 24px;
+    padding: 2px 8px;
   }
 
   .map-section > .step-actions.with-location-fallback {
@@ -2018,6 +2071,10 @@
   @supports (height: 100dvh) {
     .map-container {
       height: clamp(250px, calc(100dvh - 380px), 310px);
+    }
+
+    .optional-map-section .map-container {
+      height: clamp(280px, calc(100dvh - 300px), 350px);
     }
   }
 

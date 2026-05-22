@@ -298,6 +298,7 @@ const PaymentPage = () => {
     && currentStep !== 2
     && !showSinglePageDistrictPicker
   )
+  const isSinglePageOptionalMapStep = isSinglePageVariant && currentStep === 2
   const showDistrictSection = currentStep === 1 || (isSinglePageVariant && currentStep !== 2)
   const showInfoSection = currentStep === 3 || singlePageInfoVisible
   const hasManualMarkerSelection = Boolean(
@@ -1909,12 +1910,14 @@ const PaymentPage = () => {
 
         {/* 步顢2: 地图标记 */}
         {currentStep === 2 && (
-          <div className={`section map-section ${isInlineQuantityVariant ? 'with-location-fallback' : ''} ${customMarker ? 'has-selected-marker' : ''}`}>
+          <div className={`section map-section ${isSinglePageOptionalMapStep ? 'optional-map-section' : ''} ${isInlineQuantityVariant && !isSinglePageVariant ? 'with-location-fallback' : ''} ${customMarker ? 'has-selected-marker' : ''}`}>
             {/* 橙色提示条 */}
             <div className="location-hint map-only">
               <div className="hint-content">
                 <span className="hint-text">
-                  Veuillez choisir votre adresse de livraison sur la carte.
+                  {isSinglePageOptionalMapStep
+                    ? 'Optionnel : touchez la carte ou recherchez un repère pour préciser l’adresse.'
+                    : 'Veuillez choisir votre adresse de livraison sur la carte.'}
                 </span>
               </div>
             </div>
@@ -2009,15 +2012,15 @@ const PaymentPage = () => {
               </div>
             )}
 
-            <div className={`step-actions map-actions ${isInlineQuantityVariant ? 'with-location-fallback' : ''} ${customMarker ? 'has-selected-marker' : ''}`}>
+            <div className={`step-actions map-actions ${isSinglePageOptionalMapStep ? 'optional-map-actions' : ''} ${isInlineQuantityVariant && !isSinglePageVariant ? 'with-location-fallback' : ''} ${customMarker ? 'has-selected-marker' : ''}`}>
               {customMarker && (
                 <div className="map-selected-note">
                   <span className="marker-check">✓</span>
-                  <span>{mapSelectedNoteText}</span>
+                  <span>{isSinglePageOptionalMapStep ? 'Position sélectionnée. Appuyez sur Enregistrer.' : mapSelectedNoteText}</span>
                 </div>
               )}
               <button type="button" className="prev-btn" onClick={() => navigate(-1)}>
-                Précédent
+                {isSinglePageOptionalMapStep ? 'Retour' : 'Précédent'}
               </button>
               <button
                 type="button"
@@ -2025,9 +2028,9 @@ const PaymentPage = () => {
                 onClick={handleConfirmMarker}
                 disabled={!customMarker}
               >
-                Suivant
+                {isSinglePageOptionalMapStep ? 'Enregistrer' : 'Suivant'}
               </button>
-              {isInlineQuantityVariant && !customMarker && (
+              {isInlineQuantityVariant && !isSinglePageVariant && !customMarker && (
                 <button
                   type="button"
                   className="location-fallback-btn"
