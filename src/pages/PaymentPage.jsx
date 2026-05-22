@@ -1789,7 +1789,7 @@ const PaymentPage = () => {
 
         {/* 步顢1: 选择大区 */}
         {showDistrictSection && (
-          <div className={`section district-section ${isSinglePageVariant ? 'single-page-district-section' : ''} ${selectedDistrict ? 'has-selected-district' : ''}`}>
+          <div className={`section district-section ${isSinglePageVariant ? 'single-page-district-section' : ''} ${(selectedDistrict || singlePageCachedDistrictPending) ? 'has-selected-district' : ''}`}>
             {!isSinglePageVariant && (
               <h2 className="section-title">Sélectionnez votre district</h2>
             )}
@@ -1875,7 +1875,7 @@ const PaymentPage = () => {
                   className="selected-district-change"
                   disabled
                 >
-                  ...
+                  Changer
                 </button>
               </div>
             ) : loading ? (
