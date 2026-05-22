@@ -404,6 +404,15 @@ ORDER BY CASE WHEN d.sort_order = 0 THEN 999999 ELSE d.sort_order END ASC, d.nam
 - 如果改了部署或验证方法，在“验证方式”或“部署注意事项”里同步更新。
 - 避免在这里记录用户姓名、电话、WhatsApp、详细地址、数据库密码等敏感信息。
 
+## 已完成改动
+
+### 2026-05-22 H组单页回看版
+
+- 新增 H 组 `single_page_review`，继承 G 组单页下单流程。
+- H 组只在个人信息页底部增加“Voir le produit”按钮，让觉得流程过快的用户可以返回商品页再确认。
+- 新分流口径：E 组 50%，G 组 25%，H 组 25%；实验本地缓存 key 升级到 `cod_checkout_quantity_flow_variant_v8`。
+- 后台漏斗和签收质量看板增加 H 组识别，保持购买意图去重口径，避免回看商品造成原始点击膨胀后误判。
+
 ## 事故记录
 
 ### 2026-05-21 零星订单接口异常

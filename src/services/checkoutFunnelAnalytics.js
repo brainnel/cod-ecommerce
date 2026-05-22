@@ -5,17 +5,18 @@ const DEVICE_ID_STORAGE_KEY = 'cod_checkout_device_id'
 const LANDING_SESSION_ID_STORAGE_KEY = 'cod_landing_session_id'
 const SESSION_ID_STORAGE_KEY = 'cod_checkout_session_id'
 const SESSION_CONTEXT_STORAGE_KEY = 'cod_checkout_context'
-const QUANTITY_EXPERIMENT_STORAGE_KEY = 'cod_checkout_quantity_flow_variant_v7'
+const QUANTITY_EXPERIMENT_STORAGE_KEY = 'cod_checkout_quantity_flow_variant_v8'
 const AD_ID_STORAGE_KEY = 'facebook_ad_id'
 const CHECKOUT_FLOW = 'cod_checkout'
-const QUANTITY_FLOW_EXPERIMENT = 'checkout_reduced_friction_address_first_single_page_v7'
+const QUANTITY_FLOW_EXPERIMENT = 'checkout_reduced_friction_address_first_single_page_review_v8'
 const QUANTITY_FLOW_HOLDOUT_PERCENT = 0
 const QUANTITY_FLOW_INLINE_PERCENT = 0
 const QUANTITY_FLOW_MAP_SEARCH_PERCENT = 0
 const QUANTITY_FLOW_TRUST_PERCENT = 0
 const QUANTITY_FLOW_TRUST_LANDING_PERCENT = 0
 const QUANTITY_FLOW_ADDRESS_FIRST_PERCENT = 50
-const QUANTITY_FLOW_SINGLE_PAGE_PERCENT = 50
+const QUANTITY_FLOW_SINGLE_PAGE_PERCENT = 25
+const QUANTITY_FLOW_SINGLE_PAGE_REVIEW_PERCENT = 25
 const PENDING_CHECKOUT_REUSE_MS = 10 * 60 * 1000
 
 const QUANTITY_MODAL_VARIANT = 'quantity_modal'
@@ -25,6 +26,7 @@ const COD_TRUST_VARIANT = 'cod_trust'
 const COD_TRUST_LANDING_VARIANT = 'cod_trust_landing'
 const ADDRESS_FIRST_VARIANT = 'address_first'
 const SINGLE_PAGE_CHECKOUT_VARIANT = 'single_page_checkout'
+const SINGLE_PAGE_REVIEW_VARIANT = 'single_page_review'
 const CHECKOUT_QUANTITY_VARIANTS = [
   QUANTITY_MODAL_VARIANT,
   INLINE_QUANTITY_VARIANT,
@@ -32,7 +34,8 @@ const CHECKOUT_QUANTITY_VARIANTS = [
   COD_TRUST_VARIANT,
   COD_TRUST_LANDING_VARIANT,
   ADDRESS_FIRST_VARIANT,
-  SINGLE_PAGE_CHECKOUT_VARIANT
+  SINGLE_PAGE_CHECKOUT_VARIANT,
+  SINGLE_PAGE_REVIEW_VARIANT
 ]
 
 const getVariantGroup = (variant) => {
@@ -42,6 +45,7 @@ const getVariantGroup = (variant) => {
   if (variant === COD_TRUST_LANDING_VARIANT) return 'trust_landing'
   if (variant === ADDRESS_FIRST_VARIANT) return 'address_first'
   if (variant === SINGLE_PAGE_CHECKOUT_VARIANT) return 'single_page'
+  if (variant === SINGLE_PAGE_REVIEW_VARIANT) return 'single_page_review'
   return 'holdout'
 }
 
@@ -53,6 +57,7 @@ const normalizeCheckoutQuantityVariant = (value) => {
   if (normalized === 'd' || normalized === 'd_group' || normalized === 'trust_landing') return COD_TRUST_LANDING_VARIANT
   if (normalized === 'e' || normalized === 'e_group' || normalized === 'address_first') return ADDRESS_FIRST_VARIANT
   if (normalized === 'g' || normalized === 'g_group' || normalized === 'single_page') return SINGLE_PAGE_CHECKOUT_VARIANT
+  if (normalized === 'h' || normalized === 'h_group' || normalized === 'single_page_review') return SINGLE_PAGE_REVIEW_VARIANT
   return null
 }
 
@@ -66,6 +71,7 @@ export const isInlineCheckoutVariant = (experimentOrVariant) => {
     || variant === COD_TRUST_LANDING_VARIANT
     || variant === ADDRESS_FIRST_VARIANT
     || variant === SINGLE_PAGE_CHECKOUT_VARIANT
+    || variant === SINGLE_PAGE_REVIEW_VARIANT
 }
 
 export const isCodTrustCheckoutVariant = (experimentOrVariant) => {
@@ -93,7 +99,14 @@ export const isSinglePageCheckoutVariant = (experimentOrVariant) => {
   const variant = typeof experimentOrVariant === 'string'
     ? experimentOrVariant
     : experimentOrVariant?.checkout_quantity_variant
-  return variant === SINGLE_PAGE_CHECKOUT_VARIANT
+  return variant === SINGLE_PAGE_CHECKOUT_VARIANT || variant === SINGLE_PAGE_REVIEW_VARIANT
+}
+
+export const isSinglePageReviewCheckoutVariant = (experimentOrVariant) => {
+  const variant = typeof experimentOrVariant === 'string'
+    ? experimentOrVariant
+    : experimentOrVariant?.checkout_quantity_variant
+  return variant === SINGLE_PAGE_REVIEW_VARIANT
 }
 
 export const isInlineMapSearchCheckoutVariant = (experimentOrVariant) => {
@@ -212,7 +225,8 @@ export const getCheckoutQuantityExperiment = () => {
     checkout_quantity_trust_landing_percent: QUANTITY_FLOW_TRUST_LANDING_PERCENT,
     checkout_quantity_address_first_percent: QUANTITY_FLOW_ADDRESS_FIRST_PERCENT,
     checkout_quantity_single_page_percent: QUANTITY_FLOW_SINGLE_PAGE_PERCENT,
-    checkout_quantity_split: `${QUANTITY_FLOW_HOLDOUT_PERCENT}/${QUANTITY_FLOW_INLINE_PERCENT}/${QUANTITY_FLOW_MAP_SEARCH_PERCENT}/${QUANTITY_FLOW_TRUST_PERCENT}/${QUANTITY_FLOW_TRUST_LANDING_PERCENT}/${QUANTITY_FLOW_ADDRESS_FIRST_PERCENT}/${QUANTITY_FLOW_SINGLE_PAGE_PERCENT}`
+    checkout_quantity_single_page_review_percent: QUANTITY_FLOW_SINGLE_PAGE_REVIEW_PERCENT,
+    checkout_quantity_split: `${QUANTITY_FLOW_HOLDOUT_PERCENT}/${QUANTITY_FLOW_INLINE_PERCENT}/${QUANTITY_FLOW_MAP_SEARCH_PERCENT}/${QUANTITY_FLOW_TRUST_PERCENT}/${QUANTITY_FLOW_TRUST_LANDING_PERCENT}/${QUANTITY_FLOW_ADDRESS_FIRST_PERCENT}/${QUANTITY_FLOW_SINGLE_PAGE_PERCENT}/${QUANTITY_FLOW_SINGLE_PAGE_REVIEW_PERCENT}`
   }
 
   if (typeof window === 'undefined') return fallback
@@ -242,6 +256,7 @@ export const getCheckoutQuantityExperiment = () => {
   const trustLandingLimit = trustLimit + QUANTITY_FLOW_TRUST_LANDING_PERCENT
   const addressFirstLimit = trustLandingLimit + QUANTITY_FLOW_ADDRESS_FIRST_PERCENT
   const singlePageLimit = addressFirstLimit + QUANTITY_FLOW_SINGLE_PAGE_PERCENT
+  const singlePageReviewLimit = singlePageLimit + QUANTITY_FLOW_SINGLE_PAGE_REVIEW_PERCENT
   const variant = bucket < QUANTITY_FLOW_HOLDOUT_PERCENT
     ? QUANTITY_MODAL_VARIANT
     : bucket < inlineLimit
@@ -256,6 +271,8 @@ export const getCheckoutQuantityExperiment = () => {
     ? ADDRESS_FIRST_VARIANT
     : bucket < singlePageLimit
     ? SINGLE_PAGE_CHECKOUT_VARIANT
+    : bucket < singlePageReviewLimit
+    ? SINGLE_PAGE_REVIEW_VARIANT
     : ADDRESS_FIRST_VARIANT
   safeSetStorage(window.localStorage, QUANTITY_EXPERIMENT_STORAGE_KEY, variant)
   return {
@@ -298,6 +315,7 @@ export const buildCheckoutProductProperties = (product, extra = {}) => {
       checkout_quantity_trust_landing_percent: extra.checkout_quantity_trust_landing_percent,
       checkout_quantity_address_first_percent: extra.checkout_quantity_address_first_percent,
       checkout_quantity_single_page_percent: extra.checkout_quantity_single_page_percent,
+      checkout_quantity_single_page_review_percent: extra.checkout_quantity_single_page_review_percent,
       checkout_quantity_split: extra.checkout_quantity_split
     }
     : getCheckoutQuantityExperiment()

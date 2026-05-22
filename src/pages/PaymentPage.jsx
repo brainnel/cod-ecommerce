@@ -13,6 +13,7 @@ import {
   isInlineCheckoutVariant,
   isInlineMapSearchCheckoutVariant,
   isSinglePageCheckoutVariant,
+  isSinglePageReviewCheckoutVariant,
   resumeCheckoutSession,
   startCheckoutSession,
   trackCheckoutEvent,
@@ -234,6 +235,7 @@ const PaymentPage = () => {
   const isAddressFirstVariant = isAddressFirstCheckoutVariant(checkoutQuantityExperiment)
   const isMapSearchVariant = isInlineMapSearchCheckoutVariant(checkoutQuantityExperiment)
   const isSinglePageVariant = isSinglePageCheckoutVariant(checkoutQuantityExperiment)
+  const isSinglePageReviewVariant = isSinglePageReviewCheckoutVariant(checkoutQuantityExperiment)
   const hasMapSearchFeature = isMapSearchVariant || isSinglePageVariant || isAddressFirstVariant
   const hasInitialSinglePageCachedDistrict = isSinglePageVariant && Boolean(initialLastDistrictRef.current)
 
@@ -592,6 +594,25 @@ const PaymentPage = () => {
         state: getPaymentNavigationState(options.stateOverrides)
       }
     )
+  }
+
+  const getProductReviewPath = () => {
+    if (isBundleFlow && bundle?.id) return `/bundle/${bundle.id}`
+    const productId = productFromState?.product_id || product?.product_id
+    return productId ? `/product/${productId}` : '/'
+  }
+
+  const handleReviewProductClick = () => {
+    trackPaymentEvent('checkout_review_product_click', {
+      checkout_single_page_review: true
+    })
+
+    if (location.key && location.key !== 'default') {
+      navigate(-1)
+      return
+    }
+
+    navigate(getProductReviewPath())
   }
 
   useEffect(() => {
@@ -2208,6 +2229,15 @@ const PaymentPage = () => {
                   onClick={() => navigate(-1)}
                 >
                   Précédent
+                </button>
+              )}
+              {isSinglePageReviewVariant && (
+                <button
+                  type="button"
+                  className="review-product-btn"
+                  onClick={handleReviewProductClick}
+                >
+                  Voir le produit
                 </button>
               )}
               <button
