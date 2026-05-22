@@ -739,6 +739,10 @@ const PaymentPage = () => {
       lat: parseFloat(cachedDistrict.latitude),
       lng: parseFloat(cachedDistrict.longitude)
     }
+    const cachedManualMarker = getCachedManualMarker(cachedDistrict)
+    const autoMarker = cachedManualMarker || districtCenter
+    const autoMarkerSource = cachedManualMarker ? 'manual_cached' : 'district_center_auto_skip'
+    const autoMapZoom = cachedManualMarker ? 15 : 14
     const districtProps = {
       ...getDistrictAnalyticsProps(cachedDistrict),
       checkout_single_page: true,
@@ -746,16 +750,17 @@ const PaymentPage = () => {
     }
     const locationProps = {
       ...districtProps,
-      location_method: 'district_center_auto_skip',
+      location_method: cachedManualMarker ? 'manual_map_cached' : 'district_center_auto_skip',
+      location_cache_used: cachedManualMarker ? true : undefined,
       location_auto_skip_map: true,
-      location_fallback_requires_address_detail: true
+      location_fallback_requires_address_detail: cachedManualMarker ? undefined : true
     }
 
     setSelectedDistrict(cachedDistrict)
-    setMapCenter(districtCenter)
-    setMapZoom(14)
-    setCustomMarker(districtCenter)
-    setMarkerSelectionSource('district_center_auto_skip')
+    setMapCenter(autoMarker)
+    setMapZoom(autoMapZoom)
+    setCustomMarker(autoMarker)
+    setMarkerSelectionSource(autoMarkerSource)
     setShowSinglePageDistrictPicker(false)
 
     updateCheckoutContext(product, {
@@ -770,10 +775,12 @@ const PaymentPage = () => {
     trackPaymentEvent('location_confirmed', locationProps)
     saveCheckoutPaymentState(getPaymentNavigationState({
       selectedDistrict: cachedDistrict,
-      customMarker: districtCenter,
-      markerSelectionSource: 'district_center_auto_skip',
-      mapCenter: districtCenter,
-      mapZoom: 14
+      customMarker: autoMarker,
+      markerSelectionSource: autoMarkerSource,
+      mapCenter: autoMarker,
+      mapZoom: autoMapZoom,
+      locationSearchQuery: cachedManualMarker?.label || '',
+      locationSearchStatus: cachedManualMarker?.label ? 'selected' : 'idle'
     }))
   }, [
     isSinglePageVariant,
@@ -812,24 +819,34 @@ const PaymentPage = () => {
     setMapZoom(14)  // 大区级别，用更高的缩放
 
     if (isSinglePageVariant) {
-      setCustomMarker(districtCenter)
-      setMarkerSelectionSource('district_center_auto_skip')
+      const cachedManualMarker = getCachedManualMarker(district)
+      const autoMarker = cachedManualMarker || districtCenter
+      const autoMarkerSource = cachedManualMarker ? 'manual_cached' : 'district_center_auto_skip'
+      const autoMapZoom = cachedManualMarker ? 15 : 14
+
+      setCustomMarker(autoMarker)
+      setMarkerSelectionSource(autoMarkerSource)
+      setMapCenter(autoMarker)
+      setMapZoom(autoMapZoom)
       setShowSinglePageDistrictPicker(false)
       const singlePageProps = {
         ...getDistrictAnalyticsProps(district),
-        location_method: 'district_center_auto_skip',
+        location_method: cachedManualMarker ? 'manual_map_cached' : 'district_center_auto_skip',
+        location_cache_used: cachedManualMarker ? true : undefined,
         location_auto_skip_map: true,
-        location_fallback_requires_address_detail: true,
+        location_fallback_requires_address_detail: cachedManualMarker ? undefined : true,
         checkout_single_page: true
       }
       trackPaymentEvent('location_selected', singlePageProps)
       trackPaymentEvent('location_confirmed', singlePageProps)
       saveCheckoutPaymentState(getPaymentNavigationState({
         selectedDistrict: district,
-        customMarker: districtCenter,
-        markerSelectionSource: 'district_center_auto_skip',
-        mapCenter: districtCenter,
-        mapZoom: 14
+        customMarker: autoMarker,
+        markerSelectionSource: autoMarkerSource,
+        mapCenter: autoMarker,
+        mapZoom: autoMapZoom,
+        locationSearchQuery: cachedManualMarker?.label || '',
+        locationSearchStatus: cachedManualMarker?.label ? 'selected' : 'idle'
       }))
       return
     }
