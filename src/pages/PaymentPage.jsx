@@ -438,38 +438,6 @@ const PaymentPage = () => {
     isSameCheckoutDistrict(buildDistrictMemoryEntry(district), initialLastDistrictRef.current)
   )
 
-  const getReturnProductSearch = () => {
-    const params = new URLSearchParams()
-    const variant = checkoutQuantityExperiment?.checkout_quantity_variant
-    const previewContext = getPreviewBrowserContext(location.search)
-
-    if (variant) {
-      params.set('checkout_quantity_variant', variant)
-    }
-    if (previewContext) {
-      params.set('browser_context', previewContext)
-    }
-
-    const query = params.toString()
-    return query ? `?${query}` : ''
-  }
-
-  const handleReturnToProduct = () => {
-    const search = getReturnProductSearch()
-
-    if (isBundleFlow && bundle?.id) {
-      navigate(`/bundle/${bundle.id}${search}`)
-      return
-    }
-
-    if (product?.product_id) {
-      navigate(`/product/${product.product_id}${search}`)
-      return
-    }
-
-    navigate(-1)
-  }
-
   const ensureCheckoutSession = () => {
     if (checkoutSessionIdRef.current) return checkoutSessionIdRef.current
 
@@ -2213,13 +2181,15 @@ const PaymentPage = () => {
             )}
 
             <div className="step-actions">
-              <button
-                type="button"
-                className="prev-btn"
-                onClick={isSinglePageVariant ? handleReturnToProduct : () => navigate(-1)}
-              >
-                {isSinglePageVariant ? 'Voir le produit' : 'Précédent'}
-              </button>
+              {!isSinglePageVariant && (
+                <button
+                  type="button"
+                  className="prev-btn"
+                  onClick={() => navigate(-1)}
+                >
+                  Précédent
+                </button>
+              )}
               <button
                 type="button"
                 className={`place-order-btn ${isPlacingOrder ? 'loading' : 'enabled'}`}
