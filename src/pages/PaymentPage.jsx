@@ -235,6 +235,7 @@ const PaymentPage = () => {
   const isMapSearchVariant = isInlineMapSearchCheckoutVariant(checkoutQuantityExperiment)
   const isSinglePageVariant = isSinglePageCheckoutVariant(checkoutQuantityExperiment)
   const hasMapSearchFeature = isMapSearchVariant || isSinglePageVariant || isAddressFirstVariant
+  const hasInitialSinglePageCachedDistrict = isSinglePageVariant && Boolean(initialLastDistrictRef.current)
 
   // 三步流程：1=选大区, 2=地图标记, 3=填写信息
   const [currentStep, setCurrentStep] = useState(() => getCheckoutStepFromSearch(location.search))
@@ -244,7 +245,11 @@ const PaymentPage = () => {
   // 步顢1：大区选择
   const [districts, setDistricts] = useState([])
   const [selectedDistrict, setSelectedDistrict] = useState(() => paymentRouteState.selectedDistrict || null)
-  const [showSinglePageDistrictPicker, setShowSinglePageDistrictPicker] = useState(() => !paymentRouteState.selectedDistrict)
+  const [showSinglePageDistrictPicker, setShowSinglePageDistrictPicker] = useState(() => {
+    if (paymentRouteState.selectedDistrict) return false
+    if (hasInitialSinglePageCachedDistrict) return false
+    return true
+  })
 
   // 步顢2：地图标记
   const [mapCenter, setMapCenter] = useState(() => paymentRouteState.mapCenter || paymentRouteState.customMarker || DEFAULT_CENTER)
@@ -281,9 +286,15 @@ const PaymentPage = () => {
   const [errors, setErrors] = useState({})
   const [isPlacingOrder, setIsPlacingOrder] = useState(false)
   const [clientInfo, setClientInfo] = useState({})
+  const singlePageCachedDistrictPending = (
+    isSinglePageVariant
+    && !showSinglePageDistrictPicker
+    && !selectedDistrict
+    && Boolean(initialLastDistrictRef.current)
+  )
   const singlePageInfoVisible = (
     isSinglePageVariant
-    && selectedDistrict
+    && (selectedDistrict || singlePageCachedDistrictPending)
     && currentStep !== 2
     && !showSinglePageDistrictPicker
   )
@@ -298,6 +309,9 @@ const PaymentPage = () => {
         ? `${Number(customMarker.lat).toFixed(5)}, ${Number(customMarker.lng).toFixed(5)}`
         : ''
     )
+    : ''
+  const initialCachedDistrictLabel = initialLastDistrictRef.current
+    ? `${initialLastDistrictRef.current.displayName}${initialLastDistrictRef.current.cityName ? ` - ${initialLastDistrictRef.current.cityName}` : ''}`
     : ''
 
   const mapSelectedNoteText = markerSelectionSource === 'district_center_fallback'
@@ -683,7 +697,7 @@ const PaymentPage = () => {
 
     const requestedStep = getCheckoutStepFromSearch(location.search)
     const hasStepInUrl = hasCheckoutStepInSearch(location.search)
-    const maxAllowedStep = selectedDistrict ? (customMarker ? 3 : 2) : 1
+    const maxAllowedStep = selectedDistrict ? (customMarker ? 3 : 2) : (singlePageCachedDistrictPending ? 3 : 1)
     const nextStep = Math.min(requestedStep, maxAllowedStep)
     const canonicalSearch = buildCheckoutStepSearch(nextStep, location.search)
 
@@ -695,7 +709,7 @@ const PaymentPage = () => {
     if (currentStep !== nextStep) {
       setCurrentStep(nextStep)
     }
-  }, [location.search, product, quantity, selectedDistrict, customMarker, currentStep])
+  }, [location.search, product, quantity, selectedDistrict, customMarker, currentStep, singlePageCachedDistrictPending])
 
   // 加载大区列表（扁平化）
   useEffect(() => {
@@ -745,7 +759,11 @@ const PaymentPage = () => {
     const cachedDistrict = districts.find((district) => (
       isSameCheckoutDistrict(buildDistrictMemoryEntry(district), initialLastDistrictRef.current)
     ))
-    if (!cachedDistrict) return
+    if (!cachedDistrict) {
+      singlePageCachedDistrictAppliedRef.current = true
+      setShowSinglePageDistrictPicker(true)
+      return
+    }
 
     singlePageCachedDistrictAppliedRef.current = true
 
@@ -1591,14 +1609,14 @@ const PaymentPage = () => {
   }
 
   useEffect(() => {
-    if (!showInfoSection || infoStepTrackedRef.current) return
+    if (!showInfoSection || infoStepTrackedRef.current || (isSinglePageVariant && !selectedDistrict)) return
 
     infoStepTrackedRef.current = true
     trackPaymentEvent('info_step_view', {
       ...getDistrictAnalyticsProps(),
       checkout_single_page: isSinglePageVariant || undefined
     })
-  }, [showInfoSection, isSinglePageVariant])
+  }, [showInfoSection, isSinglePageVariant, selectedDistrict])
 
   // 提交订单
   const handlePlaceOrder = async () => {
@@ -1842,6 +1860,22 @@ const PaymentPage = () => {
                   onClick={() => setShowSinglePageDistrictPicker(true)}
                 >
                   Changer
+                </button>
+              </div>
+            ) : singlePageCachedDistrictPending ? (
+              <div className="selected-district-summary selected-district-summary-loading">
+                <div className="selected-district-icon"><FiMapPin aria-hidden="true" /></div>
+                <div className="selected-district-copy">
+                  <span className="selected-district-label">Zone de livraison</span>
+                  <strong>{initialCachedDistrictLabel || 'Votre dernière zone'}</strong>
+                  <span className="selected-district-note">Choisi la dernière fois</span>
+                </div>
+                <button
+                  type="button"
+                  className="selected-district-change"
+                  disabled
+                >
+                  ...
                 </button>
               </div>
             ) : loading ? (
@@ -2184,15 +2218,17 @@ const PaymentPage = () => {
               </button>
               <button
                 type="button"
-                className={`place-order-btn ${!isPlacingOrder ? 'enabled' : 'loading'}`}
+                className={`place-order-btn ${!isPlacingOrder && !singlePageCachedDistrictPending ? 'enabled' : 'loading'}`}
                 onClick={handlePlaceOrder}
-                disabled={isPlacingOrder}
+                disabled={isPlacingOrder || singlePageCachedDistrictPending}
               >
                 {isPlacingOrder ? (
                   <>
                     <span className="btn-spinner"></span>
                     <span>Commande en cours...</span>
                   </>
+                ) : singlePageCachedDistrictPending ? (
+                  'Chargement...'
                 ) : (
                   'Passer la commande'
                 )}
