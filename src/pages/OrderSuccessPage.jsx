@@ -1,5 +1,5 @@
 import { useLocation, useNavigate } from 'react-router-dom'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   FiCheckCircle,
   FiClock,
@@ -21,6 +21,46 @@ import './OrderSuccessPage.css'
 
 // 缓存下载链接，避免重复请求
 let cachedDownloadLinks = null
+const ORDER_SUCCESS_STATE_STORAGE_KEY = 'cod_order_success_state_v1'
+const ORDER_SUCCESS_STATE_TTL_MS = 2 * 60 * 60 * 1000
+
+const isCompleteOrderSuccessState = (state) => (
+  Boolean(state?.product && state?.quantity && state?.userInfo && state?.selectedLocation)
+)
+
+const loadCachedOrderSuccessState = () => {
+  if (typeof window === 'undefined') return null
+
+  try {
+    const raw = window.sessionStorage.getItem(ORDER_SUCCESS_STATE_STORAGE_KEY)
+    if (!raw) return null
+
+    const parsed = JSON.parse(raw)
+    const savedAt = Number(parsed?.savedAt || 0)
+    if (!savedAt || Date.now() - savedAt > ORDER_SUCCESS_STATE_TTL_MS) {
+      window.sessionStorage.removeItem(ORDER_SUCCESS_STATE_STORAGE_KEY)
+      return null
+    }
+
+    return isCompleteOrderSuccessState(parsed?.state) ? parsed.state : null
+  } catch (error) {
+    console.warn('order success cache read failed:', error)
+    return null
+  }
+}
+
+const saveCachedOrderSuccessState = (state) => {
+  if (typeof window === 'undefined' || !isCompleteOrderSuccessState(state)) return
+
+  try {
+    window.sessionStorage.setItem(ORDER_SUCCESS_STATE_STORAGE_KEY, JSON.stringify({
+      savedAt: Date.now(),
+      state
+    }))
+  } catch (error) {
+    console.warn('order success cache write failed:', error)
+  }
+}
 
 const getDevOrderSuccessPreviewState = (search) => {
   if (!import.meta.env.DEV) return null
@@ -56,13 +96,27 @@ const getDevOrderSuccessPreviewState = (search) => {
 const OrderSuccessPage = () => {
   const location = useLocation()
   const navigate = useNavigate()
-  const previewState = getDevOrderSuccessPreviewState(location.search)
-  const { product, quantity, userInfo, selectedLocation, totalPrice, orderResponse } = location.state || previewState || {}
+  const previewState = useMemo(
+    () => getDevOrderSuccessPreviewState(location.search),
+    [location.search]
+  )
+  const cachedInitialSuccessState = useMemo(() => loadCachedOrderSuccessState(), [])
+  const orderSuccessState = useMemo(
+    () => location.state || previewState || cachedInitialSuccessState || {},
+    [location.state, previewState, cachedInitialSuccessState]
+  )
+  const { product, quantity, userInfo, selectedLocation, totalPrice, orderResponse } = orderSuccessState
   const [isModalOpen, setIsModalOpen] = useState(false)
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
   }, [])
+
+  useEffect(() => {
+    if (isCompleteOrderSuccessState(orderSuccessState) && !previewState) {
+      saveCachedOrderSuccessState(orderSuccessState)
+    }
+  }, [orderSuccessState, previewState])
 
   // 如果没有订单信息，重定向回首页
   useEffect(() => {
@@ -142,7 +196,16 @@ const OrderSuccessPage = () => {
   }
 
   if (!product || !quantity || !userInfo || !selectedLocation) {
-    return null
+    return (
+      <div className="order-success-page">
+        <div className="order-success-header">
+          <button type="button" className="back-btn" onClick={() => navigate('/')}>
+            <FiHome aria-hidden="true" />
+          </button>
+          <h1 className="header-title">Commande confirmée</h1>
+        </div>
+      </div>
+    )
   }
 
   return (

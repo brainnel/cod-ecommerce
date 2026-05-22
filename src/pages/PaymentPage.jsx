@@ -44,7 +44,6 @@ import './PaymentPage.css'
 const CHECKOUT_MIN_STEP = 1
 const CHECKOUT_MAX_STEP = 3
 const MapSelector = lazy(() => import('../components/MapSelector'))
-const ATTECOUBE_CENTER = { lat: 5.3362, lng: -4.0414 }
 const LOCATION_SEARCH_SCOPE_TEXT = 'Abidjan, Côte d’Ivoire'
 const LOCATION_SEARCH_GENERIC_LABELS = new Set([
   'abidjan',
@@ -52,13 +51,6 @@ const LOCATION_SEARCH_GENERIC_LABELS = new Set([
   'cote d ivoire',
   'cote d ivoire abidjan'
 ])
-
-const normalizeDistrictLabel = (value) => (
-  String(value || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-)
 
 const getDistrictDisplayName = (district) => (
   district?.display_name || district?.name || ''
@@ -90,29 +82,6 @@ const buildDistrictMemoryEntry = (district) => (
     cityName: district?.city_name
   })
 )
-
-const addDistrictDisplayAliases = (districts) => {
-  const hasAttecoube = districts.some((district) => (
-    normalizeDistrictLabel(getDistrictDisplayName(district)) === 'attecoube'
-  ))
-  if (hasAttecoube) return districts
-
-  return districts.flatMap((district) => {
-    if (normalizeDistrictLabel(district.name) !== 'yopougon') return [district]
-
-    return [
-      district,
-      {
-        ...district,
-        display_name: 'Attécoubé',
-        display_alias_for: district.name,
-        display_alias_key: `${district.id || 'yopougon'}-attecoube`,
-        latitude: ATTECOUBE_CENTER.lat,
-        longitude: ATTECOUBE_CENTER.lng
-      }
-    ]
-  })
-}
 
 const clampCheckoutStep = (step) => {
   const parsedStep = Number(step)
@@ -750,7 +719,7 @@ const PaymentPage = () => {
           }
         })
         
-        setDistricts(addDistrictDisplayAliases(allDistricts))
+        setDistricts(allDistricts)
       } catch (err) {
         console.error('获取大区列表失败:', err)
         alert('Impossible de charger la liste des districts')
@@ -1886,7 +1855,7 @@ const PaymentPage = () => {
                   const isLastSelected = isLastSelectedDistrict(district)
                   return (
                   <div
-                    key={district.display_alias_key || district.id}
+                    key={district.id}
                     className={`district-card ${isLastSelected ? 'last-selected' : ''}`}
                     onClick={() => handleSelectDistrict(district)}
                     onKeyDown={(event) => {
