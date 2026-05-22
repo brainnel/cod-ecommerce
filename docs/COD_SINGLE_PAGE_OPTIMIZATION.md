@@ -14,6 +14,7 @@
 - G 组打开大区列表时不再显示底部下单按钮；个人信息页底部左按钮改为 `Voir le produit`，切换大区只保留顶部大区卡里的 `Changer`，避免同一页面出现两个换区入口。
 - 分流已切到 E/G 各 50%：E 组 `address_first` 保留地址优先版；G 组 `single_page_checkout` 复用 E 组落地页权益表达，checkout 改为渐进式单页。A/B/C/D/F 只保留 URL 强制预览和历史数据识别，不再自然分配流量。
 - 后台下单漏斗已兼容 G 组：`single_page_checkout` 不再落到 unknown；A/B/C/D/E/F/G 对比表、定位方式组内占比、E/G 地址优先补定位和 F/E/G 地图搜索明细都能分组展示。默认版本窗口切到“G组单页下单上线”（`2026-05-22 04:13:46 UTC` / 北京时间 05-22 12:13）。
+- 首页新增组合品入口：分类栏 `Tout` 右侧增加 `Packs promo`，URL 为 `/?view=packs`；进入后调用 `GET /api/flash-local/bundles/` 展示 active 组合产品清单，点击卡片跳转已有 `/bundle/:bundleId` 组合品详情页。后端接口已同步推送 `main` 和 `test`。
 
 ## 2026-05-21 当前补丁
 
@@ -29,7 +30,9 @@
 - 主前端：`/Users/jushenxiaoshan/projects/brainnel/cod-ecommerce`
 - 主下单页：`src/pages/PaymentPage.jsx`
 - 地图组件：`src/components/MapSelector.jsx`
+- 首页组合品清单：`src/components/BundleList.jsx`
 - 后端下单与大区接口：`app_backend/product_api/app/api/endpoints/flash_local.py`
+- 后端组合品接口：`app_backend/product_api/app/api/endpoints/flash_bundles.py`
 - 后端漏斗统计：`app_backend/product_api/app/models/vite_analytics.py`
 - 管理端漏斗页：`app_admin_web`
 
