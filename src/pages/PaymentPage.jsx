@@ -1641,6 +1641,10 @@ const PaymentPage = () => {
       return
     }
 
+    if (singlePageCachedDistrictPending || !selectedDistrict || !customMarker) {
+      return
+    }
+
     saveCheckoutCustomerInfo({
       ...effectiveUserInfo,
       whatsappSameAsPhone
@@ -2218,17 +2222,15 @@ const PaymentPage = () => {
               </button>
               <button
                 type="button"
-                className={`place-order-btn ${!isPlacingOrder && !singlePageCachedDistrictPending ? 'enabled' : 'loading'}`}
+                className={`place-order-btn ${isPlacingOrder ? 'loading' : 'enabled'}`}
                 onClick={handlePlaceOrder}
-                disabled={isPlacingOrder || singlePageCachedDistrictPending}
+                disabled={isPlacingOrder}
               >
                 {isPlacingOrder ? (
                   <>
                     <span className="btn-spinner"></span>
                     <span>Commande en cours...</span>
                   </>
-                ) : singlePageCachedDistrictPending ? (
-                  'Chargement...'
                 ) : (
                   'Passer la commande'
                 )}
