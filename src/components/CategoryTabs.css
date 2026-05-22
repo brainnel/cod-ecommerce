@@ -49,6 +49,13 @@
   font-weight: 600;
 }
 
+.category-tab-pack {
+  border-color: #ffd2bf;
+  color: #f45112;
+  background: #fff6f0;
+  font-weight: 700;
+}
+
 /* 加载状态 */
 .category-tabs-loading {
   padding: 16px 20px;

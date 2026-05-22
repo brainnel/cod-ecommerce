@@ -167,6 +167,23 @@ export const districtAPI = {
 
 // 组合产品相关接口
 export const bundleAPI = {
+  // 获取组合产品列表
+  getBundleList: async (params = {}) => {
+    const { page = 1, page_size = 20 } = params
+    const queryParams = new URLSearchParams({
+      page: page.toString(),
+      page_size: page_size.toString()
+    })
+
+    try {
+      const response = await api.get(`/api/flash-local/bundles/?${queryParams}`)
+      return response.data
+    } catch (error) {
+      console.error('获取组合产品列表失败:', error)
+      throw error
+    }
+  },
+
   // 获取组合产品详情
   getBundleDetail: async (bundleId) => {
     try {
