@@ -10,6 +10,7 @@ import {
   isAddressFirstCheckoutVariant,
   isCodTrustLandingVariant,
   isInlineCheckoutVariant,
+  isSinglePageCheckoutVariant,
   trackCheckoutEvent,
   trackProductLandingEngagement,
   trackProductLandingView
@@ -90,6 +91,7 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
   const isCheckoutOptimizationVariant = isInlineCheckoutVariant(checkoutQuantityExperiment)
   const isCodTrustLanding = isCodTrustLandingVariant(checkoutQuantityExperiment)
   const isAddressFirstLanding = isAddressFirstCheckoutVariant(checkoutQuantityExperiment)
+    || isSinglePageCheckoutVariant(checkoutQuantityExperiment)
   const bundleSwiperModules = [Pagination, Navigation, Autoplay]
 
   const bundleProduct = useMemo(() => {

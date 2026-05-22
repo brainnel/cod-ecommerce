@@ -11,6 +11,7 @@ import {
   isAddressFirstCheckoutVariant,
   isCodTrustLandingVariant,
   isInlineCheckoutVariant,
+  isSinglePageCheckoutVariant,
   trackCheckoutEvent,
   trackProductLandingEngagement,
   trackProductLandingView
@@ -92,7 +93,8 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
   const checkoutQuantityExperiment = useMemo(() => getCheckoutQuantityExperiment(), []);
   const isCheckoutOptimizationVariant = isInlineCheckoutVariant(checkoutQuantityExperiment);
   const isCodTrustLanding = isCodTrustLandingVariant(checkoutQuantityExperiment);
-  const isAddressFirstLanding = isAddressFirstCheckoutVariant(checkoutQuantityExperiment);
+  const isAddressFirstLanding = isAddressFirstCheckoutVariant(checkoutQuantityExperiment)
+    || isSinglePageCheckoutVariant(checkoutQuantityExperiment);
   const productMainImages = normalizeImageList(product?.image_url);
   const productDetailImages = normalizeImageList(product?.description_fr);
   const promotedDetailImages = productMainImages.length === 1

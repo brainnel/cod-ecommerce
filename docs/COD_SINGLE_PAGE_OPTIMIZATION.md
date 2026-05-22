@@ -1,8 +1,19 @@
 # COD 单页优化维护记录
 
-更新时间：2026-05-21 CST
+更新时间：2026-05-22 CST
 
 这个文档用于维护 COD ecommerce 单页优化的历史轨迹。后续如果对下单页、商品详情页、地图定位、埋点、后台漏斗分析、大区排序等做了重要调整，先把关键结论追加到这里。上下文压缩后，优先读这个文件恢复背景。
+
+## 2026-05-22 当前预览
+
+- 新增本地预览分支 `checkout_quantity_variant=single_page` / `g`，用于验证 G 组“渐进式单页 checkout”：点击下单后同页完成大区、地址描述和个人信息；地图标点只作为地址字段下方的可选入口。
+- `single_page` 分支仍保留 B 组的默认数量 1 和页内改数量逻辑；如果本机没有上次大区，用户先看大区列表，点击大区后同页展开地址和个人信息表单；如果本机已有上次大区，则进入 checkout 后直接恢复该大区和大区中心坐标，跳过大区列表，直接展示个人信息，并保留“Changer”按钮供用户换区。
+- `single_page` 分支默认把定位完成为所选大区中心点，埋点 `location_method = district_center_auto_skip`；如果用户点“Optionnel : marquer sur la carte”并真正标点，则沿用现有地图页、地图搜索和手动标点缓存逻辑。
+- E 组地图可选标点页已补齐搜索框，搜索/候选/落点逻辑和 G 组对齐；区别仍是 E 组先重新点大区再进入信息页，G 组有本机大区缓存时可直接进入信息页。
+- G 组信息页 UI 降低橙色背景和边框密度：商品数量卡、大区卡、WhatsApp 勾选和输入框改成更中性的白底/灰边，橙色只保留在价格、定位图标和主按钮上。
+- G 组打开大区列表时不再显示底部下单按钮；个人信息页底部左按钮改为 `Voir le produit`，切换大区只保留顶部大区卡里的 `Changer`，避免同一页面出现两个换区入口。
+- 分流准备切到 E/G 各 50%：E 组 `address_first` 保留地址优先版；G 组 `single_page_checkout` 复用 E 组落地页权益表达，checkout 改为渐进式单页。A/B/C/D/F 只保留 URL 强制预览和历史数据识别，不再自然分配流量。
+- 当前代码已按待上线的 E/G 50/50 分流准备，但尚未推线上；预览入口示例：`/product/{product_id}?checkout_quantity_variant=single_page&browser_context=facebook_in_app`。
 
 ## 2026-05-21 当前补丁
 
@@ -57,8 +68,8 @@
 
 ### 下单减摩擦 A/B/C/D/E
 
-- A/B/C/D/E 分组不是每次打开页面重新随机，而是设备级固定分流：首次生成 `device_id` 后，对 `device_id` 做 hash。当前自然分流只进入 B/E：B 组 `inline_quantity` 是当前稳定 checkout，占 65%；E 组 `address_first` 是地址优先版，占 35%。A 组 `quantity_modal`、C 组 `cod_trust`、D 组 `cod_trust_landing` 保留为 URL 强制预览和历史数据识别，不再自然分配流量。
-- 本地调试可以用 URL 参数强制分组：`checkout_quantity_variant=quantity_modal`、`checkout_quantity_variant=inline_quantity`、`checkout_quantity_variant=cod_trust`、`checkout_quantity_variant=cod_trust_landing` 或 `checkout_quantity_variant=address_first`。
+- A/B/C/D/E/F/G 分组不是每次打开页面重新随机，而是设备级固定分流：首次生成 `device_id` 后，对 `device_id` 做 hash。当前准备自然分流只进入 E/G：E 组 `address_first` 占 50%；G 组 `single_page_checkout` 占 50%。A 组 `quantity_modal`、B 组 `inline_quantity`、C 组 `cod_trust`、D 组 `cod_trust_landing`、F 组 `inline_quantity_map_search` 保留为 URL 强制预览和历史数据识别，不再自然分配流量。
+- 本地调试可以用 URL 参数强制分组：`checkout_quantity_variant=quantity_modal`、`checkout_quantity_variant=inline_quantity`、`checkout_quantity_variant=cod_trust`、`checkout_quantity_variant=cod_trust_landing`、`checkout_quantity_variant=address_first`、`checkout_quantity_variant=map_search` 或 `checkout_quantity_variant=single_page` / `g`。
 - B 组里“数量已定”和“已选大区”不是同一个动作：点击商品页下单按钮时会默认确认数量 1 件并记录 `quantity_confirmed`；进入大区页后，只有用户点击大区卡片才记录 `district_selected`。
 - 判断默认数量 1 是否值得保留时，不能只看转化率，还要看平均件数。后台 A/B/C/D/E 表的“单均件数”主值来自 `order_create_success` 的成功订单平均数量；灰字“确认”来自 `quantity_confirmed` 的数量确认平均值。
 - B/C/D 组兜底按钮事件是 `location_fallback_used`。点击兜底按钮后会同步记录 `location_selected`，且 `location_method = district_center_fallback`，所以在主漏斗里计入“完成定位”；E 组默认跳过地图页，使用 `district_center_auto_skip` 单独区分。

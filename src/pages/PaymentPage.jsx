@@ -12,6 +12,7 @@ import {
   isCodTrustCheckoutVariant,
   isInlineCheckoutVariant,
   isInlineMapSearchCheckoutVariant,
+  isSinglePageCheckoutVariant,
   resumeCheckoutSession,
   startCheckoutSession,
   trackCheckoutEvent,
@@ -251,16 +252,20 @@ const PaymentPage = () => {
   const infoStepTrackedRef = useRef(false)
   const completedFieldsRef = useRef(new Set())
   const fieldRefs = useRef({})
+  const singlePageCachedDistrictAppliedRef = useRef(false)
   const initialMarkerSelectionSource = paymentRouteState.markerSelectionSource || 'none'
   const markerSelectionSourceRef = useRef(initialMarkerSelectionSource)
   const cachedFieldCompletionTrackedRef = useRef(false)
   const browserContext = useMemo(() => getBrowserContext(), [])
   const cachedCustomerInfo = useMemo(() => loadCheckoutCustomerInfo(), [])
   const [cachedLocationMemory, setCachedLocationMemory] = useState(() => loadCheckoutLocationMemory())
+  const initialLastDistrictRef = useRef(cachedLocationMemory?.lastDistrict || null)
   const isInlineQuantityVariant = isInlineCheckoutVariant(checkoutQuantityExperiment)
   const isCodTrustVariant = isCodTrustCheckoutVariant(checkoutQuantityExperiment)
   const isAddressFirstVariant = isAddressFirstCheckoutVariant(checkoutQuantityExperiment)
   const isMapSearchVariant = isInlineMapSearchCheckoutVariant(checkoutQuantityExperiment)
+  const isSinglePageVariant = isSinglePageCheckoutVariant(checkoutQuantityExperiment)
+  const hasMapSearchFeature = isMapSearchVariant || isSinglePageVariant || isAddressFirstVariant
 
   // 三步流程：1=选大区, 2=地图标记, 3=填写信息
   const [currentStep, setCurrentStep] = useState(() => getCheckoutStepFromSearch(location.search))
@@ -270,6 +275,7 @@ const PaymentPage = () => {
   // 步顢1：大区选择
   const [districts, setDistricts] = useState([])
   const [selectedDistrict, setSelectedDistrict] = useState(() => paymentRouteState.selectedDistrict || null)
+  const [showSinglePageDistrictPicker, setShowSinglePageDistrictPicker] = useState(() => !paymentRouteState.selectedDistrict)
 
   // 步顢2：地图标记
   const [mapCenter, setMapCenter] = useState(() => paymentRouteState.mapCenter || paymentRouteState.customMarker || DEFAULT_CENTER)
@@ -306,6 +312,24 @@ const PaymentPage = () => {
   const [errors, setErrors] = useState({})
   const [isPlacingOrder, setIsPlacingOrder] = useState(false)
   const [clientInfo, setClientInfo] = useState({})
+  const singlePageInfoVisible = (
+    isSinglePageVariant
+    && selectedDistrict
+    && currentStep !== 2
+    && !showSinglePageDistrictPicker
+  )
+  const showDistrictSection = currentStep === 1 || (isSinglePageVariant && currentStep !== 2)
+  const showInfoSection = currentStep === 3 || singlePageInfoVisible
+  const hasManualMarkerSelection = Boolean(
+    customMarker && (markerSelectionSource === 'manual' || markerSelectionSource === 'manual_cached')
+  )
+  const selectedMarkerText = hasManualMarkerSelection
+    ? customMarker.label || (
+      Number.isFinite(Number(customMarker.lat)) && Number.isFinite(Number(customMarker.lng))
+        ? `${Number(customMarker.lat).toFixed(5)}, ${Number(customMarker.lng).toFixed(5)}`
+        : ''
+    )
+    : ''
 
   const mapSelectedNoteText = markerSelectionSource === 'district_center_fallback'
     ? 'Adresse prise en compte. Appuyez sur Suivant.'
@@ -426,6 +450,42 @@ const PaymentPage = () => {
   const isLastSelectedDistrict = (district) => (
     isSameCheckoutDistrict(buildDistrictMemoryEntry(district), cachedLocationMemory?.lastDistrict)
   )
+
+  const wasLastSelectedDistrictOnEntry = (district) => (
+    isSameCheckoutDistrict(buildDistrictMemoryEntry(district), initialLastDistrictRef.current)
+  )
+
+  const getReturnProductSearch = () => {
+    const params = new URLSearchParams()
+    const variant = checkoutQuantityExperiment?.checkout_quantity_variant
+    const previewContext = getPreviewBrowserContext(location.search)
+
+    if (variant) {
+      params.set('checkout_quantity_variant', variant)
+    }
+    if (previewContext) {
+      params.set('browser_context', previewContext)
+    }
+
+    const query = params.toString()
+    return query ? `?${query}` : ''
+  }
+
+  const handleReturnToProduct = () => {
+    const search = getReturnProductSearch()
+
+    if (isBundleFlow && bundle?.id) {
+      navigate(`/bundle/${bundle.id}${search}`)
+      return
+    }
+
+    if (product?.product_id) {
+      navigate(`/product/${product.product_id}${search}`)
+      return
+    }
+
+    navigate(-1)
+  }
 
   const ensureCheckoutSession = () => {
     if (checkoutSessionIdRef.current) return checkoutSessionIdRef.current
@@ -701,6 +761,76 @@ const PaymentPage = () => {
     fetchDistricts()
   }, [])
 
+  useEffect(() => {
+    if (
+      !isSinglePageVariant
+      || singlePageCachedDistrictAppliedRef.current
+      || selectedDistrict
+      || currentStep === 2
+      || !product
+      || !quantity
+      || districts.length === 0
+      || !initialLastDistrictRef.current
+    ) return
+
+    const cachedDistrict = districts.find((district) => (
+      isSameCheckoutDistrict(buildDistrictMemoryEntry(district), initialLastDistrictRef.current)
+    ))
+    if (!cachedDistrict) return
+
+    singlePageCachedDistrictAppliedRef.current = true
+
+    const districtCenter = {
+      lat: parseFloat(cachedDistrict.latitude),
+      lng: parseFloat(cachedDistrict.longitude)
+    }
+    const districtProps = {
+      ...getDistrictAnalyticsProps(cachedDistrict),
+      checkout_single_page: true,
+      district_from_cache: true
+    }
+    const locationProps = {
+      ...districtProps,
+      location_method: 'district_center_auto_skip',
+      location_auto_skip_map: true,
+      location_fallback_requires_address_detail: true
+    }
+
+    setSelectedDistrict(cachedDistrict)
+    setMapCenter(districtCenter)
+    setMapZoom(14)
+    setCustomMarker(districtCenter)
+    setMarkerSelectionSource('district_center_auto_skip')
+    setShowSinglePageDistrictPicker(false)
+
+    updateCheckoutContext(product, {
+      quantity,
+      total_price: product.price * quantity,
+      ad_id: adId,
+      ...checkoutQuantityExperiment,
+      ...districtProps
+    })
+    trackPaymentEvent('district_selected', districtProps)
+    trackPaymentEvent('location_selected', locationProps)
+    trackPaymentEvent('location_confirmed', locationProps)
+    saveCheckoutPaymentState(getPaymentNavigationState({
+      selectedDistrict: cachedDistrict,
+      customMarker: districtCenter,
+      markerSelectionSource: 'district_center_auto_skip',
+      mapCenter: districtCenter,
+      mapZoom: 14
+    }))
+  }, [
+    isSinglePageVariant,
+    selectedDistrict,
+    currentStep,
+    product,
+    quantity,
+    districts,
+    adId,
+    checkoutQuantityExperiment
+  ])
+
   // 选择大区
   const handleSelectDistrict = (district) => {
     const districtMemoryEntry = buildDistrictMemoryEntry(district)
@@ -725,6 +855,29 @@ const PaymentPage = () => {
     }
     setMapCenter(districtCenter)
     setMapZoom(14)  // 大区级别，用更高的缩放
+
+    if (isSinglePageVariant) {
+      setCustomMarker(districtCenter)
+      setMarkerSelectionSource('district_center_auto_skip')
+      setShowSinglePageDistrictPicker(false)
+      const singlePageProps = {
+        ...getDistrictAnalyticsProps(district),
+        location_method: 'district_center_auto_skip',
+        location_auto_skip_map: true,
+        location_fallback_requires_address_detail: true,
+        checkout_single_page: true
+      }
+      trackPaymentEvent('location_selected', singlePageProps)
+      trackPaymentEvent('location_confirmed', singlePageProps)
+      saveCheckoutPaymentState(getPaymentNavigationState({
+        selectedDistrict: district,
+        customMarker: districtCenter,
+        markerSelectionSource: 'district_center_auto_skip',
+        mapCenter: districtCenter,
+        mapZoom: 14
+      }))
+      return
+    }
 
     if (isAddressFirstVariant) {
       setCustomMarker(districtCenter)
@@ -1078,7 +1231,7 @@ const PaymentPage = () => {
   }
 
   useEffect(() => {
-    if (!isMapSearchVariant || currentStep !== 2) return undefined
+    if (!hasMapSearchFeature || currentStep !== 2) return undefined
     if (locationSearchStatus === 'selected') return undefined
 
     const query = locationSearchQuery.trim()
@@ -1110,10 +1263,10 @@ const PaymentPage = () => {
         locationSearchDebounceRef.current = null
       }
     }
-  }, [locationSearchQuery, isMapSearchVariant, currentStep, selectedDistrict?.id])
+  }, [locationSearchQuery, hasMapSearchFeature, currentStep, selectedDistrict?.id])
 
   useEffect(() => {
-    if (!isMapSearchVariant) return
+    if (!hasMapSearchFeature) return
     if (locationSearchDebounceRef.current) {
       clearTimeout(locationSearchDebounceRef.current)
       locationSearchDebounceRef.current = null
@@ -1137,7 +1290,7 @@ const PaymentPage = () => {
     setLocationSearchResults([])
     setLocationSearchStatus('idle')
     setLocationSearchMessage('')
-  }, [isMapSearchVariant, selectedDistrict?.id])
+  }, [hasMapSearchFeature, selectedDistrict?.id])
 
   useEffect(() => {
     if (currentStep !== 2 || !selectedDistrict) return
@@ -1384,7 +1537,7 @@ const PaymentPage = () => {
   }
 
   useEffect(() => {
-    if (currentStep !== 3 || cachedFieldCompletionTrackedRef.current || !cachedCustomerInfo) return
+    if (!showInfoSection || cachedFieldCompletionTrackedRef.current || !cachedCustomerInfo) return
 
     cachedFieldCompletionTrackedRef.current = true
 
@@ -1410,7 +1563,7 @@ const PaymentPage = () => {
     }
   }, [
     cachedCustomerInfo,
-    currentStep,
+    showInfoSection,
     userInfo.addressDescription,
     userInfo.fullName,
     userInfo.phone,
@@ -1469,11 +1622,14 @@ const PaymentPage = () => {
   }
 
   useEffect(() => {
-    if (currentStep !== 3 || infoStepTrackedRef.current) return
+    if (!showInfoSection || infoStepTrackedRef.current) return
 
     infoStepTrackedRef.current = true
-    trackPaymentEvent('info_step_view', getDistrictAnalyticsProps())
-  }, [currentStep])
+    trackPaymentEvent('info_step_view', {
+      ...getDistrictAnalyticsProps(),
+      checkout_single_page: isSinglePageVariant || undefined
+    })
+  }, [showInfoSection, isSinglePageVariant])
 
   // 提交订单
   const handlePlaceOrder = async () => {
@@ -1625,6 +1781,7 @@ const PaymentPage = () => {
 
       <div className="payment-content">
         {/* 步骤指示器 */}
+        {!isSinglePageVariant && (
         <div className="steps-indicator">
           <div className={`step ${currentStep >= 1 ? 'active' : ''} ${selectedDistrict ? 'completed' : ''}`}>
             <div className="step-icon">{selectedDistrict ? '✓' : '1'}</div>
@@ -1641,11 +1798,14 @@ const PaymentPage = () => {
             <span className="step-label">Informations</span>
           </div>
         </div>
+        )}
 
         {/* 步顢1: 选择大区 */}
-        {currentStep === 1 && (
-          <div className="section district-section">
-            <h2 className="section-title">Sélectionnez votre district</h2>
+        {showDistrictSection && (
+          <div className={`section district-section ${isSinglePageVariant ? 'single-page-district-section' : ''} ${selectedDistrict ? 'has-selected-district' : ''}`}>
+            {!isSinglePageVariant && (
+              <h2 className="section-title">Sélectionnez votre district</h2>
+            )}
             {isInlineQuantityVariant && (
               <div className="inline-quantity-card">
                 <img
@@ -1697,7 +1857,25 @@ const PaymentPage = () => {
                 </div>
               </div>
             )}
-            {loading ? (
+            {isSinglePageVariant && selectedDistrict && !showSinglePageDistrictPicker ? (
+              <div className="selected-district-summary">
+                <div className="selected-district-icon"><FiMapPin aria-hidden="true" /></div>
+                <div className="selected-district-copy">
+                  <span className="selected-district-label">Zone de livraison</span>
+                  <strong>{getDistrictDisplayName(selectedDistrict)} - {selectedDistrict.city_name}</strong>
+                  {wasLastSelectedDistrictOnEntry(selectedDistrict) && (
+                    <span className="selected-district-note">Choisi la dernière fois</span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  className="selected-district-change"
+                  onClick={() => setShowSinglePageDistrictPicker(true)}
+                >
+                  Changer
+                </button>
+              </div>
+            ) : loading ? (
               <div className="loading-container">
                 <div className="loading-spinner"></div>
                 <p>Chargement...</p>
@@ -1711,6 +1889,12 @@ const PaymentPage = () => {
                     key={district.display_alias_key || district.id}
                     className={`district-card ${isLastSelected ? 'last-selected' : ''}`}
                     onClick={() => handleSelectDistrict(district)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault()
+                        handleSelectDistrict(district)
+                      }
+                    }}
                     role="button"
                     tabIndex={0}
                   >
@@ -1744,7 +1928,7 @@ const PaymentPage = () => {
             </div>
             
             <div className="map-container">
-              {isMapSearchVariant && (
+              {hasMapSearchFeature && (
                 <div className="location-search-overlay" aria-label="Recherche de position">
                   <form className="location-search-form" onSubmit={handleLocationSearchSubmit}>
                     <FiSearch className="location-search-icon" aria-hidden="true" />
@@ -1868,8 +2052,8 @@ const PaymentPage = () => {
         )}
 
         {/* 步骤3: 填写信息 */}
-        {currentStep === 3 && (
-          <div className="section info-section">
+        {showInfoSection && (
+          <div className={`section info-section ${isSinglePageVariant ? 'single-page-info-section' : ''}`}>
             <h2 className="section-title">Informations de livraison</h2>
 
             <div className="form-group">
@@ -1957,7 +2141,8 @@ const PaymentPage = () => {
                   Ajoutez un repère clair. Si le livreur ne trouve pas, nous vous contactons par téléphone ou WhatsApp.
                 </div>
               )}
-              {isAddressFirstVariant && selectedDistrict && (
+              <div className="char-count">{userInfo.addressDescription.length}/200</div>
+              {(isAddressFirstVariant || isSinglePageVariant) && selectedDistrict && (
                 <div className="address-map-option">
                   <button
                     type="button"
@@ -1965,56 +2150,68 @@ const PaymentPage = () => {
                     onClick={handleChoosePreciseMapLocation}
                   >
                     <FiMapPin aria-hidden="true" />
-                    Optionnel : marquer sur la carte
+                    {hasManualMarkerSelection ? 'Modifier le point sur la carte' : 'Optionnel : marquer sur la carte'}
                   </button>
+                  {hasManualMarkerSelection && selectedMarkerText && (
+                    <div className="selected-map-marker-note">
+                      <FiMapPin aria-hidden="true" />
+                      <span>
+                        <strong>Point marqué :</strong> {selectedMarkerText}
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
-              <div className="char-count">{userInfo.addressDescription.length}/200</div>
               {errors.addressDescription && <div className="error-message">{errors.addressDescription}</div>}
             </div>
 
-            {/* 订单摘要 */}
-            <div className="order-summary">
-              <h3>Récapitulatif</h3>
-              <div className="order-item">
-                <img
-                  src={product.image_url?.[0]}
-                  alt={product.name_fr}
-                  className="order-item-image"
-                  loading="lazy"
-                  decoding="async"
-                />
-                <div className="order-item-details">
-                  <div className="order-item-name">{product.name_fr}</div>
-                  <div className="order-item-price">{product.price} FCFA × {quantity}</div>
+            {!isSinglePageVariant && (
+              <div className="order-summary">
+                <h3>Récapitulatif</h3>
+                <div className="order-item">
+                  <img
+                    src={product.image_url?.[0]}
+                    alt={product.name_fr}
+                    className="order-item-image"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                  <div className="order-item-details">
+                    <div className="order-item-name">{product.name_fr}</div>
+                    <div className="order-item-price">{product.price} FCFA × {quantity}</div>
+                  </div>
+                  <div className="order-item-total">{totalPrice} FCFA</div>
                 </div>
-                <div className="order-item-total">{totalPrice} FCFA</div>
-              </div>
-              
-              <div className="order-totals">
-                <div className="total-row">
-                  <span>Sous-total</span>
-                  <span>{totalPrice} FCFA</span>
+                
+                <div className="order-totals">
+                  <div className="total-row">
+                    <span>Sous-total</span>
+                    <span>{totalPrice} FCFA</span>
+                  </div>
+                  <div className="total-row shipping">
+                    <span>Livraison</span>
+                    <span className="free-shipping">Gratuite</span>
+                  </div>
+                  <div className="total-row final-total">
+                    <span>Total</span>
+                    <span>{totalPrice} FCFA</span>
+                  </div>
                 </div>
-                <div className="total-row shipping">
-                  <span>Livraison</span>
-                  <span className="free-shipping">Gratuite</span>
-                </div>
-                <div className="total-row final-total">
-                  <span>Total</span>
-                  <span>{totalPrice} FCFA</span>
-                </div>
-              </div>
 
-              <div className="payment-method">
-                <span className="payment-icon" aria-hidden="true"><FiCreditCard /></span>
-                <span>{isCodTrustVariant ? 'Aucun paiement maintenant. Cash ou Wave à la livraison.' : 'Paiement à la livraison'}</span>
+                <div className="payment-method">
+                  <span className="payment-icon" aria-hidden="true"><FiCreditCard /></span>
+                  <span>{isCodTrustVariant ? 'Aucun paiement maintenant. Cash ou Wave à la livraison.' : 'Paiement à la livraison'}</span>
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="step-actions">
-              <button type="button" className="prev-btn" onClick={() => navigate(-1)}>
-                Précédent
+              <button
+                type="button"
+                className="prev-btn"
+                onClick={isSinglePageVariant ? handleReturnToProduct : () => navigate(-1)}
+              >
+                {isSinglePageVariant ? 'Voir le produit' : 'Précédent'}
               </button>
               <button
                 type="button"
