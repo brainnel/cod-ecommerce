@@ -12,8 +12,8 @@
 - E 组地图可选标点页已补齐搜索框，搜索/候选/落点逻辑和 G 组对齐；区别仍是 E 组先重新点大区再进入信息页，G 组有本机大区缓存时可直接进入信息页。
 - G 组信息页 UI 降低橙色背景和边框密度：商品数量卡、大区卡、WhatsApp 勾选和输入框改成更中性的白底/灰边，橙色只保留在价格、定位图标和主按钮上。
 - G 组打开大区列表时不再显示底部下单按钮；个人信息页底部左按钮改为 `Voir le produit`，切换大区只保留顶部大区卡里的 `Changer`，避免同一页面出现两个换区入口。
-- 分流准备切到 E/G 各 50%：E 组 `address_first` 保留地址优先版；G 组 `single_page_checkout` 复用 E 组落地页权益表达，checkout 改为渐进式单页。A/B/C/D/F 只保留 URL 强制预览和历史数据识别，不再自然分配流量。
-- 当前代码已按待上线的 E/G 50/50 分流准备，但尚未推线上；预览入口示例：`/product/{product_id}?checkout_quantity_variant=single_page&browser_context=facebook_in_app`。
+- 分流已切到 E/G 各 50%：E 组 `address_first` 保留地址优先版；G 组 `single_page_checkout` 复用 E 组落地页权益表达，checkout 改为渐进式单页。A/B/C/D/F 只保留 URL 强制预览和历史数据识别，不再自然分配流量。
+- 后台下单漏斗已兼容 G 组：`single_page_checkout` 不再落到 unknown；A/B/C/D/E/F/G 对比表、定位方式组内占比、E/G 地址优先补定位和 F/E/G 地图搜索明细都能分组展示。默认版本窗口切到“G组单页下单上线”（`2026-05-22 04:13:46 UTC` / 北京时间 05-22 12:13）。
 
 ## 2026-05-21 当前补丁
 
@@ -66,7 +66,7 @@
   - 第 4 次及之后计入 `duplicate_checkout_excluded_sessions`，后台顶部显示“已排除重复点击”，不再污染商品/广告/主漏斗下单尝试数。
   - 这个规则只处理未完成 SKU 数量选择的重复点击；已经进入后续步骤的 session 不会被剔除。
 
-### 下单减摩擦 A/B/C/D/E
+### 下单减摩擦 A/B/C/D/E/F/G
 
 - A/B/C/D/E/F/G 分组不是每次打开页面重新随机，而是设备级固定分流：首次生成 `device_id` 后，对 `device_id` 做 hash。当前准备自然分流只进入 E/G：E 组 `address_first` 占 50%；G 组 `single_page_checkout` 占 50%。A 组 `quantity_modal`、B 组 `inline_quantity`、C 组 `cod_trust`、D 组 `cod_trust_landing`、F 组 `inline_quantity_map_search` 保留为 URL 强制预览和历史数据识别，不再自然分配流量。
 - 本地调试可以用 URL 参数强制分组：`checkout_quantity_variant=quantity_modal`、`checkout_quantity_variant=inline_quantity`、`checkout_quantity_variant=cod_trust`、`checkout_quantity_variant=cod_trust_landing`、`checkout_quantity_variant=address_first`、`checkout_quantity_variant=map_search` 或 `checkout_quantity_variant=single_page` / `g`。
