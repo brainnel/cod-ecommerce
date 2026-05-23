@@ -1,5 +1,5 @@
 import { useLocation, useNavigate } from 'react-router-dom'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo } from 'react'
 import {
   FiCheckCircle,
   FiClock,
@@ -14,7 +14,6 @@ import {
   FiUser
 } from 'react-icons/fi'
 import { FaWhatsapp } from 'react-icons/fa'
-import AppDownloadModal from '../components/AppDownloadModal'
 import { appDownloadAPI } from '../services/api'
 import { trackCheckoutEvent } from '../services/checkoutFunnelAnalytics'
 import './OrderSuccessPage.css'
@@ -106,7 +105,6 @@ const OrderSuccessPage = () => {
     [location.state, previewState, cachedInitialSuccessState]
   )
   const { product, quantity, userInfo, selectedLocation, totalPrice, orderResponse } = orderSuccessState
-  const [isModalOpen, setIsModalOpen] = useState(false)
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
@@ -117,6 +115,18 @@ const OrderSuccessPage = () => {
       saveCachedOrderSuccessState(orderSuccessState)
     }
   }, [orderSuccessState, previewState])
+
+  useEffect(() => {
+    if (cachedDownloadLinks) return
+
+    appDownloadAPI.getDownloadLinks()
+      .then((links) => {
+        cachedDownloadLinks = links
+      })
+      .catch((error) => {
+        console.warn('app download links preload failed:', error)
+      })
+  }, [])
 
   // 如果没有订单信息，重定向回首页
   useEffect(() => {
@@ -140,59 +150,43 @@ const OrderSuccessPage = () => {
 
   const handleDownloadApp = () => {
     trackSuccessPageAction('order_success_app_download_click')
-    // 打开自定义弹窗
-    setIsModalOpen(true)
-  }
-
-  const handleModalClose = () => {
-    setIsModalOpen(false)
-  }
-
-  const handleModalConfirm = () => {
-    // 关闭弹窗
-    setIsModalOpen(false)
-    
-    // 检测用户设备类型并跳转
     redirectToAppStore()
   }
 
   const redirectToAppStore = async () => {
-    if (!cachedDownloadLinks) {
-      cachedDownloadLinks = await appDownloadAPI.getDownloadLinks()
+    try {
+      if (!cachedDownloadLinks) {
+        cachedDownloadLinks = await appDownloadAPI.getDownloadLinks()
+      }
+    } catch (error) {
+      console.warn('app download links fetch failed:', error)
     }
 
     const userAgent = navigator.userAgent || navigator.vendor || window.opera;
     const iosUrl = cachedDownloadLinks?.ios?.url || 'https://apps.apple.com/app/id6760172301'
     const androidUrl = cachedDownloadLinks?.android?.url || 'https://play.google.com/store/apps/details?id=com.brainnel.vite'
 
+    saveCachedOrderSuccessState(orderSuccessState)
+
     if (/iPad|iPhone|iPod/.test(userAgent) && !window.MSStream) {
-      window.open(iosUrl, '_blank');
+      window.location.assign(iosUrl);
       return;
     }
 
     if (/android/i.test(userAgent)) {
-      window.open(androidUrl, '_blank');
+      window.location.assign(androidUrl);
       return;
     }
 
-    const choice = window.confirm(
-      'Choisissez votre plateforme:\n\n' +
-      'OK = Android (Google Play)\n' +
-      'Annuler = iOS (App Store)'
-    );
-
-    if (choice) {
-      window.open(androidUrl, '_blank');
-    } else {
-      window.open(iosUrl, '_blank');
-    }
+    window.location.assign('/download')
   }
 
   const handleWhatsAppContact = () => {
     trackSuccessPageAction('order_success_whatsapp_contact_click')
     const phoneNumber = '8615167909497'
     const whatsappUrl = `https://wa.me/${phoneNumber}`
-    window.open(whatsappUrl, '_blank')
+    saveCachedOrderSuccessState(orderSuccessState)
+    window.location.assign(whatsappUrl)
   }
 
   if (!product || !quantity || !userInfo || !selectedLocation) {
@@ -298,24 +292,19 @@ const OrderSuccessPage = () => {
 
         {/* 操作按钮 */}
         <div className="success-actions">
-          <button type="button" className="download-btn" onClick={handleDownloadApp}>
-            <FiDownload aria-hidden="true" />
-            <span>Télécharger l'app</span>
-          </button>
+          <div className="download-action-block">
+            <button type="button" className="download-btn" onClick={handleDownloadApp}>
+              <FiDownload aria-hidden="true" />
+              <span>Télécharger l'app Brainnel</span>
+            </button>
+            <p className="download-benefit-copy">Après téléchargement, votre 2e commande sera encore plus avantageuse.</p>
+          </div>
           <button type="button" className="whatsapp-btn" onClick={handleWhatsAppContact}>
             <FaWhatsapp aria-hidden="true" />
             <span>Nous contacter sur WhatsApp</span>
           </button>
         </div>
       </div>
-
-      {/* 下载App弹窗 */}
-      <AppDownloadModal
-        isOpen={isModalOpen}
-        onClose={handleModalClose}
-        onConfirm={handleModalConfirm}
-        whatsappNumber={userInfo?.whatsapp}
-      />
     </div>
   )
 }
