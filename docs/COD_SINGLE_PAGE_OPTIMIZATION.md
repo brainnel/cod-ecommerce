@@ -17,7 +17,7 @@
 - 自然流量已全量切到 G 组 `single_page_checkout`：实验缓存 key 升级到 `cod_checkout_quantity_flow_variant_v9`，默认分流为 E 0%、G 100%、H 0%。这样旧设备不会继续沿用 v8 的 E/H 缓存，URL 强制参数仍保留给本地和线上排查。
 - 当前判断：H 组 `single_page_review` 的“返回看商品”没有提供明显新增价值，暂时停止自然分流；E 组 `address_first` 作为历史稳定对照保留 URL 强制预览和后台识别。
 - 后台版本窗口新增“G组全量上线”（`2026-05-23 01:36:43 UTC` / 北京时间 05-23 09:36），用于单独观察全量 G 后的去重访问、去重下单、下单成功率和校正访问成功率。
-- 订单成功页 App 下载和 WhatsApp 联系按钮不再使用 `window.open(..., '_blank')`。FB 内置浏览器里 `_blank` 容易留下空白 WebView，用户从外部 App 返回后会看到空白页；现在改为当前页 `window.location.assign(...)` 跳转，返回时更稳定地回到订单成功页。App 下载入口取消中间确认弹窗，按钮作为更突出的主按钮，并增加“下载后第二单更优惠”的法语提示。
+- 订单成功页 App 下载和 WhatsApp 联系按钮不再使用 `window.open(..., '_blank')`。FB 内置浏览器里 `_blank` 容易留下空白 WebView，用户从外部 App 返回后会看到空白页；现在改为当前页 `window.location.assign(...)` 跳转，返回时更稳定地回到订单成功页。App 下载入口取消中间确认弹窗，按钮作为更突出的主按钮，并增加“下载 App 后下单享更多优惠”的法语提示。
 
 ## 2026-05-22 当前预览
 

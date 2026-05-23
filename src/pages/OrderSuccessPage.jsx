@@ -5,6 +5,7 @@ import {
   FiClock,
   FiCreditCard,
   FiDownload,
+  FiGift,
   FiHome,
   FiMap,
   FiMapPin,
@@ -293,11 +294,14 @@ const OrderSuccessPage = () => {
         {/* 操作按钮 */}
         <div className="success-actions">
           <div className="download-action-block">
+            <div className="download-benefit-pill">
+              <FiGift aria-hidden="true" />
+              <span>Offres spéciales sur votre prochaine commande</span>
+            </div>
             <button type="button" className="download-btn" onClick={handleDownloadApp}>
               <FiDownload aria-hidden="true" />
               <span>Télécharger l'app Brainnel</span>
             </button>
-            <p className="download-benefit-copy">Après téléchargement, votre 2e commande sera encore plus avantageuse.</p>
           </div>
           <button type="button" className="whatsapp-btn" onClick={handleWhatsAppContact}>
             <FaWhatsapp aria-hidden="true" />
