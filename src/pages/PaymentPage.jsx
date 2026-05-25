@@ -286,6 +286,7 @@ const PaymentPage = () => {
     cachedCustomerInfo?.whatsappSameAsPhone ?? true
   ))
   const [errors, setErrors] = useState({})
+  const orderSubmitLockRef = useRef(false)
   const [isPlacingOrder, setIsPlacingOrder] = useState(false)
   const [clientInfo, setClientInfo] = useState({})
   const singlePageCachedDistrictPending = (
@@ -1627,6 +1628,16 @@ const PaymentPage = () => {
 
   // 提交订单
   const handlePlaceOrder = async () => {
+    if (orderSubmitLockRef.current) return
+
+    orderSubmitLockRef.current = true
+    setIsPlacingOrder(true)
+
+    const releaseOrderSubmitLock = () => {
+      orderSubmitLockRef.current = false
+      setIsPlacingOrder(false)
+    }
+
     const effectiveWhatsapp = whatsappSameAsPhone ? userInfo.phone : userInfo.whatsapp
     const effectiveUserInfo = {
       ...userInfo,
@@ -1645,10 +1656,12 @@ const PaymentPage = () => {
         whatsapp_same_as_phone: whatsappSameAsPhone
       })
       scrollToFirstMissingField(missingFields)
+      releaseOrderSubmitLock()
       return
     }
 
     if (singlePageCachedDistrictPending || !selectedDistrict || !customMarker) {
+      releaseOrderSubmitLock()
       return
     }
 
@@ -1661,8 +1674,8 @@ const PaymentPage = () => {
       ...getDistrictAnalyticsProps(),
       whatsapp_same_as_phone: whatsappSameAsPhone
     })
-    setIsPlacingOrder(true)
 
+    let shouldReleaseSubmitLock = true
     try {
       let response
       const deliveryMarker = getDeliveryMarkerForOrder()
@@ -1750,6 +1763,7 @@ const PaymentPage = () => {
           checkoutQuantityExperiment
         }
       })
+      shouldReleaseSubmitLock = false
 
     } catch (err) {
       console.error('订单失败:', err)
@@ -1761,7 +1775,9 @@ const PaymentPage = () => {
       })
       alert(err.response?.data?.message || 'Une erreur est survenue')
     } finally {
-      setIsPlacingOrder(false)
+      if (shouldReleaseSubmitLock) {
+        releaseOrderSubmitLock()
+      }
     }
   }
 
@@ -2245,6 +2261,7 @@ const PaymentPage = () => {
                 className={`place-order-btn ${isPlacingOrder ? 'loading' : 'enabled'}`}
                 onClick={handlePlaceOrder}
                 disabled={isPlacingOrder}
+                aria-busy={isPlacingOrder}
               >
                 {isPlacingOrder ? (
                   <>

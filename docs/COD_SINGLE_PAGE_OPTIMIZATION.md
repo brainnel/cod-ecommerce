@@ -422,6 +422,13 @@ ORDER BY CASE WHEN d.sort_order = 0 THEN 999999 ELSE d.sort_order END ASC, d.nam
 
 ## 已完成改动
 
+### 2026-05-25 下单按钮防重复提交
+
+- 修复最终下单按钮可被连续点击导致重复创建订单的问题。
+- 点击“Passer la commande”后立即进入 `Commande en cours...` loading 状态，按钮禁用并显示 spinner。
+- 前端增加同步提交锁：即使 React state 还没刷新，第二次连续点击也会被拦截。
+- 表单校验失败、缺少大区/坐标、订单接口失败时会释放锁，允许用户修正后重新提交；订单成功跳转时不释放，避免成功页跳转前再次提交。
+
 ### 2026-05-22 H组单页回看版
 
 - 新增 H 组 `single_page_review`，继承 G 组单页下单流程。
