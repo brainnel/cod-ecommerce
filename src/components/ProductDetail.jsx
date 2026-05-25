@@ -741,10 +741,11 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
             type="button"
             role="tab"
             aria-selected={activeProductInfoTab === 'reviews'}
-            className={`product-info-tab ${activeProductInfoTab === 'reviews' ? 'active' : ''}`}
+            className={`product-info-tab reviews-tab ${activeProductInfoTab === 'reviews' ? 'active' : ''}`}
             onClick={() => handleProductInfoTabClick('reviews')}
           >
-            Avis
+            <span>Avis clients réels</span>
+            <span className="reviews-tab-score">4,8/5</span>
           </button>
         </div>
 

@@ -554,10 +554,11 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
             type="button"
             role="tab"
             aria-selected={activeBundleInfoTab === 'reviews'}
-            className={`product-info-tab ${activeBundleInfoTab === 'reviews' ? 'active' : ''}`}
+            className={`product-info-tab reviews-tab ${activeBundleInfoTab === 'reviews' ? 'active' : ''}`}
             onClick={() => handleBundleInfoTabClick('reviews')}
           >
-            Avis
+            <span>Avis clients réels</span>
+            <span className="reviews-tab-score">4,8/5</span>
           </button>
         </div>
 

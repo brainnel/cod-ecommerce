@@ -429,6 +429,12 @@ ORDER BY CASE WHEN d.sort_order = 0 THEN 999999 ELSE d.sort_order END ASC, d.nam
 - 前端增加同步提交锁：即使 React state 还没刷新，第二次连续点击也会被拦截。
 - 表单校验失败、缺少大区/坐标、订单接口失败时会释放锁，允许用户修正后重新提交；订单成功跳转时不释放，避免成功页跳转前再次提交。
 
+### 2026-05-25 评论入口强化
+
+- 商品页和组合品页评论 tab 文案从 `Avis` 改为 `Avis clients réels`。
+- 评论入口位置不变，但增加橙色高亮和 `4,8/5` 小徽标，提高用户注意力。
+- 埋点仍沿用 `product_review_tab_click`，只统计用户从详情切到评论 tab 的点击。
+
 ### 2026-05-22 H组单页回看版
 
 - 新增 H 组 `single_page_review`，继承 G 组单页下单流程。
