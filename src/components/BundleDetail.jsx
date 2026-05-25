@@ -13,10 +13,12 @@ import {
   isSinglePageCheckoutVariant,
   trackCheckoutEvent,
   trackProductLandingEngagement,
-  trackProductLandingView
+  trackProductLandingView,
+  trackProductReviewTabClick
 } from '../services/checkoutFunnelAnalytics'
 import { useAdTrackingContext } from '../hooks/useAdTrackingHooks.js'
 import ServiceInfo from './ServiceInfo'
+import ProductReviewsPanel, { getDisplayProductReviews } from './ProductReviewsPanel'
 import logoImage from '../assets/logo.png'
 import {
   getLocalPreviewBrowserContextParam,
@@ -85,6 +87,7 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
   const [loading, setLoading] = useState(!initialBundle)
   const [error, setError] = useState(null)
   const [quantity, setQuantity] = useState(1)
+  const [activeBundleInfoTab, setActiveBundleInfoTab] = useState('details')
   const viewTrackedBundleRef = useRef(null)
   const landingEngagementRef = useRef(null)
   const checkoutQuantityExperiment = useMemo(() => getCheckoutQuantityExperiment(), [])
@@ -103,9 +106,11 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
       image_url: bundle.cover_image_url ? [bundle.cover_image_url] : [],
       stock: 99,
       skus: [],
-      product_type: 'bundle'
+      product_type: 'bundle',
+      reviews: bundle.reviews || bundle.product_reviews || []
     }
   }, [bundle])
+  const bundleReviews = useMemo(() => getDisplayProductReviews(bundleProduct), [bundleProduct])
 
   useLayoutEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
@@ -114,6 +119,10 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
   useEffect(() => {
     syncLocalPreviewBrowserContextFromSearch(window.location.search)
   }, [])
+
+  useEffect(() => {
+    setActiveBundleInfoTab('details')
+  }, [bundleId])
 
   useEffect(() => {
     if (!bundle || error) return undefined
@@ -323,6 +332,22 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
     })
   }
 
+  const handleBundleInfoTabClick = (tab) => {
+    setActiveBundleInfoTab(tab)
+    if (tab !== 'reviews' || activeBundleInfoTab === 'reviews' || !bundleProduct) return
+
+    try {
+      trackProductReviewTabClick(bundleProduct, {
+        ad_id: adId,
+        product_type: 'bundle',
+        bundle_id: String(bundle.id),
+        review_count: bundleReviews.length
+      })
+    } catch (error) {
+      console.warn('bundle product_review_tab_click 埋点失败:', error)
+    }
+  }
+
   const totalPrice = (bundle.cfa_price || 0) * quantity
   const detailImages = Array.isArray(bundle.detail_images) ? bundle.detail_images : []
   const items = Array.isArray(bundle.items) ? bundle.items : []
@@ -513,27 +538,53 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
         </div>
       </div>
 
-      {/* 描述 + 详情图 */}
+      {/* 描述与评价 */}
       <div className="product-description">
-        <h3>Détails du pack</h3>
-        {bundle.description_fr && (
-          <div className="description-text">
-            {String(bundle.description_fr).split('\n').map((line, index) => (
-              <p key={`bundle-${bundle.id}-desc-${index}`}>{line}</p>
-            ))}
+        <div className="product-info-tabs" role="tablist" aria-label="Informations pack">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeBundleInfoTab === 'details'}
+            className={`product-info-tab ${activeBundleInfoTab === 'details' ? 'active' : ''}`}
+            onClick={() => handleBundleInfoTabClick('details')}
+          >
+            Détails
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeBundleInfoTab === 'reviews'}
+            className={`product-info-tab ${activeBundleInfoTab === 'reviews' ? 'active' : ''}`}
+            onClick={() => handleBundleInfoTabClick('reviews')}
+          >
+            Avis
+          </button>
+        </div>
+
+        {activeBundleInfoTab === 'details' ? (
+          <div className="product-tab-panel" role="tabpanel">
+            {bundle.description_fr && (
+              <div className="description-text">
+                {String(bundle.description_fr).split('\n').map((line, index) => (
+                  <p key={`bundle-${bundle.id}-desc-${index}`}>{line}</p>
+                ))}
+              </div>
+            )}
+            {detailImages.length > 0 && (
+              <div className="description-images">
+                {detailImages.map((image, index) => (
+                  <img
+                    key={`bundle-${bundle.id}-detail-${index}`}
+                    src={image}
+                    alt={`Détails pack ${index + 1}`}
+                    loading="lazy"
+                  />
+                ))}
+              </div>
+            )}
           </div>
-        )}
-        {detailImages.length > 0 && (
-          <div className="description-images">
-            {detailImages.map((image, index) => (
-              <img
-                key={`bundle-${bundle.id}-detail-${index}`}
-                src={image}
-                alt={`Détails pack ${index + 1}`}
-                loading="lazy"
-              />
-            ))}
-          </div>
+        ) : (
+          <ProductReviewsPanel reviews={bundleReviews} />
         )}
       </div>
     </div>

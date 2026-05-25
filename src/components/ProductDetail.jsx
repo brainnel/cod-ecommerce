@@ -15,7 +15,8 @@ import {
   isSinglePageCheckoutVariant,
   trackCheckoutEvent,
   trackProductLandingEngagement,
-  trackProductLandingView
+  trackProductLandingView,
+  trackProductReviewTabClick
 } from '../services/checkoutFunnelAnalytics';
 import { useAdTrackingContext } from '../hooks/useAdTrackingHooks.js';
 import Countdown from './Countdown';
@@ -573,6 +574,22 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
     setIsModalOpen(true);
   };
 
+  const handleProductInfoTabClick = (tab) => {
+    setActiveProductInfoTab(tab);
+    if (tab !== 'reviews' || activeProductInfoTab === 'reviews') return;
+
+    try {
+      trackProductReviewTabClick(product, {
+        ad_id: adId,
+        category_id: product.category_id,
+        product_type: 'product',
+        review_count: productReviews.length
+      });
+    } catch (error) {
+      console.warn('product_review_tab_click 埋点失败:', error);
+    }
+  };
+
   return (
     <div className="product-detail">
       {/* 顶部标题栏 */}
@@ -705,7 +722,7 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
             role="tab"
             aria-selected={activeProductInfoTab === 'details'}
             className={`product-info-tab ${activeProductInfoTab === 'details' ? 'active' : ''}`}
-            onClick={() => setActiveProductInfoTab('details')}
+            onClick={() => handleProductInfoTabClick('details')}
           >
             Détails
           </button>
@@ -714,7 +731,7 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
             role="tab"
             aria-selected={activeProductInfoTab === 'reviews'}
             className={`product-info-tab ${activeProductInfoTab === 'reviews' ? 'active' : ''}`}
-            onClick={() => setActiveProductInfoTab('reviews')}
+            onClick={() => handleProductInfoTabClick('reviews')}
           >
             Avis
           </button>

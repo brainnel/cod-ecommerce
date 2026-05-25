@@ -520,6 +520,41 @@ export const trackProductLandingEngagement = (product, extra = {}) => {
   return landingSessionId
 }
 
+export const trackProductReviewTabClick = (product, extra = {}) => {
+  const landingSessionId = extra.landing_session_id || getLandingSessionId()
+  if (!landingSessionId) return null
+
+  const eventProperties = {
+    ...buildCheckoutProductProperties(product, {
+      ...extra,
+      landing_session_id: landingSessionId
+    }),
+    checkout_flow: CHECKOUT_FLOW,
+    event_id: createId('event'),
+    landing_session_id: landingSessionId,
+    review_tab_name: 'reviews',
+    review_click_source: extra.review_click_source || 'product_info_tabs',
+    review_count: extra.review_count ?? null,
+    ...getPageProperties()
+  }
+
+  sendAnalyticsPayload({
+    device_id: getCheckoutDeviceId(),
+    platform: 'web',
+    app_version: 'cod-ecommerce-web',
+    events: [
+      {
+        event_name: 'product_review_tab_click',
+        session_id: landingSessionId,
+        timestamp: new Date().toISOString(),
+        properties: eventProperties
+      }
+    ]
+  })
+
+  return landingSessionId
+}
+
 export const beginCheckoutFunnel = (product, extra = {}) => {
   const nextContext = buildCheckoutProductProperties(product, extra)
   const existingSessionId = getCheckoutSessionId()
