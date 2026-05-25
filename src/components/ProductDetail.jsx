@@ -301,38 +301,49 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
   }, [error, product?.product_id]);
 
   useEffect(() => {
+    let isCancelled = false;
+
     const fetchData = async () => {
       try {
         setError(null);
         setErrorRedirectCategoryId(null);
-        let data;
-        
-        // 如果已经有初始产品数据，就不需要再次获取
+
         if (initialProduct) {
-          data = initialProduct;
+          setProduct(initialProduct);
           setLoading(false);
         } else {
           setLoading(true);
-          data = await productAPI.getProductDetail(productId);
-          setProduct(data);
         }
+
+        // 列表页传来的 initialProduct 不包含 reviews 等详情字段，需要再拉详情补齐。
+        const data = await productAPI.getProductDetail(productId);
+        if (isCancelled) return;
+        setProduct(data);
         
         // 如果产品有product_group_id，获取变体列表
         if (data && data.product_group_id) {
           const variantList = await productAPI.getProductVariants(productId);
+          if (isCancelled) return;
           setVariants(variantList);
         }
       } catch (err) {
+        if (isCancelled) return;
         setError(getProductFetchErrorMessage(err));
         setErrorRedirectCategoryId(isUnavailableProductError(err) ? getUnavailableCategoryId(err) : null);
         setRedirectCountdown(PRODUCT_UNAVAILABLE_REDIRECT_SECONDS);
         console.error('Error fetching product:', err);
       } finally {
-        setLoading(false);
+        if (!isCancelled) {
+          setLoading(false);
+        }
       }
     };
 
     fetchData();
+
+    return () => {
+      isCancelled = true;
+    };
   }, [productId, initialProduct]);
 
   const unavailableRedirectTarget = error === PRODUCT_UNAVAILABLE_MESSAGE_FR
