@@ -646,6 +646,52 @@ const PaymentPage = () => {
     syncLocalPreviewBrowserContextFromSearch(location.search)
   }, [location.search])
 
+  useEffect(() => {
+    const root = document.documentElement
+    const visualViewport = window.visualViewport
+
+    if (!visualViewport) {
+      root.style.setProperty('--checkout-keyboard-offset', '0px')
+      return undefined
+    }
+
+    const isEditableFocused = () => {
+      const activeTag = document.activeElement?.tagName
+      return activeTag === 'INPUT' || activeTag === 'TEXTAREA' || activeTag === 'SELECT'
+    }
+
+    const updateKeyboardOffset = () => {
+      if (!isEditableFocused()) {
+        root.style.setProperty('--checkout-keyboard-offset', '0px')
+        return
+      }
+
+      const keyboardOffset = Math.max(
+        0,
+        window.innerHeight - visualViewport.height - visualViewport.offsetTop
+      )
+      root.style.setProperty('--checkout-keyboard-offset', `${Math.round(keyboardOffset)}px`)
+    }
+
+    const resetKeyboardOffset = () => {
+      window.setTimeout(updateKeyboardOffset, 80)
+    }
+
+    visualViewport.addEventListener('resize', updateKeyboardOffset)
+    visualViewport.addEventListener('scroll', updateKeyboardOffset)
+    window.addEventListener('focusin', updateKeyboardOffset)
+    window.addEventListener('focusout', resetKeyboardOffset)
+    updateKeyboardOffset()
+
+    return () => {
+      visualViewport.removeEventListener('resize', updateKeyboardOffset)
+      visualViewport.removeEventListener('scroll', updateKeyboardOffset)
+      window.removeEventListener('focusin', updateKeyboardOffset)
+      window.removeEventListener('focusout', resetKeyboardOffset)
+      root.style.removeProperty('--checkout-keyboard-offset')
+    }
+  }, [])
+
   // 重定向检查
   useEffect(() => {
     if (!product || !quantity) {
@@ -1604,11 +1650,11 @@ const PaymentPage = () => {
     
     if (!userInfo.addressDescription.trim()) {
       newErrors.addressDescription = isInlineQuantityVariant
-        ? 'Ajoutez votre adresse et un repère pour le livreur'
+        ? 'Ajoutez l’adresse + un repère. Minimum 5 caractères.'
         : 'La description de l\'adresse est requise'
     } else if (userInfo.addressDescription.trim().length < 5) {
       newErrors.addressDescription = isInlineQuantityVariant
-        ? 'Ajoutez une adresse plus précise'
+        ? 'Adresse trop courte : minimum 5 caractères.'
         : 'Au moins 5 caractères requis'
     }
     
@@ -2154,6 +2200,11 @@ const PaymentPage = () => {
               <label htmlFor="addressDescription" className="form-label">
                 {isInlineQuantityVariant ? 'Adresse détaillée et repère *' : 'Description de l\'adresse *'}
               </label>
+              {isInlineQuantityVariant && (
+                <div className="address-field-hint">
+                  Quartier, rue/bloc + repère visible. Minimum 5 caractères.
+                </div>
+              )}
               <textarea
                 id="addressDescription"
                 ref={(node) => { fieldRefs.current.addressDescription = node }}
@@ -2174,6 +2225,7 @@ const PaymentPage = () => {
                 </div>
               )}
               <div className="char-count">{userInfo.addressDescription.length}/200</div>
+              {errors.addressDescription && <div className="error-message address-error-message">{errors.addressDescription}</div>}
               {(isAddressFirstVariant || isSinglePageVariant) && selectedDistrict && (
                 <div className="address-map-option">
                   <button
@@ -2194,7 +2246,6 @@ const PaymentPage = () => {
                   )}
                 </div>
               )}
-              {errors.addressDescription && <div className="error-message">{errors.addressDescription}</div>}
             </div>
 
             {!isSinglePageVariant && (

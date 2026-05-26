@@ -557,8 +557,7 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
             className={`product-info-tab reviews-tab ${activeBundleInfoTab === 'reviews' ? 'active' : ''}`}
             onClick={() => handleBundleInfoTabClick('reviews')}
           >
-            <span>Avis clients réels</span>
-            <span className="reviews-tab-score">4,8/5</span>
+            Avis clients réels
           </button>
         </div>
 

@@ -744,8 +744,7 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
             className={`product-info-tab reviews-tab ${activeProductInfoTab === 'reviews' ? 'active' : ''}`}
             onClick={() => handleProductInfoTabClick('reviews')}
           >
-            <span>Avis clients réels</span>
-            <span className="reviews-tab-score">4,8/5</span>
+            Avis clients réels
           </button>
         </div>
 
