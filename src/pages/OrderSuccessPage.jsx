@@ -19,8 +19,15 @@ import { appDownloadAPI } from '../services/api'
 import { trackCheckoutEvent } from '../services/checkoutFunnelAnalytics'
 import './OrderSuccessPage.css'
 
-// 缓存下载链接，避免重复请求
-let cachedDownloadLinks = null
+const FALLBACK_DOWNLOAD_LINKS = {
+  ios: { url: 'https://apps.apple.com/app/id6760172301', version: '' },
+  android: { url: 'https://play.google.com/store/apps/details?id=com.brainnel.vite', version: '' },
+  apk: { url: 'https://api.brainnel.com/static/app/brainnel.apk', version: '' }
+}
+
+// 缓存下载链接，避免重复请求；点击时先用兜底链接，不能被接口慢响应卡住。
+let cachedDownloadLinks = FALLBACK_DOWNLOAD_LINKS
+let hasLoadedDownloadLinks = false
 const ORDER_SUCCESS_STATE_STORAGE_KEY = 'cod_order_success_state_v1'
 const ORDER_SUCCESS_STATE_TTL_MS = 2 * 60 * 60 * 1000
 
@@ -60,6 +67,29 @@ const saveCachedOrderSuccessState = (state) => {
   } catch (error) {
     console.warn('order success cache write failed:', error)
   }
+}
+
+const mergeDownloadLinks = (links) => ({
+  ios: links?.ios?.url ? links.ios : FALLBACK_DOWNLOAD_LINKS.ios,
+  android: links?.android?.url ? links.android : FALLBACK_DOWNLOAD_LINKS.android,
+  apk: links?.apk?.url ? links.apk : FALLBACK_DOWNLOAD_LINKS.apk
+})
+
+const getPreferredDownloadUrl = () => {
+  if (typeof window === 'undefined') return FALLBACK_DOWNLOAD_LINKS.android.url
+
+  const links = mergeDownloadLinks(cachedDownloadLinks)
+  const userAgent = navigator.userAgent || navigator.vendor || window.opera
+
+  if (/iPad|iPhone|iPod/.test(userAgent) && !window.MSStream) {
+    return links.ios.url
+  }
+
+  if (/android/i.test(userAgent)) {
+    return links.android.url
+  }
+
+  return links.apk.url || '/download'
 }
 
 const getDevOrderSuccessPreviewState = (search) => {
@@ -118,11 +148,12 @@ const OrderSuccessPage = () => {
   }, [orderSuccessState, previewState])
 
   useEffect(() => {
-    if (cachedDownloadLinks) return
+    if (hasLoadedDownloadLinks) return
 
     appDownloadAPI.getDownloadLinks()
       .then((links) => {
-        cachedDownloadLinks = links
+        cachedDownloadLinks = mergeDownloadLinks(links)
+        hasLoadedDownloadLinks = true
       })
       .catch((error) => {
         console.warn('app download links preload failed:', error)
@@ -154,32 +185,9 @@ const OrderSuccessPage = () => {
     redirectToAppStore()
   }
 
-  const redirectToAppStore = async () => {
-    try {
-      if (!cachedDownloadLinks) {
-        cachedDownloadLinks = await appDownloadAPI.getDownloadLinks()
-      }
-    } catch (error) {
-      console.warn('app download links fetch failed:', error)
-    }
-
-    const userAgent = navigator.userAgent || navigator.vendor || window.opera;
-    const iosUrl = cachedDownloadLinks?.ios?.url || 'https://apps.apple.com/app/id6760172301'
-    const androidUrl = cachedDownloadLinks?.android?.url || 'https://play.google.com/store/apps/details?id=com.brainnel.vite'
-
+  const redirectToAppStore = () => {
     saveCachedOrderSuccessState(orderSuccessState)
-
-    if (/iPad|iPhone|iPod/.test(userAgent) && !window.MSStream) {
-      window.location.assign(iosUrl);
-      return;
-    }
-
-    if (/android/i.test(userAgent)) {
-      window.location.assign(androidUrl);
-      return;
-    }
-
-    window.location.assign('/download')
+    window.location.assign(getPreferredDownloadUrl())
   }
 
   const handleWhatsAppContact = () => {
