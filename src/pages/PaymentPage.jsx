@@ -282,9 +282,7 @@ const PaymentPage = () => {
     whatsapp: cachedCustomerInfo?.whatsapp || cachedCustomerInfo?.phone || '',
     addressDescription: cachedCustomerInfo?.addressDescription || ''
   }))
-  const [whatsappSameAsPhone, setWhatsappSameAsPhone] = useState(() => (
-    cachedCustomerInfo?.whatsappSameAsPhone ?? true
-  ))
+  const [whatsappSameAsPhone] = useState(true)
   const [errors, setErrors] = useState({})
   const orderSubmitLockRef = useRef(false)
   const [isPlacingOrder, setIsPlacingOrder] = useState(false)
@@ -1559,24 +1557,6 @@ const PaymentPage = () => {
     }
   }
 
-  const handleWhatsappSameAsPhoneChange = (checked) => {
-    setWhatsappSameAsPhone(checked)
-    setUserInfo(prev => ({
-      ...prev,
-      whatsapp: checked ? prev.phone : prev.whatsapp
-    }))
-    setErrors(prev => ({ ...prev, whatsapp: '' }))
-
-    trackPaymentEvent('whatsapp_same_as_phone_changed', {
-      ...getDistrictAnalyticsProps(),
-      whatsapp_same_as_phone: checked
-    })
-
-    if (checked && userInfo.phone.length === 10) {
-      trackFieldCompletedOnce('whatsapp', { whatsapp_same_as_phone: true })
-    }
-  }
-
   useEffect(() => {
     if (!showInfoSection || cachedFieldCompletionTrackedRef.current || !cachedCustomerInfo) return
 
@@ -1650,11 +1630,11 @@ const PaymentPage = () => {
     
     if (!userInfo.addressDescription.trim()) {
       newErrors.addressDescription = isInlineQuantityVariant
-        ? 'Ajoutez l’adresse + un repère. Minimum 5 caractères.'
+        ? 'Ajoutez un quartier ou un repère pour aider le livreur à vous trouver.'
         : 'La description de l\'adresse est requise'
     } else if (userInfo.addressDescription.trim().length < 5) {
       newErrors.addressDescription = isInlineQuantityVariant
-        ? 'Adresse trop courte : minimum 5 caractères.'
+        ? 'Ajoutez un peu plus de détails pour aider le livreur.'
         : 'Au moins 5 caractères requis'
     }
     
@@ -1830,6 +1810,9 @@ const PaymentPage = () => {
   if (!product || !quantity) return null
 
   const totalPrice = product.price * quantity
+  const fullNameReady = userInfo.fullName.trim().length > 0 && !errors.fullName
+  const phoneReady = userInfo.phone.length === 10 && !errors.phone
+  const addressReady = userInfo.addressDescription.trim().length >= 5 && !errors.addressDescription
 
   return (
     <div className="payment-page">
@@ -2135,12 +2118,17 @@ const PaymentPage = () => {
             <h2 className="section-title">Informations de livraison</h2>
 
             <div className="form-group">
-              <label htmlFor="fullName" className="form-label">Nom complet *</label>
+              <label htmlFor="fullName" className="form-label required-field-label">
+                <span>Nom complet</span>
+                <span className={`field-status-dot ${fullNameReady ? 'ready' : ''}`} aria-hidden="true">
+                  {fullNameReady ? '✓' : ''}
+                </span>
+              </label>
               <input
                 id="fullName"
                 type="text"
                 ref={(node) => { fieldRefs.current.fullName = node }}
-                className={`form-input ${errors.fullName ? 'error' : ''}`}
+                className={`form-input ${errors.fullName ? 'error' : ''} ${fullNameReady ? 'field-ready' : ''}`}
                 value={userInfo.fullName}
                 onChange={(e) => handleInputChange('fullName', e.target.value)}
                 placeholder="Entrez votre nom complet"
@@ -2151,8 +2139,13 @@ const PaymentPage = () => {
             </div>
 
             <div className="form-group">
-              <label htmlFor="phone" className="form-label">Téléphone *</label>
-              <div className={`phone-input-group ${errors.phone ? 'error' : ''}`}>
+              <label htmlFor="phone" className="form-label required-field-label">
+                <span>Téléphone</span>
+                <span className={`field-status-dot ${phoneReady ? 'ready' : ''}`} aria-hidden="true">
+                  {phoneReady ? '✓' : ''}
+                </span>
+              </label>
+              <div className={`phone-input-group ${errors.phone ? 'error' : ''} ${phoneReady ? 'field-ready' : ''}`}>
                 <div className="country-code-prefix">+225</div>
                 <input
                   id="phone"
@@ -2169,52 +2162,27 @@ const PaymentPage = () => {
             </div>
 
             <div className="form-group">
-              <label className="form-label">WhatsApp *</label>
-              <label className="same-whatsapp-option">
-                <input
-                  type="checkbox"
-                  checked={whatsappSameAsPhone}
-                  onChange={(e) => handleWhatsappSameAsPhoneChange(e.target.checked)}
-                />
-                <span>WhatsApp identique au téléphone</span>
-              </label>
-              {!whatsappSameAsPhone && (
-                <div className={`phone-input-group whatsapp-manual-input ${errors.whatsapp ? 'error' : ''}`}>
-                  <div className="country-code-prefix">+225</div>
-                  <input
-                    id="whatsapp"
-                    type="tel"
-                    ref={(node) => { fieldRefs.current.whatsapp = node }}
-                    className="form-input phone-input"
-                    value={userInfo.whatsapp}
-                    onChange={(e) => handleInputChange('whatsapp', e.target.value)}
-                    placeholder="XXXXXXXX"
-                    autoComplete="tel"
-                  />
-                </div>
-              )}
-              {errors.whatsapp && <div className="error-message">{errors.whatsapp}</div>}
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="addressDescription" className="form-label">
-                {isInlineQuantityVariant ? 'Adresse détaillée et repère *' : 'Description de l\'adresse *'}
+              <label htmlFor="addressDescription" className="form-label required-field-label">
+                <span>{isInlineQuantityVariant ? 'Adresse ou repère' : 'Description de l\'adresse'}</span>
+                <span className={`field-status-dot ${addressReady ? 'ready' : ''}`} aria-hidden="true">
+                  {addressReady ? '✓' : ''}
+                </span>
               </label>
               {isInlineQuantityVariant && (
                 <div className="address-field-hint">
-                  Quartier, rue/bloc + repère visible. Minimum 5 caractères.
+                  Quartier, lieu connu ou repère visible. Le livreur appellera avant de passer.
                 </div>
               )}
               <textarea
                 id="addressDescription"
                 ref={(node) => { fieldRefs.current.addressDescription = node }}
-                className={`form-textarea ${errors.addressDescription ? 'error' : ''}`}
+                className={`form-textarea ${errors.addressDescription ? 'error' : ''} ${isInlineQuantityVariant && addressReady ? 'address-ready' : ''}`}
                 value={userInfo.addressDescription}
                 onChange={(e) => handleInputChange('addressDescription', e.target.value)}
                 placeholder={isCodTrustVariant
-                  ? 'Ex: Cocody Riviera 2, rue 12, portail bleu, près de la pharmacie'
+                  ? 'Ex: Cocody Riviera 3, près de la Pharmacie Sainte Marie, portail bleu'
                   : isInlineQuantityVariant
-                  ? 'Ex: Cocody Riviera 2, rue 12, portail bleu, près de la pharmacie'
+                  ? 'Ex: Cocody Riviera 3, près de la Pharmacie Sainte Marie, portail bleu'
                   : 'Ex: Près de l\'université, à côté du bâtiment rouge'}
                 autoComplete="street-address"
                 rows={4}

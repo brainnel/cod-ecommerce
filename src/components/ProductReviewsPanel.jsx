@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { FiStar } from 'react-icons/fi'
 
 export const PRODUCT_REVIEW_SUMMARY = {

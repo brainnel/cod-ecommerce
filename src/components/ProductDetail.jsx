@@ -101,13 +101,13 @@ const FALLBACK_QUALITY_REVIEW_POOL = [
   (shortName) => ({
     text: `Le ${shortName} était bien emballé. À la réception, tout était en bon état et rien ne semblait abîmé.`
   }),
-  (shortName) => ({
+  () => ({
     text: `Le modèle reçu correspondait aux photos de la page. La finition est correcte pour le prix payé.`
   }),
-  (shortName) => ({
+  () => ({
     text: `Le colis était propre à l'arrivée. Le produit était complet et conforme à ce que j'avais commandé.`
   }),
-  (shortName) => ({
+  () => ({
     text: `J'ai vérifié le produit à la livraison. Il était en bon état et le modèle était bien celui choisi.`
   }),
   (shortName) => ({
