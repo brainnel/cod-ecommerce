@@ -285,6 +285,7 @@ const PaymentPage = () => {
   const [whatsappSameAsPhone] = useState(true)
   const [errors, setErrors] = useState({})
   const orderSubmitLockRef = useRef(false)
+  const touchSubmitHandledRef = useRef(false)
   const [isPlacingOrder, setIsPlacingOrder] = useState(false)
   const [clientInfo, setClientInfo] = useState({})
   const singlePageCachedDistrictPending = (
@@ -1807,6 +1808,26 @@ const PaymentPage = () => {
     }
   }
 
+  const handlePlaceOrderPointerDown = (event) => {
+    if (event.pointerType === 'mouse' || isPlacingOrder) return
+
+    event.preventDefault()
+    touchSubmitHandledRef.current = true
+    window.setTimeout(() => {
+      touchSubmitHandledRef.current = false
+    }, 800)
+    handlePlaceOrder()
+  }
+
+  const handlePlaceOrderClick = () => {
+    if (touchSubmitHandledRef.current) {
+      touchSubmitHandledRef.current = false
+      return
+    }
+
+    handlePlaceOrder()
+  }
+
   if (!product || !quantity) return null
 
   const totalPrice = product.price * quantity
@@ -2278,7 +2299,8 @@ const PaymentPage = () => {
               <button
                 type="button"
                 className={`place-order-btn ${isPlacingOrder ? 'loading' : 'enabled'}`}
-                onClick={handlePlaceOrder}
+                onPointerDown={handlePlaceOrderPointerDown}
+                onClick={handlePlaceOrderClick}
                 disabled={isPlacingOrder}
                 aria-busy={isPlacingOrder}
               >
