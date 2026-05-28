@@ -89,7 +89,7 @@ const getPreferredDownloadUrl = () => {
     return links.android.url
   }
 
-  return links.apk.url || '/download'
+  return '/download'
 }
 
 const getDevOrderSuccessPreviewState = (search) => {
