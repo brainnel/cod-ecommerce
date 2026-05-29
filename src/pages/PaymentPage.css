@@ -562,12 +562,35 @@
   font-size: 12px;
   color: #999;
   text-align: right;
-  margin-top: 4px;
+  margin-top: 0;
+  white-space: nowrap;
 }
 
-.address-error-message {
-  margin-top: 3px;
-  font-weight: 750;
+.address-feedback-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 22px;
+  margin-top: 5px;
+}
+
+.address-minimum-hint {
+  min-width: 0;
+  color: #7a8493;
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.address-minimum-hint.error {
+  color: #dc3545;
+  font-weight: 800;
+}
+
+.address-minimum-hint.ready {
+  color: #15803d;
+  font-weight: 800;
 }
 
 .address-field-hint {

@@ -1610,11 +1610,22 @@ const PaymentPage = () => {
     const fieldNode = fieldRefs.current[field]
     if (!fieldNode) return
 
+    const scrollFieldIntoComfortView = () => {
+      const rect = fieldNode.getBoundingClientRect()
+      const targetTop = field === 'addressDescription' ? 92 : 112
+      const delta = rect.top - targetTop
+
+      if (Math.abs(delta) > 8) {
+        window.scrollBy({ top: delta, behavior: 'smooth' })
+      }
+    }
+
     window.requestAnimationFrame(() => {
-      fieldNode.scrollIntoView({ behavior: 'smooth', block: 'center' })
       if (typeof fieldNode.focus === 'function') {
         fieldNode.focus({ preventScroll: true })
       }
+      scrollFieldIntoComfortView()
+      window.setTimeout(scrollFieldIntoComfortView, 320)
     })
   }
 
@@ -1641,11 +1652,11 @@ const PaymentPage = () => {
     
     if (!userInfo.addressDescription.trim()) {
       newErrors.addressDescription = isInlineQuantityVariant
-        ? 'Ajoutez un quartier ou un repère pour aider le livreur à vous trouver.'
+        ? 'Ajoutez au moins 5 caractères : quartier ou repère connu.'
         : 'La description de l\'adresse est requise'
     } else if (userInfo.addressDescription.trim().length < 5) {
       newErrors.addressDescription = isInlineQuantityVariant
-        ? 'Ajoutez un peu plus de détails pour aider le livreur.'
+        ? 'Ajoutez au moins 5 caractères : quartier ou repère connu.'
         : 'Au moins 5 caractères requis'
     }
     
@@ -2224,8 +2235,12 @@ const PaymentPage = () => {
                   Ajoutez un repère clair. Si le livreur ne trouve pas, nous vous contactons par téléphone ou WhatsApp.
                 </div>
               )}
-              <div className="char-count">{userInfo.addressDescription.length}/200</div>
-              {errors.addressDescription && <div className="error-message address-error-message">{errors.addressDescription}</div>}
+              <div className="address-feedback-row">
+                <div className={`address-minimum-hint ${errors.addressDescription ? 'error' : ''} ${addressReady ? 'ready' : ''}`}>
+                  {errors.addressDescription || (!addressReady ? 'Minimum 5 caractères' : '')}
+                </div>
+                <div className="char-count">{userInfo.addressDescription.length}/200</div>
+              </div>
               {(isAddressFirstVariant || isSinglePageVariant) && selectedDistrict && (
                 <div className="address-map-option">
                   <button
