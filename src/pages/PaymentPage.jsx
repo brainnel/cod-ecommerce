@@ -1800,17 +1800,18 @@ const PaymentPage = () => {
 
       // 跳转到订单成功页面
       clearCheckoutPaymentState()
+      const orderSuccessState = {
+        product,
+        quantity,
+        userInfo: effectiveUserInfo,
+        selectedLocation: selectedDistrict,
+        totalPrice: product.price * quantity,
+        orderResponse: response.data,
+        checkoutQuantityExperiment
+      }
+      navigate('/', { replace: true })
       navigate('/order-success', {
-        replace: true,
-        state: {
-          product,
-          quantity,
-          userInfo: effectiveUserInfo,
-          selectedLocation: selectedDistrict,
-          totalPrice: product.price * quantity,
-          orderResponse: response.data,
-          checkoutQuantityExperiment
-        }
+        state: orderSuccessState
       })
       shouldReleaseSubmitLock = false
 
