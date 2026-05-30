@@ -620,16 +620,6 @@ const PaymentPage = () => {
     navigate(getProductReviewPath())
   }
 
-  const replaceCheckoutHistoryWithHome = () => {
-    if (typeof window === 'undefined') return
-
-    try {
-      window.history.replaceState(window.history.state, '', '/')
-    } catch (error) {
-      console.warn('替换 checkout 历史记录失败:', error)
-    }
-  }
-
   useEffect(() => {
     if (!product || !quantity) return
     saveCheckoutPaymentState(getPaymentNavigationState())
@@ -1810,8 +1800,8 @@ const PaymentPage = () => {
 
       // 跳转到订单成功页面
       clearCheckoutPaymentState()
-      replaceCheckoutHistoryWithHome()
       navigate('/order-success', {
+        replace: true,
         state: {
           product,
           quantity,

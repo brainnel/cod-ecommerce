@@ -135,6 +135,7 @@ const OrderSuccessPage = () => {
     () => location.state || previewState || cachedInitialSuccessState || {},
     [location.state, previewState, cachedInitialSuccessState]
   )
+  const hasBackGuard = Boolean(location.state?.orderSuccessBackGuard)
   const { product, quantity, userInfo, selectedLocation, totalPrice, orderResponse } = orderSuccessState
 
   useEffect(() => {
@@ -146,6 +147,33 @@ const OrderSuccessPage = () => {
       saveCachedOrderSuccessState(orderSuccessState)
     }
   }, [orderSuccessState, previewState])
+
+  useEffect(() => {
+    if (previewState || !isCompleteOrderSuccessState(orderSuccessState) || hasBackGuard) return
+
+    navigate('/order-success', {
+      replace: false,
+      state: {
+        ...orderSuccessState,
+        orderSuccessBackGuard: true
+      }
+    })
+  }, [orderSuccessState, previewState, hasBackGuard, navigate])
+
+  useEffect(() => {
+    if (previewState || !isCompleteOrderSuccessState(orderSuccessState)) return undefined
+
+    const handleBrowserBack = () => {
+      window.setTimeout(() => {
+        navigate('/', { replace: true })
+      }, 0)
+    }
+
+    window.addEventListener('popstate', handleBrowserBack)
+    return () => {
+      window.removeEventListener('popstate', handleBrowserBack)
+    }
+  }, [orderSuccessState, previewState, navigate])
 
   useEffect(() => {
     if (hasLoadedDownloadLinks) return

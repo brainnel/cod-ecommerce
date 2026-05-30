@@ -30,6 +30,7 @@
 - 有效手机号必须为 10 位，并以 `01`、`05` 或 `07` 开头；`21/25/27` 等固定电话不作为 COD 配送联系电话通过。明显测试号或假号如全重复、顺序号、某一数字重复过多会被拦截。
 - 前端失败提示保持简短法语：位数不对提示 `Entrez un numéro ivoirien à 10 chiffres.`；前缀不对提示 `Le numéro doit commencer par 01, 05 ou 07.`；明显假号提示 `Entrez un numéro valide pour que le livreur puisse vous appeler.`
 - 后端 `FlashOrderCreate` 和 `FlashBundleOrderCreate` 也做同样规范化和兜底校验，最终仍按 `225 + 本地 10 位` 存储，防止绕过前端提交脏号码。后续本地/线上测试单不要再用 `1234567890`，建议用 `0712345678` 或 `0512345678`。
+- 下单成功跳转到订单成功页时，必须把 checkout 页从浏览器历史栈里替换掉；订单成功页监听浏览器返回/左滑并直接回首页。不要让用户在成功页左滑时短暂看到个人信息页，再由 checkout 自己重定向首页。
 
 ## 2026-05-22 当前预览
 
