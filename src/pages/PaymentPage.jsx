@@ -29,6 +29,11 @@ import {
   saveCheckoutCustomerInfo
 } from '../utils/checkoutCustomerInfoCache'
 import {
+  isValidCheckoutPhone,
+  normalizeCheckoutPhone,
+  validateCheckoutPhone
+} from '../utils/checkoutPhone'
+import {
   buildCheckoutDistrictCacheEntry,
   getCachedManualMarkerForDistrict,
   isSameCheckoutDistrict,
@@ -1534,7 +1539,7 @@ const PaymentPage = () => {
     let nextValue = value
 
     if (field === 'phone' || field === 'whatsapp') {
-      nextValue = value.replace(/\D/g, '').slice(0, 10)
+      nextValue = normalizeCheckoutPhone(value)
     } else if (field === 'addressDescription') {
       nextValue = value.slice(0, 200)
     }
@@ -1553,7 +1558,7 @@ const PaymentPage = () => {
 
     const isFieldComplete = (
       (field === 'fullName' && nextValue.trim().length > 0) ||
-      ((field === 'phone' || field === 'whatsapp') && nextValue.length === 10) ||
+      ((field === 'phone' || field === 'whatsapp') && isValidCheckoutPhone(nextValue)) ||
       (field === 'addressDescription' && nextValue.trim().length >= 5)
     )
 
@@ -1563,7 +1568,7 @@ const PaymentPage = () => {
       })
     }
 
-    if (field === 'phone' && whatsappSameAsPhone && nextValue.length === 10) {
+    if (field === 'phone' && whatsappSameAsPhone && isValidCheckoutPhone(nextValue)) {
       trackFieldCompletedOnce('whatsapp', { whatsapp_same_as_phone: true })
     }
   }
@@ -1576,15 +1581,15 @@ const PaymentPage = () => {
     if (userInfo.fullName.trim().length > 0) {
       trackFieldCompletedOnce('fullName', { field_fill_method: 'local_cache' })
     }
-    if (userInfo.phone.length === 10) {
+    if (isValidCheckoutPhone(userInfo.phone)) {
       trackFieldCompletedOnce('phone', { field_fill_method: 'local_cache' })
     }
-    if (whatsappSameAsPhone && userInfo.phone.length === 10) {
+    if (whatsappSameAsPhone && isValidCheckoutPhone(userInfo.phone)) {
       trackFieldCompletedOnce('whatsapp', {
         field_fill_method: 'local_cache',
         whatsapp_same_as_phone: true
       })
-    } else if (!whatsappSameAsPhone && userInfo.whatsapp.length === 10) {
+    } else if (!whatsappSameAsPhone && isValidCheckoutPhone(userInfo.whatsapp)) {
       trackFieldCompletedOnce('whatsapp', {
         field_fill_method: 'local_cache',
         whatsapp_same_as_phone: false
@@ -1633,21 +1638,23 @@ const PaymentPage = () => {
   const validateForm = () => {
     const newErrors = {}
     const effectiveWhatsapp = whatsappSameAsPhone ? userInfo.phone : userInfo.whatsapp
+    const phoneValidation = validateCheckoutPhone(userInfo.phone, {
+      requiredMessage: 'Le numéro de téléphone est requis'
+    })
+    const whatsappValidation = validateCheckoutPhone(effectiveWhatsapp, {
+      requiredMessage: 'Le numéro WhatsApp est requis'
+    })
     
     if (!userInfo.fullName.trim()) {
       newErrors.fullName = 'Le nom complet est requis'
     }
     
-    if (!userInfo.phone.trim()) {
-      newErrors.phone = 'Le numéro de téléphone est requis'
-    } else if (userInfo.phone.length !== 10) {
-      newErrors.phone = 'Le numéro doit contenir 10 chiffres'
+    if (!phoneValidation.isValid) {
+      newErrors.phone = phoneValidation.error
     }
     
-    if (!whatsappSameAsPhone && !effectiveWhatsapp.trim()) {
-      newErrors.whatsapp = 'Le numéro WhatsApp est requis'
-    } else if (!whatsappSameAsPhone && effectiveWhatsapp.length !== 10) {
-      newErrors.whatsapp = 'Le numéro doit contenir 10 chiffres'
+    if (!whatsappSameAsPhone && !whatsappValidation.isValid) {
+      newErrors.whatsapp = whatsappValidation.error
     }
     
     if (!userInfo.addressDescription.trim()) {
@@ -1687,16 +1694,19 @@ const PaymentPage = () => {
     }
 
     const effectiveWhatsapp = whatsappSameAsPhone ? userInfo.phone : userInfo.whatsapp
+    const normalizedPhone = normalizeCheckoutPhone(userInfo.phone)
+    const normalizedWhatsapp = normalizeCheckoutPhone(effectiveWhatsapp)
     const effectiveUserInfo = {
       ...userInfo,
-      whatsapp: effectiveWhatsapp
+      phone: normalizedPhone,
+      whatsapp: normalizedWhatsapp
     }
 
     if (!validateForm()) {
       const missingFields = []
       if (!userInfo.fullName.trim()) missingFields.push('fullName')
-      if (userInfo.phone.length !== 10) missingFields.push('phone')
-      if (!whatsappSameAsPhone && effectiveWhatsapp.length !== 10) missingFields.push('whatsapp')
+      if (!isValidCheckoutPhone(userInfo.phone)) missingFields.push('phone')
+      if (!whatsappSameAsPhone && !isValidCheckoutPhone(effectiveWhatsapp)) missingFields.push('whatsapp')
       if (userInfo.addressDescription.trim().length < 5) missingFields.push('addressDescription')
       trackPaymentEvent('submit_validation_failed', {
         ...getDistrictAnalyticsProps(),
@@ -1736,8 +1746,8 @@ const PaymentPage = () => {
         const bundleOrderData = {
           district_id: selectedDistrict.id,
           full_name: userInfo.fullName,
-          phone: `225${userInfo.phone}`,
-          whatsapp: `225${effectiveWhatsapp}`,
+          phone: `225${normalizedPhone}`,
+          whatsapp: `225${normalizedWhatsapp}`,
           receiver_address: userInfo.addressDescription,
           latitude: deliveryMarker.lat,
           longitude: deliveryMarker.lng,
@@ -1759,8 +1769,8 @@ const PaymentPage = () => {
           }],
           district_id: selectedDistrict.id,
           full_name: userInfo.fullName,
-          phone: `225${userInfo.phone}`,
-          whatsapp: `225${effectiveWhatsapp}`,
+          phone: `225${normalizedPhone}`,
+          whatsapp: `225${normalizedWhatsapp}`,
           receiver_address: userInfo.addressDescription,
           latitude: deliveryMarker.lat,
           longitude: deliveryMarker.lng,
@@ -1854,7 +1864,7 @@ const PaymentPage = () => {
 
   const totalPrice = product.price * quantity
   const fullNameReady = userInfo.fullName.trim().length > 0 && !errors.fullName
-  const phoneReady = userInfo.phone.length === 10 && !errors.phone
+  const phoneReady = isValidCheckoutPhone(userInfo.phone) && !errors.phone
   const addressReady = userInfo.addressDescription.trim().length >= 5 && !errors.addressDescription
 
   return (
@@ -2197,7 +2207,7 @@ const PaymentPage = () => {
                   className="form-input phone-input"
                   value={userInfo.phone}
                   onChange={(e) => handleInputChange('phone', e.target.value)}
-                  placeholder="XXXXXXXX"
+                  placeholder="XXXXXXXXXX"
                   autoComplete="tel"
                 />
               </div>

@@ -1,3 +1,5 @@
+import { isValidCheckoutPhone, normalizeCheckoutPhone } from './checkoutPhone'
+
 const STORAGE_KEY = 'cod_checkout_customer_info_v1'
 const MAX_ADDRESS_LENGTH = 200
 
@@ -13,16 +15,12 @@ const getDefaultStorage = () => {
 
 const normalizeText = (value) => String(value || '').trim()
 
-export const normalizeCheckoutPhone = (value) => (
-  String(value || '').replace(/\D/g, '').slice(0, 10)
-)
-
 const normalizeAddress = (value) => (
   String(value || '').trim().slice(0, MAX_ADDRESS_LENGTH)
 )
 
 const isValidName = (value) => normalizeText(value).length > 0
-const isValidPhone = (value) => normalizeCheckoutPhone(value).length === 10
+const isValidPhone = isValidCheckoutPhone
 const isValidAddress = (value) => normalizeAddress(value).length >= 5
 
 const safeReadJson = (storage) => {
