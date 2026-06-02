@@ -454,7 +454,7 @@ ORDER BY CASE WHEN d.sort_order = 0 THEN 999999 ELSE d.sort_order END ASC, d.nam
 - Google 广告流量的 `ad_id` 不再伪装成 Meta 数字 ID；优先写 `google:creative:<creative>`，其次写 `google:content:<utm_content>`、`google:adgroup:<adgroup>`、`google:campaign:<campaign>`，最后 fallback 到 `google:gclid:<短码>` / `google:gbraid:<短码>` / `google:wbraid:<短码>`。
 - checkout 第一方埋点会额外带 `traffic_source=google_ads` 和 `google_*` 原始字段，便于后台按 Google campaign/adgroup/creative 追踪。
 - 后台下单漏斗默认广告口径从“纯数字 Meta Ad ID”扩展为“Meta 数字 ID 或 `google:` 前缀”；Google 流量可以进默认广告流量看板。
-- 本次只接全站 tag 和第一方漏斗归因，不发 Google Ads 下单 conversion event；等拿到 conversion label 后再单独加购买转化回传。
+- Google Ads 购买转化事件已接入订单接口成功分支：`send_to=AW-17793385318/FJMeCPyCxLccEOaGxqRC`，按 Google 默认 snippet 先记 `value=1.0`、`currency=USD`，`transaction_id` 用真实 `order_no/order_id`，同一浏览器 session 内用 `transaction_id` 防重复触发。
 
 ### 2026-05-22 H组单页回看版
 

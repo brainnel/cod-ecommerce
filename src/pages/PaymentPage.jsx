@@ -4,6 +4,7 @@ import { FiCreditCard, FiMapPin, FiSearch, FiX } from 'react-icons/fi'
 import { districtAPI, orderAPI, bundleAPI } from '../services/api'
 import { useAdId } from '../hooks/useAdTrackingHooks.js'
 import { trackPurchaseEvent, getClientInfo } from '../services/facebookConversions'
+import { trackGoogleAdsPurchaseConversion } from '../services/googleAdsConversions'
 import {
   buildCheckoutProductProperties,
   getCheckoutQuantityExperiment,
@@ -1778,6 +1779,8 @@ const PaymentPage = () => {
 
       // 发送Facebook购买事件
       if (response?.data && response.status >= 200 && response.status < 300) {
+        const orderTransactionId = response.data.order_no || response.data.order_id || getCheckoutSessionId()
+
         trackPaymentEvent('order_create_success', {
           ...getDistrictAnalyticsProps(),
           order_no: response.data.order_no || response.data.order_id || null,
@@ -1795,6 +1798,14 @@ const PaymentPage = () => {
           }, effectiveUserInfo, clientInfo).catch(err => console.warn('Facebook事件失败:', err))
         } catch (fbError) {
           console.warn('Facebook事件错误:', fbError)
+        }
+
+        try {
+          trackGoogleAdsPurchaseConversion({
+            transactionId: orderTransactionId
+          })
+        } catch (googleAdsError) {
+          console.warn('Google Ads购买转化事件错误:', googleAdsError)
         }
       }
 
