@@ -1,7 +1,20 @@
 /**
  * URL参数解析工具
- * 用于从URL中提取各种参数，特别是Facebook广告追踪参数
+ * 用于从URL中提取各种参数，特别是付费广告追踪参数
  */
+
+const GOOGLE_SOURCE_VALUES = new Set(['google', 'google_ads', 'googleads', 'adwords'])
+
+const cleanParamValue = (value) => {
+  const text = String(value || '').trim()
+  return text || null
+}
+
+const shortParamValue = (value, maxLength = 32) => {
+  const text = cleanParamValue(value)
+  if (!text) return null
+  return text.slice(0, maxLength)
+}
 
 /**
  * 从当前URL中获取指定的查询参数
@@ -37,7 +50,14 @@ export const getUtmParams = () => {
     utm_content: getUrlParam('utm_content'),
     utm_term: getUrlParam('utm_term'),
     utm_id: getUrlParam('utm_id'),
-    fbclid: getUrlParam('fbclid')
+    fbclid: getUrlParam('fbclid'),
+    gclid: getUrlParam('gclid'),
+    gbraid: getUrlParam('gbraid'),
+    wbraid: getUrlParam('wbraid'),
+    gad_source: getUrlParam('gad_source'),
+    google_campaign_id: getUrlParam('google_campaign_id') || getUrlParam('g_campaignid') || getUrlParam('campaignid'),
+    google_adgroup_id: getUrlParam('google_adgroup_id') || getUrlParam('g_adgroupid') || getUrlParam('adgroupid'),
+    google_creative_id: getUrlParam('google_creative_id') || getUrlParam('g_creative') || getUrlParam('creative')
   }
   
   // 调试日志
@@ -48,6 +68,53 @@ export const getUtmParams = () => {
   }
   
   return utmParams
+}
+
+export const getGoogleAdsParams = () => {
+  return {
+    gclid: cleanParamValue(getUrlParam('gclid')),
+    gbraid: cleanParamValue(getUrlParam('gbraid')),
+    wbraid: cleanParamValue(getUrlParam('wbraid')),
+    gad_source: cleanParamValue(getUrlParam('gad_source')),
+    campaign_id: cleanParamValue(getUrlParam('google_campaign_id') || getUrlParam('g_campaignid') || getUrlParam('campaignid') || getUrlParam('utm_id')),
+    adgroup_id: cleanParamValue(getUrlParam('google_adgroup_id') || getUrlParam('g_adgroupid') || getUrlParam('adgroupid')),
+    creative_id: cleanParamValue(getUrlParam('google_creative_id') || getUrlParam('g_creative') || getUrlParam('creative')),
+    keyword: cleanParamValue(getUrlParam('keyword') || getUrlParam('utm_term')),
+    matchtype: cleanParamValue(getUrlParam('matchtype')),
+    network: cleanParamValue(getUrlParam('network')),
+    device: cleanParamValue(getUrlParam('device')),
+    placement: cleanParamValue(getUrlParam('placement')),
+    target_id: cleanParamValue(getUrlParam('targetid')),
+    loc_interest_ms: cleanParamValue(getUrlParam('loc_interest_ms')),
+    loc_physical_ms: cleanParamValue(getUrlParam('loc_physical_ms'))
+  }
+}
+
+export const isFromGoogleAd = () => {
+  const utmSource = cleanParamValue(getUrlParam('utm_source'))?.toLowerCase()
+  const googleParams = getGoogleAdsParams()
+  return GOOGLE_SOURCE_VALUES.has(utmSource) ||
+    !!googleParams.gclid ||
+    !!googleParams.gbraid ||
+    !!googleParams.wbraid ||
+    !!googleParams.gad_source
+}
+
+export const getGoogleAdIdFromUrl = () => {
+  if (!isFromGoogleAd()) return null
+
+  const googleParams = getGoogleAdsParams()
+  const utmContent = cleanParamValue(getUrlParam('utm_content'))
+
+  if (googleParams.creative_id) return `google:creative:${shortParamValue(googleParams.creative_id, 40)}`
+  if (utmContent) return `google:content:${shortParamValue(utmContent, 40)}`
+  if (googleParams.adgroup_id) return `google:adgroup:${shortParamValue(googleParams.adgroup_id, 40)}`
+  if (googleParams.campaign_id) return `google:campaign:${shortParamValue(googleParams.campaign_id, 40)}`
+  if (googleParams.gclid) return `google:gclid:${shortParamValue(googleParams.gclid, 24)}`
+  if (googleParams.gbraid) return `google:gbraid:${shortParamValue(googleParams.gbraid, 24)}`
+  if (googleParams.wbraid) return `google:wbraid:${shortParamValue(googleParams.wbraid, 24)}`
+
+  return 'google'
 }
 
 /**
@@ -113,13 +180,19 @@ export const isFromTikTokAd = () => {
  * @returns {string|null} 广告来源标识
  */
 export const getAdSource = () => {
-  // 1. 优先检查是否有Facebook广告ID（utm_content为纯数字）
+  // 1. Google 广告先识别，避免 Google creative 数字 ID 被误判成 Meta ad_id。
+  const googleAdId = getGoogleAdIdFromUrl()
+  if (googleAdId) {
+    return googleAdId
+  }
+
+  // 2. 检查是否有Facebook广告ID（utm_content为纯数字）
   const fbAdId = getAdIdFromUrl()
   if (fbAdId) {
     return fbAdId
   }
 
-  // 2. 返回utm_source的值（不管是什么都保存）
+  // 3. 返回utm_source的值（不管是什么都保存）
   const utmSource = getUrlParam('utm_source')
   if (utmSource) {
     if (import.meta.env.VITE_ENABLE_CONSOLE_LOGS === 'true') {
@@ -140,12 +213,18 @@ export const getAdTrackingInfo = () => {
   const utmParams = getUtmParams()
   const isFromFb = isFromFacebookAd()
   const isFromTt = isFromTikTokAd()
+  const isFromGoogle = isFromGoogleAd()
+  const googleAdsParams = getGoogleAdsParams()
 
   const trackingInfo = {
     ad_id: adSource,
+    ad_source: isFromGoogle ? 'google' : isFromFb ? 'facebook' : isFromTt ? 'tiktok' : (utmParams.utm_source || null),
+    traffic_source: isFromGoogle ? 'google_ads' : isFromFb ? 'meta_ads' : isFromTt ? 'tiktok_ads' : null,
     utm_params: utmParams,
+    google_ads: googleAdsParams,
     is_from_facebook: isFromFb,
     is_from_tiktok: isFromTt,
+    is_from_google: isFromGoogle,
     captured_at: new Date().toISOString(),
     url: window.location.href
   }

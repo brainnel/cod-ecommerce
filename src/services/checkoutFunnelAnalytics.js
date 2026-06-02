@@ -7,6 +7,7 @@ const SESSION_ID_STORAGE_KEY = 'cod_checkout_session_id'
 const SESSION_CONTEXT_STORAGE_KEY = 'cod_checkout_context'
 const QUANTITY_EXPERIMENT_STORAGE_KEY = 'cod_checkout_quantity_flow_variant_v9'
 const AD_ID_STORAGE_KEY = 'facebook_ad_id'
+const AD_TRACKING_INFO_KEY = 'ad_tracking_info'
 const CHECKOUT_FLOW = 'cod_checkout'
 const QUANTITY_FLOW_EXPERIMENT = 'checkout_reduced_friction_single_page_checkout_v9'
 const QUANTITY_FLOW_HOLDOUT_PERCENT = 0
@@ -166,6 +167,55 @@ const getStoredAdId = () => {
   return safeGetStorage(window.localStorage, AD_ID_STORAGE_KEY)
 }
 
+const getStoredAdTrackingInfo = () => {
+  if (typeof window === 'undefined') return null
+  const rawInfo = safeGetStorage(window.localStorage, AD_TRACKING_INFO_KEY)
+  if (!rawInfo) return null
+
+  try {
+    return JSON.parse(rawInfo) || null
+  } catch (error) {
+    console.warn('解析广告追踪信息失败:', error)
+    return null
+  }
+}
+
+const buildAdTrackingProperties = () => {
+  const trackingInfo = getStoredAdTrackingInfo()
+  if (!trackingInfo) return {}
+
+  const utmParams = trackingInfo.utm_params || {}
+  const googleAds = trackingInfo.google_ads || {}
+
+  return {
+    ad_source: trackingInfo.ad_source || null,
+    traffic_source: trackingInfo.traffic_source || null,
+    is_from_google: Boolean(trackingInfo.is_from_google),
+    is_from_facebook: Boolean(trackingInfo.is_from_facebook),
+    is_from_tiktok: Boolean(trackingInfo.is_from_tiktok),
+    utm_source: utmParams.utm_source || null,
+    utm_medium: utmParams.utm_medium || null,
+    utm_campaign: utmParams.utm_campaign || null,
+    utm_content: utmParams.utm_content || null,
+    utm_term: utmParams.utm_term || null,
+    utm_id: utmParams.utm_id || null,
+    gclid: googleAds.gclid || utmParams.gclid || null,
+    gbraid: googleAds.gbraid || utmParams.gbraid || null,
+    wbraid: googleAds.wbraid || utmParams.wbraid || null,
+    google_campaign_id: googleAds.campaign_id || utmParams.google_campaign_id || null,
+    google_adgroup_id: googleAds.adgroup_id || utmParams.google_adgroup_id || null,
+    google_creative_id: googleAds.creative_id || utmParams.google_creative_id || null,
+    google_keyword: googleAds.keyword || null,
+    google_matchtype: googleAds.matchtype || null,
+    google_network: googleAds.network || null,
+    google_device: googleAds.device || null,
+    google_placement: googleAds.placement || null,
+    google_target_id: googleAds.target_id || null,
+    google_loc_interest_ms: googleAds.loc_interest_ms || null,
+    google_loc_physical_ms: googleAds.loc_physical_ms || null
+  }
+}
+
 const getCheckoutContext = () => {
   if (typeof window === 'undefined') return {}
 
@@ -323,6 +373,7 @@ export const buildCheckoutProductProperties = (product, extra = {}) => {
   return {
     checkout_flow: CHECKOUT_FLOW,
     ...quantityExperiment,
+    ...buildAdTrackingProperties(),
     product_id: product?.product_id ? String(product.product_id) : extra.product_id || null,
     product_name: product?.name_fr || extra.product_name || null,
     internal_no: product?.internal_no || extra.internal_no || null,

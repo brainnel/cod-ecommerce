@@ -447,6 +447,15 @@ ORDER BY CASE WHEN d.sort_order = 0 THEN 999999 ELSE d.sort_order END ASC, d.nam
 - 评论入口位置不变，但增加橙色高亮和 `4,8/5` 小徽标，提高用户注意力。
 - 埋点仍沿用 `product_review_tab_click`，只统计用户从详情切到评论 tab 的点击。
 
+### 2026-06-02 Google Ads 埋点接入
+
+- 前端全量加入 Google tag：`AW-17793385318`。
+- URL 识别 Google Ads 参数：`gclid`、`gbraid`、`wbraid`、`gad_source`、`campaignid/g_campaignid`、`adgroupid/g_adgroupid`、`creative/g_creative`、`keyword` 等。
+- Google 广告流量的 `ad_id` 不再伪装成 Meta 数字 ID；优先写 `google:creative:<creative>`，其次写 `google:content:<utm_content>`、`google:adgroup:<adgroup>`、`google:campaign:<campaign>`，最后 fallback 到 `google:gclid:<短码>` / `google:gbraid:<短码>` / `google:wbraid:<短码>`。
+- checkout 第一方埋点会额外带 `traffic_source=google_ads` 和 `google_*` 原始字段，便于后台按 Google campaign/adgroup/creative 追踪。
+- 后台下单漏斗默认广告口径从“纯数字 Meta Ad ID”扩展为“Meta 数字 ID 或 `google:` 前缀”；Google 流量可以进默认广告流量看板。
+- 本次只接全站 tag 和第一方漏斗归因，不发 Google Ads 下单 conversion event；等拿到 conversion label 后再单独加购买转化回传。
+
 ### 2026-05-22 H组单页回看版
 
 - 新增 H 组 `single_page_review`，继承 G 组单页下单流程。
