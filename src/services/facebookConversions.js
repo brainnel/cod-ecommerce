@@ -72,6 +72,38 @@ const toCatalogContentId = async (productId) => {
   return await hashUserData(normalizedPath)
 }
 
+const getProductId = (productData = {}) => (
+  productData?.productId || productData?.product_id || productData?.id
+)
+
+const buildProductEventSourceUrl = (productData = {}) => {
+  const productId = getProductId(productData)
+  if (!productId) {
+    return typeof window !== 'undefined' ? window.location.href : 'https://www.brainnel.com/'
+  }
+
+  const rawId = productId.toString().trim()
+  if (!rawId) {
+    return typeof window !== 'undefined' ? window.location.href : 'https://www.brainnel.com/'
+  }
+
+  if (/^https?:\/\//i.test(rawId)) {
+    try {
+      const url = new URL(rawId)
+      const productPath = url.pathname.match(/^\/product\/[^/?#]+/)?.[0]
+      if (productPath) {
+        return `https://www.brainnel.com${productPath}`
+      }
+    } catch (error) {
+      console.warn('商品事件来源链接解析失败:', error)
+    }
+  }
+
+  const productPath = rawId.startsWith('/product/') ? rawId : `/product/${rawId}`
+  const cleanPath = productPath.split('?')[0].split('#')[0]
+  return `https://www.brainnel.com${cleanPath}`
+}
+
 /**
  * 构建用户数据对象
  */
@@ -199,7 +231,7 @@ export const trackPurchaseEvent = async (orderData, userInfo, clientInfo = {}) =
       event_time: eventTime,
       user_data: userData,
       custom_data: customData,
-      event_source_url: window.location.href,
+      event_source_url: buildProductEventSourceUrl(orderData),
       action_source: 'website',
       event_id: eventId
     }
@@ -214,7 +246,7 @@ export const trackPurchaseEvent = async (orderData, userInfo, clientInfo = {}) =
 }
 
 const buildProductEventCustomData = async (productData = {}, fallbackQuantity = 1) => {
-  const productId = productData.productId || productData.product_id || productData.id
+  const productId = getProductId(productData)
   const catalogContentId = await toCatalogContentId(productId)
   const quantity = parseInt(productData.quantity || fallbackQuantity || 1)
   const unitPrice = parseFloat(productData.unitPrice || productData.price || 0)
@@ -253,7 +285,7 @@ export const trackViewContentEvent = async (productData, clientInfo = {}) => {
       event_id: eventId,
       user_data: await buildUserData({}, clientInfo),
       custom_data: customData,
-      event_source_url: window.location.href,
+      event_source_url: buildProductEventSourceUrl(productData),
       action_source: 'website'
     }
 
@@ -285,7 +317,7 @@ export const trackAddToCartEvent = async (productData, clientInfo = {}) => {
       event_id: eventId,
       user_data: await buildUserData({}, clientInfo),
       custom_data: customData,
-      event_source_url: window.location.href,
+      event_source_url: buildProductEventSourceUrl(productData),
       action_source: 'website'
     }
 
