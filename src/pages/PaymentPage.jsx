@@ -226,6 +226,10 @@ const PaymentPage = () => {
   const checkoutSessionIdRef = useRef(routeCheckoutSessionId || null)
   const inlineQuantityConfirmedRef = useRef(Boolean(routeQuantityConfirmed))
   const infoStepTrackedRef = useRef(false)
+  const infoStepExitTrackedRef = useRef(false)
+  const infoStepValidationFailedRef = useRef(false)
+  const infoStepOrderSuccessRef = useRef(false)
+  const infoStepLatestStateRef = useRef({})
   const completedFieldsRef = useRef(new Set())
   const fieldRefs = useRef({})
   const singlePageCachedDistrictAppliedRef = useRef(false)
@@ -528,6 +532,83 @@ const PaymentPage = () => {
     })
   }
 
+  const getAddressLengthBucket = (length) => {
+    if (length <= 0) return '0'
+    if (length < 5) return '1-4'
+    if (length < 15) return '5-14'
+    return '15+'
+  }
+
+  const getInfoStepFieldState = (latestState = infoStepLatestStateRef.current) => {
+    const latestUserInfo = latestState.userInfo || userInfo
+    const fullNameLength = latestUserInfo.fullName?.trim().length || 0
+    const phoneReady = isValidCheckoutPhone(latestUserInfo.phone)
+    const effectiveWhatsapp = latestState.whatsappSameAsPhone
+      ? latestUserInfo.phone
+      : latestUserInfo.whatsapp
+    const whatsappReady = latestState.whatsappSameAsPhone
+      ? phoneReady
+      : isValidCheckoutPhone(effectiveWhatsapp)
+    const addressLength = latestUserInfo.addressDescription?.trim().length || 0
+    const addressReady = addressLength >= 5
+
+    return {
+      has_full_name: fullNameLength > 0,
+      has_valid_phone: phoneReady,
+      has_valid_whatsapp: whatsappReady,
+      whatsapp_same_as_phone: Boolean(latestState.whatsappSameAsPhone),
+      has_address_description: addressLength > 0,
+      address_ready: addressReady,
+      address_length_bucket: getAddressLengthBucket(addressLength),
+      completed_required_field_count: [
+        fullNameLength > 0,
+        phoneReady,
+        addressReady
+      ].filter(Boolean).length,
+      had_validation_error: infoStepValidationFailedRef.current
+    }
+  }
+
+  const trackInfoStepExit = (exitReason, extra = {}) => {
+    const latestState = infoStepLatestStateRef.current
+    if (
+      !latestState.showInfoSection
+      || infoStepExitTrackedRef.current
+      || infoStepOrderSuccessRef.current
+      || (latestState.isSinglePageVariant && !latestState.selectedDistrict)
+    ) return
+
+    infoStepExitTrackedRef.current = true
+    trackPaymentEvent('info_step_exit', {
+      ...getDistrictAnalyticsProps(latestState.selectedDistrict),
+      ...getInfoStepFieldState(latestState),
+      exit_reason: exitReason,
+      marker_selection_source: latestState.markerSelectionSource || null,
+      location_method: getLocationMethodForMarkerSource(latestState.markerSelectionSource),
+      checkout_single_page: latestState.isSinglePageVariant || undefined,
+      ...extra
+    })
+  }
+
+  const handleCheckoutBackClick = () => {
+    if (showInfoSection) {
+      trackInfoStepExit('back_button')
+    }
+    navigate(-1)
+  }
+
+  useEffect(() => {
+    infoStepLatestStateRef.current = {
+      showInfoSection,
+      isSinglePageVariant,
+      selectedDistrict,
+      userInfo,
+      whatsappSameAsPhone,
+      markerSelectionSource,
+      customMarker
+    }
+  })
+
   useEffect(() => {
     saveCheckoutCustomerInfo({
       ...userInfo,
@@ -612,6 +693,9 @@ const PaymentPage = () => {
     trackPaymentEvent('checkout_review_product_click', {
       checkout_single_page_review: true
     })
+    if (showInfoSection) {
+      trackInfoStepExit('review_product_click')
+    }
 
     if (location.key && location.key !== 'default') {
       navigate(-1)
@@ -1672,6 +1756,28 @@ const PaymentPage = () => {
     })
   }, [showInfoSection, isSinglePageVariant, selectedDistrict])
 
+  useEffect(() => {
+    if (!showInfoSection) return undefined
+
+    const handlePageHide = () => {
+      trackInfoStepExit('pagehide')
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        trackInfoStepExit('visibility_hidden')
+      }
+    }
+
+    window.addEventListener('pagehide', handlePageHide)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      window.removeEventListener('pagehide', handlePageHide)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [showInfoSection])
+
   // 提交订单
   const handlePlaceOrder = async () => {
     if (orderSubmitLockRef.current) return
@@ -1699,6 +1805,7 @@ const PaymentPage = () => {
       if (!isValidCheckoutPhone(userInfo.phone)) missingFields.push('phone')
       if (!whatsappSameAsPhone && !isValidCheckoutPhone(effectiveWhatsapp)) missingFields.push('whatsapp')
       if (userInfo.addressDescription.trim().length < 5) missingFields.push('addressDescription')
+      infoStepValidationFailedRef.current = true
       trackPaymentEvent('submit_validation_failed', {
         ...getDistrictAnalyticsProps(),
         missing_fields: missingFields,
@@ -1787,6 +1894,7 @@ const PaymentPage = () => {
           order_status: response.status,
           whatsapp_same_as_phone: whatsappSameAsPhone
         })
+        infoStepOrderSuccessRef.current = true
 
         try {
           trackPurchaseEvent({
@@ -1873,7 +1981,7 @@ const PaymentPage = () => {
     <div className="payment-page">
       {/* 顶部标题栏 */}
       <div className="payment-header">
-        <button type="button" className="back-btn" onClick={() => navigate(-1)}>←</button>
+        <button type="button" className="back-btn" onClick={handleCheckoutBackClick}>←</button>
         <h1 className="payment-title">Finaliser la commande</h1>
       </div>
 
@@ -2140,7 +2248,7 @@ const PaymentPage = () => {
                   <span>{isSinglePageOptionalMapStep ? 'Position sélectionnée. Appuyez sur Enregistrer.' : mapSelectedNoteText}</span>
                 </div>
               )}
-              <button type="button" className="prev-btn" onClick={() => navigate(-1)}>
+              <button type="button" className="prev-btn" onClick={handleCheckoutBackClick}>
                 {isSinglePageOptionalMapStep ? 'Retour' : 'Précédent'}
               </button>
               <button
@@ -2320,7 +2428,7 @@ const PaymentPage = () => {
                 <button
                   type="button"
                   className="prev-btn"
-                  onClick={() => navigate(-1)}
+                  onClick={handleCheckoutBackClick}
                 >
                   Précédent
                 </button>
