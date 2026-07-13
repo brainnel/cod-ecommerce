@@ -72,7 +72,8 @@ export const productAPI = {
     const { page = 1, page_size = 20, category_id } = params
     const queryParams = new URLSearchParams({
       page: page.toString(),
-      page_size: page_size.toString()
+      page_size: page_size.toString(),
+      is_web: '1'
     })
     
     if (category_id) {
@@ -91,7 +92,7 @@ export const productAPI = {
   // 获取单个产品详情
   getProductDetail: async (productId) => {
     try {
-      const response = await api.get(`${API_ENDPOINTS.PRODUCT_DETAIL(productId)}`)
+      const response = await api.get(`${API_ENDPOINTS.PRODUCT_DETAIL(productId)}?is_web=1`)
       return response.data
     } catch (error) {
       console.error('获取产品详情失败:', error)
@@ -102,7 +103,7 @@ export const productAPI = {
   // 获取产品变体列表
   getProductVariants: async (productId) => {
     try {
-      const response = await api.get(`${API_ENDPOINTS.PRODUCTS}/products/${productId}/variants/`)
+      const response = await api.get(`${API_ENDPOINTS.PRODUCTS}/products/${productId}/variants/?is_web=1`)
       return response.data
     } catch (error) {
       console.error('获取产品变体失败:', error)
