@@ -16,19 +16,19 @@ export const preloadPaymentPage = () => {
 export const schedulePaymentPagePreload = () => {
   if (typeof window === 'undefined') return undefined
 
-  const run = () => {
+  let idleId
+  const timerId = window.setTimeout(() => {
+    if (typeof window.requestIdleCallback === 'function') {
+      idleId = window.requestIdleCallback(preloadPaymentPage, { timeout: 800 })
+      return
+    }
     preloadPaymentPage()
-  }
+  }, 1200)
 
-  if (typeof window.requestIdleCallback === 'function') {
-    const idleId = window.requestIdleCallback(run, { timeout: 1200 })
-    return () => {
-      if (typeof window.cancelIdleCallback === 'function') {
-        window.cancelIdleCallback(idleId)
-      }
+  return () => {
+    window.clearTimeout(timerId)
+    if (idleId !== undefined && typeof window.cancelIdleCallback === 'function') {
+      window.cancelIdleCallback(idleId)
     }
   }
-
-  const timerId = window.setTimeout(run, 500)
-  return () => window.clearTimeout(timerId)
 }

@@ -15,12 +15,13 @@
   background: var(--bg);
   color: var(--text);
   min-height: 100vh;
+  min-height: 100dvh;
 }
 
 /* ===== Hero Gradient ===== */
 .dl-hero {
   background: linear-gradient(160deg, #1A1207 0%, #2D1A08 40%, #4A2410 70%, #E56012 100%);
-  padding: 48px 20px 64px;
+  padding: calc(48px + env(safe-area-inset-top, 0px)) max(20px, env(safe-area-inset-right, 0px)) 64px max(20px, env(safe-area-inset-left, 0px));
   text-align: center;
   position: relative;
   overflow: hidden;

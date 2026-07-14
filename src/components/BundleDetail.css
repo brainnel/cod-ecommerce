@@ -39,8 +39,8 @@
 }
 
 .bundle-quantity-btn {
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   background: #fafafa;
   border: none;
   font-size: 18px;
@@ -62,7 +62,7 @@
 
 .bundle-quantity-input {
   width: 48px;
-  height: 36px;
+  height: 44px;
   border: none;
   border-left: 1px solid #ddd;
   border-right: 1px solid #ddd;

@@ -202,7 +202,7 @@ const OrderSuccessPage = () => {
     return (
       <div className="order-success-page">
         <div className="order-success-header">
-          <button type="button" className="back-btn" onClick={() => navigate('/')}>
+          <button type="button" className="back-btn" aria-label="Retour à l'accueil" onClick={() => navigate('/')}>
             <FiHome aria-hidden="true" />
           </button>
           <h1 className="header-title">Commande confirmée</h1>
@@ -215,7 +215,7 @@ const OrderSuccessPage = () => {
     <div className="order-success-page">
       {/* 顶部标题栏 */}
       <div className="order-success-header">
-        <button type="button" className="back-btn" onClick={() => navigate('/')}>
+        <button type="button" className="back-btn" aria-label="Retour à l'accueil" onClick={() => navigate('/')}>
           <FiHome aria-hidden="true" />
         </button>
         <h1 className="header-title">Commande confirmée</h1>

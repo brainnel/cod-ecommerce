@@ -1981,7 +1981,14 @@ const PaymentPage = () => {
     <div className="payment-page">
       {/* 顶部标题栏 */}
       <div className="payment-header">
-        <button type="button" className="back-btn" onClick={handleCheckoutBackClick}>←</button>
+        <button
+          type="button"
+          className="back-btn"
+          aria-label="Retour"
+          onClick={handleCheckoutBackClick}
+        >
+          ←
+        </button>
         <h1 className="payment-title">Finaliser la commande</h1>
       </div>
 

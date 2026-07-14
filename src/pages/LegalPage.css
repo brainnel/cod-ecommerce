@@ -1,6 +1,7 @@
 /* Legal pages shared styles (Privacy Policy & Terms of Use) */
 .legal-page {
   min-height: 100vh;
+  min-height: 100dvh;
   background: #f8f9fa;
   color: #333;
 }
@@ -8,7 +9,7 @@
 .legal-header {
   display: flex;
   align-items: center;
-  padding: 1rem;
+  padding: calc(1rem + env(safe-area-inset-top, 0px)) max(1rem, env(safe-area-inset-right, 0px)) 1rem max(1rem, env(safe-area-inset-left, 0px));
   position: relative;
   background: white;
   border-bottom: 1px solid rgba(0, 0, 0, 0.1);
@@ -18,8 +19,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   border: none;
   background: #f8f9fa;
   border-radius: 50%;

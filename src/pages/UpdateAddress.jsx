@@ -388,6 +388,7 @@ export default function UpdateAddress() {
         <button 
           type="button" 
           className="back-btn" 
+          aria-label="Retour"
           onClick={goBack}
           style={{ visibility: currentStep > 1 && currentStep < 4 ? 'visible' : 'hidden' }}
         >

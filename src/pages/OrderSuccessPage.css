@@ -1,12 +1,13 @@
 .order-success-page {
   min-height: 100vh;
+  min-height: 100dvh;
   background: #f4f6f8;
 }
 
 /* 顶部标题栏 */
 .order-success-header {
   background: rgba(255, 255, 255, 0.96);
-  padding: 14px 18px;
+  padding: calc(14px + env(safe-area-inset-top, 0px)) max(18px, env(safe-area-inset-right, 0px)) 14px max(18px, env(safe-area-inset-left, 0px));
   display: flex;
   align-items: center;
   border-bottom: 1px solid #edf0f4;
@@ -29,8 +30,8 @@
   align-items: center;
   justify-content: center;
   color: #4b5563;
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
 }
 
 .order-success-header .back-btn:hover {
@@ -447,7 +448,7 @@
 /* 响应式设计 */
 @media (max-width: 768px) {
   .order-success-header {
-    padding: 14px 16px;
+    padding: calc(14px + env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) 14px max(16px, env(safe-area-inset-left, 0px));
   }
   
   .header-title {
@@ -455,9 +456,9 @@
   }
   
   .order-success-header .back-btn {
-    padding: 6px;
-    width: 32px;
-    height: 32px;
+    padding: 10px;
+    width: 44px;
+    height: 44px;
   }
   
   .order-success-header .back-btn svg {

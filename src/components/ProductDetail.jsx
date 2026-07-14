@@ -307,6 +307,7 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
       try {
         setError(null);
         setErrorRedirectCategoryId(null);
+        setVariants([]);
 
         if (initialProduct) {
           setProduct(initialProduct);
@@ -319,12 +320,17 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
         const data = await productAPI.getProductDetail(productId);
         if (isCancelled) return;
         setProduct(data);
+        setLoading(false);
         
-        // 如果产品有product_group_id，获取变体列表
+        // 变体不属于首屏关键内容，详情先展示，变体在后台补齐。
         if (data && data.product_group_id) {
-          const variantList = await productAPI.getProductVariants(productId);
-          if (isCancelled) return;
-          setVariants(variantList);
+          productAPI.getProductVariants(productId)
+            .then((variantList) => {
+              if (!isCancelled) setVariants(variantList);
+            })
+            .catch((variantError) => {
+              console.warn('Error fetching product variants:', variantError);
+            });
         }
       } catch (err) {
         if (isCancelled) return;
@@ -613,7 +619,12 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
     <div className="product-detail">
       {/* 顶部标题栏 */}
       <div className="product-header">
-        <button type="button" className="back-btn" onClick={() => navigate('/')}>
+        <button
+          type="button"
+          className="back-btn"
+          aria-label="Retour à l'accueil"
+          onClick={() => navigate('/')}
+        >
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M3 12L5 10M5 10L12 3L19 10M5 10V20C5 20.5523 5.44772 21 6 21H9M19 10L21 12M19 10V20C19 20.5523 18.5523 21 18 21H15M9 21C9.55228 21 10 20.5523 10 20V16C10 15.4477 10.4477 15 11 15H13C13.5523 15 14 15.4477 14 16V20C14 20.5523 14.4477 21 15 21M9 21H15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
@@ -650,9 +661,10 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
                     src={image.src}
                     alt={`Image produit ${index + 1}`}
                     loading={index === 0 ? 'eager' : 'lazy'}
-                    fetchPriority={index === 0 ? 'high' : 'auto'}
+                    fetchPriority={index === 0 ? 'high' : index === 1 ? 'auto' : 'low'}
                     decoding="async"
                   />
+                  {index > 0 && <div className="swiper-lazy-preloader" aria-hidden="true" />}
                   {index === 0 && product.off > 0 && (
                     <div className="discount-badge">
                       -{formatDiscount(product.off)}%
@@ -774,6 +786,7 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
                     src={image}
                     alt={`Détails produit ${index + 1}`}
                     loading="lazy"
+                    fetchPriority="low"
                     decoding="async"
                   />
                 ))}
