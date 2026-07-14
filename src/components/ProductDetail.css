@@ -205,8 +205,8 @@
 }
 
 .image-container.detail-preview-image img {
-  object-fit: cover;
-  object-position: top center;
+  object-fit: contain;
+  object-position: center;
 }
 
 /* 折扣标签 */
