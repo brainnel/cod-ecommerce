@@ -30,6 +30,7 @@ import {
 } from '../utils/checkoutBrowserContextPreview';
 import { saveCheckoutPaymentState } from '../utils/checkoutPaymentStateCache';
 import { preloadPaymentPage, schedulePaymentPagePreload } from '../utils/preloadRoutes';
+import { getProductImageLoadingPolicy } from '../utils/productImageLoadingPolicy';
 
 const PRODUCT_UNAVAILABLE_BACKEND_MESSAGE = '此商品已下架，请查看其它商品';
 const PRODUCT_UNAVAILABLE_MESSAGE_FR = "Ce produit n'est plus disponible. Veuillez consulter d'autres produits.";
@@ -260,6 +261,7 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
   const viewTrackedProductRef = useRef(null);
   const landingEngagementRef = useRef(null);
   const checkoutQuantityExperiment = useMemo(() => getCheckoutQuantityExperiment(), []);
+  const imageLoadingPolicy = useMemo(() => getProductImageLoadingPolicy(), []);
   const isCheckoutOptimizationVariant = isInlineCheckoutVariant(checkoutQuantityExperiment);
   const isCodTrustLanding = isCodTrustLandingVariant(checkoutQuantityExperiment);
   const isAddressFirstLanding = isAddressFirstCheckoutVariant(checkoutQuantityExperiment)
@@ -267,7 +269,10 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
   const productMainImages = normalizeImageList(product?.image_url);
   const productDetailImages = normalizeImageList(product?.description_fr);
   const promotedDetailImages = productMainImages.length === 1
-    ? productDetailImages.slice(0, MAX_PROMOTED_DETAIL_IMAGES)
+    ? productDetailImages.slice(
+        0,
+        Math.min(MAX_PROMOTED_DETAIL_IMAGES, imageLoadingPolicy.promotedDetailImageLimit)
+      )
     : [];
   const galleryImages = [
     ...productMainImages.map((src) => ({ src, type: 'main' })),
@@ -275,7 +280,7 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
   ];
   const productReviews = useMemo(() => getDisplayProductReviews(product), [product]);
   const productSwiperModules = [Pagination, Navigation, Autoplay];
-  const productGalleryAutoplay = galleryImages.length > 1
+  const productGalleryAutoplay = galleryImages.length > 1 && imageLoadingPolicy.autoplayEnabled
     ? {
         delay: 3500,
         disableOnInteraction: true,

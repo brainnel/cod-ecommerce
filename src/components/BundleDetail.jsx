@@ -26,6 +26,7 @@ import {
 } from '../utils/checkoutBrowserContextPreview'
 import { saveCheckoutPaymentState } from '../utils/checkoutPaymentStateCache'
 import { preloadPaymentPage, schedulePaymentPagePreload } from '../utils/preloadRoutes'
+import { getProductImageLoadingPolicy } from '../utils/productImageLoadingPolicy'
 import Countdown from './Countdown'
 
 import 'swiper/css'
@@ -91,6 +92,7 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
   const viewTrackedBundleRef = useRef(null)
   const landingEngagementRef = useRef(null)
   const checkoutQuantityExperiment = useMemo(() => getCheckoutQuantityExperiment(), [])
+  const imageLoadingPolicy = useMemo(() => getProductImageLoadingPolicy(), [])
   const isCheckoutOptimizationVariant = isInlineCheckoutVariant(checkoutQuantityExperiment)
   const isCodTrustLanding = isCodTrustLandingVariant(checkoutQuantityExperiment)
   const isAddressFirstLanding = isAddressFirstCheckoutVariant(checkoutQuantityExperiment)
@@ -361,7 +363,10 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
   const items = Array.isArray(bundle.items) ? bundle.items : []
   const coverImages = bundle.cover_image_url ? [bundle.cover_image_url] : []
   const promotedDetailImages = coverImages.length <= 1
-    ? detailImages.slice(0, MAX_PROMOTED_DETAIL_IMAGES)
+    ? detailImages.slice(
+        0,
+        Math.min(MAX_PROMOTED_DETAIL_IMAGES, imageLoadingPolicy.promotedDetailImageLimit)
+      )
     : []
   const galleryImages = [
     ...coverImages.map((src) => ({ src, type: 'main' })),
@@ -369,7 +374,7 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
   ]
   const displayDiscount = getBundleDisplayDiscount(bundle.id)
   const displayOriginalPrice = getBundleDisplayOriginalPrice(bundle.cfa_price, displayDiscount)
-  const bundleGalleryAutoplay = galleryImages.length > 1
+  const bundleGalleryAutoplay = galleryImages.length > 1 && imageLoadingPolicy.autoplayEnabled
     ? {
         delay: 3500,
         disableOnInteraction: true,

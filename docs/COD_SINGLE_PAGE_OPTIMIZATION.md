@@ -22,6 +22,13 @@
 - 2026-07-14 已按“网页 COD 优先”落实后端隔离：网页订单按 WhatsApp 找/建用户改走 16 连接的专用小池，新用户用 `lastrowid` 直接返回，避免通用创建路径的重复查库；同进程对相同号码合并并发创建，并缓存有效映射 1 小时。
 - App 购物车接口统一加 16 并发上限，超出请求在 App 侧排队，不能继续挤占网页 COD 所需的数据库容量；重复提交相同 selected 状态时不再产生无效更新。生产 `DB_POOL_SIZE` 已为 256，不能用继续放大共享连接池代替流量隔离。
 
+## 2026-07-14 商品详情加载优化
+
+- `GET /api/flash-local/{product_id}` 增加 45 秒 Redis 短缓存，cache key 同时区分 `product_id` 和 `is_web`。只缓存成功商品详情，不缓存 404；缓存读取最多等待 200ms，写入在响应后异步执行，Redis 超时或异常会直接回退原数据库查询，不能阻塞商品页。
+- 单品与组合品主轮播增加网络自适应：浏览器开启省流量模式，或报告 `slow-2g / 2g / 3g` 时，只把 1 张详情图提前放进主轮播并停止自动轮播，避免用户停留时自动下载多张大图；用户仍能在下方详情区按需看到全部图片。
+- 正常网络保持原体验：单主图商品仍提升前 4 张详情图进入轮播，3.5 秒自动切换，详情区继续完整重复展示；相同 URL 继续复用浏览器/CDN 缓存。
+- 当前 Cloudflare 静态图片已有 30 天缓存，但 `/cdn-cgi/image` 动态缩图未启用，直接改缩图 URL 会返回 404。本轮不引入第三方图片代理或服务端实时压图，避免图片不可用和新增后端 CPU 风险；后续如启用 Cloudflare Images/Transformations，再补 480/640/960px `srcset` 和 WebP/AVIF 才是真正的尺寸压缩方案。
+
 ## 2026-06-10 下单漏斗看板查询性能中期优化
 
 - 生产库 `brainnel_vite.vite_analytics_events` 增加 checkout 热字段生成列和索引，避免漏斗接口在大表上反复 `JSON_EXTRACT`；热字段包括 checkout flow、ad_id、product_id、district、variant、landing_session_id、location/error/order/quantity 和落地页停留字段。
