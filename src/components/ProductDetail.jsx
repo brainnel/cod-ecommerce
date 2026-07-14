@@ -656,6 +656,7 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
             pagination={{ clickable: true }}
             navigation={true}
             autoplay={productGalleryAutoplay}
+            lazyPreloadPrevNext={imageLoadingPolicy.lazyPreloadPrevNext}
             speed={450}
             className="main-swiper"
           >
@@ -665,8 +666,8 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
                   <img
                     src={image.src}
                     alt={`Image produit ${index + 1}`}
-                    loading={index === 0 ? 'eager' : 'lazy'}
-                    fetchPriority={index === 0 ? 'high' : index === 1 ? 'auto' : 'low'}
+                    loading={index < imageLoadingPolicy.eagerGalleryImageCount ? 'eager' : 'lazy'}
+                    fetchPriority={index < 2 ? 'high' : index < imageLoadingPolicy.eagerGalleryImageCount ? 'auto' : 'low'}
                     decoding="async"
                   />
                   {index > 0 && <div className="swiper-lazy-preloader" aria-hidden="true" />}

@@ -5,7 +5,9 @@ export const getProductImageLoadingPolicy = () => {
     return {
       isConstrainedNetwork: false,
       promotedDetailImageLimit: 4,
-      autoplayEnabled: true
+      autoplayEnabled: true,
+      eagerGalleryImageCount: 3,
+      lazyPreloadPrevNext: 2
     };
   }
 
@@ -19,6 +21,8 @@ export const getProductImageLoadingPolicy = () => {
   return {
     isConstrainedNetwork,
     promotedDetailImageLimit: isConstrainedNetwork ? 1 : 4,
-    autoplayEnabled: !isConstrainedNetwork
+    autoplayEnabled: !isConstrainedNetwork,
+    eagerGalleryImageCount: isConstrainedNetwork ? 1 : 3,
+    lazyPreloadPrevNext: isConstrainedNetwork ? 0 : 2
   };
 };

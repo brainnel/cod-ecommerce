@@ -447,6 +447,7 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
               pagination={{ clickable: true }}
               navigation={true}
               autoplay={bundleGalleryAutoplay}
+              lazyPreloadPrevNext={imageLoadingPolicy.lazyPreloadPrevNext}
               speed={450}
               className="main-swiper"
             >
@@ -456,8 +457,8 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
                     <img
                       src={image.src}
                       alt={bundle.title_fr || `Pack ${bundle.id}`}
-                      loading={index === 0 ? 'eager' : 'lazy'}
-                      fetchPriority={index === 0 ? 'high' : index === 1 ? 'auto' : 'low'}
+                      loading={index < imageLoadingPolicy.eagerGalleryImageCount ? 'eager' : 'lazy'}
+                      fetchPriority={index < 2 ? 'high' : index < imageLoadingPolicy.eagerGalleryImageCount ? 'auto' : 'low'}
                       decoding="async"
                     />
                     {index > 0 && <div className="swiper-lazy-preloader" aria-hidden="true" />}
