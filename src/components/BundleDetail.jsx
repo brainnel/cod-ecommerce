@@ -210,15 +210,19 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
           state.passiveSent = true
         }
         const now = typeof performance !== 'undefined' ? performance.now() : Date.now()
-        trackProductLandingEngagement(bundleProduct, {
-          ad_id: adId,
-          product_type: 'bundle',
-          bundle_id: String(bundle.id),
-          landing_session_id: state.landingSessionId,
-          landing_duration_ms: now - state.startedAt,
-          landing_max_scroll_percent: state.maxScrollPercent,
-          landing_exit_reason: reason
-        })
+        try {
+          trackProductLandingEngagement(bundleProduct, {
+            ad_id: adId,
+            product_type: 'bundle',
+            bundle_id: String(bundle.id),
+            landing_session_id: state.landingSessionId,
+            landing_duration_ms: now - state.startedAt,
+            landing_max_scroll_percent: state.maxScrollPercent,
+            landing_exit_reason: reason
+          })
+        } catch (error) {
+          console.warn('组合品落地页停留埋点失败:', error)
+        }
       }
 
       landingEngagementRef.current.send = sendLandingEngagement
@@ -286,7 +290,11 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
 
   const handleBuyNow = () => {
     preloadPaymentPage()
-    landingEngagementRef.current?.send?.('checkout_click')
+    try {
+      landingEngagementRef.current?.send?.('checkout_click')
+    } catch (error) {
+      console.warn('组合品落地页下单点击埋点失败:', error)
+    }
 
     let checkoutSessionId = null
     try {

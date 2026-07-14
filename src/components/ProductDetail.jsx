@@ -418,15 +418,19 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
           state.passiveSent = true;
         }
         const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
-        trackProductLandingEngagement(product, {
-          ad_id: adId,
-          category_id: product.category_id,
-          product_type: 'product',
-          landing_session_id: state.landingSessionId,
-          landing_duration_ms: now - state.startedAt,
-          landing_max_scroll_percent: state.maxScrollPercent,
-          landing_exit_reason: reason
-        });
+        try {
+          trackProductLandingEngagement(product, {
+            ad_id: adId,
+            category_id: product.category_id,
+            product_type: 'product',
+            landing_session_id: state.landingSessionId,
+            landing_duration_ms: now - state.startedAt,
+            landing_max_scroll_percent: state.maxScrollPercent,
+            landing_exit_reason: reason
+          });
+        } catch (error) {
+          console.warn('落地页停留埋点失败:', error);
+        }
       };
 
       landingEngagementRef.current.send = sendLandingEngagement;
@@ -523,7 +527,11 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
 
   const handleBuyNowClick = () => {
     preloadPaymentPage();
-    landingEngagementRef.current?.send?.('checkout_click');
+    try {
+      landingEngagementRef.current?.send?.('checkout_click');
+    } catch (error) {
+      console.warn('落地页下单点击埋点失败:', error);
+    }
 
     const quantityExperiment = checkoutQuantityExperiment;
     const isInlineQuantityVariant = isInlineCheckoutVariant(quantityExperiment);

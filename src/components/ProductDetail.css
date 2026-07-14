@@ -563,7 +563,7 @@
   flex-direction: column;
   gap: 7px;
   background: #fff;
-  padding: 10px 16px 12px;
+  padding: 10px 16px calc(12px + env(safe-area-inset-bottom, 0px));
   box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
   z-index: 100;
 }
@@ -591,11 +591,16 @@
   transition: all 0.3s ease;
   background: linear-gradient(135deg, #ff6b35, #f7931e);
   color: white;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
-.buy-now-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(255, 107, 53, 0.3);
+@media (hover: hover) and (pointer: fine) {
+  .buy-now-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(255, 107, 53, 0.3);
+  }
 }
 
 /* 响应式设计 */
@@ -648,7 +653,7 @@
   }
   
   .bottom-actions {
-    padding: 8px 12px 10px;
+    padding: 8px 12px calc(10px + env(safe-area-inset-bottom, 0px));
   }
 
   .cta-trust-note {

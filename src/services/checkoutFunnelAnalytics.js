@@ -447,10 +447,10 @@ const getPageProperties = () => {
 }
 
 const sendAnalyticsPayload = (payload) => {
-  const url = buildApiUrl(ANALYTICS_ENDPOINT)
-  const body = JSON.stringify(payload)
-
   try {
+    const url = buildApiUrl(ANALYTICS_ENDPOINT)
+    const body = JSON.stringify(payload)
+
     if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
       const blob = new Blob([body], { type: 'application/json' })
       if (navigator.sendBeacon(url, blob)) return
