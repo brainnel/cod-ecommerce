@@ -35,6 +35,10 @@ import {
   validateCheckoutPhone
 } from '../utils/checkoutPhone'
 import {
+  isValidCheckoutAddress,
+  validateCheckoutAddress
+} from '../utils/checkoutAddress'
+import {
   buildCheckoutDistrictCacheEntry,
   getCachedManualMarkerForDistrict,
   isSameCheckoutDistrict,
@@ -550,7 +554,11 @@ const PaymentPage = () => {
       ? phoneReady
       : isValidCheckoutPhone(effectiveWhatsapp)
     const addressLength = latestUserInfo.addressDescription?.trim().length || 0
-    const addressReady = addressLength >= 5
+    const addressReady = isValidCheckoutAddress(latestUserInfo.addressDescription, {
+      fullName: latestUserInfo.fullName,
+      phone: latestUserInfo.phone,
+      districtName: getDistrictDisplayName(selectedDistrict)
+    })
 
     return {
       has_full_name: fullNameLength > 0,
@@ -1624,7 +1632,12 @@ const PaymentPage = () => {
       [field]: nextValue,
       ...(field === 'phone' && whatsappSameAsPhone ? { whatsapp: nextValue } : {})
     }))
-    if (errors[field]) {
+    const shouldClearFieldError = field !== 'addressDescription' || isValidCheckoutAddress(nextValue, {
+      fullName: userInfo.fullName,
+      phone: userInfo.phone,
+      districtName: getDistrictDisplayName(selectedDistrict)
+    })
+    if (errors[field] && shouldClearFieldError) {
       setErrors(prev => ({ ...prev, [field]: '' }))
     }
     if (field === 'phone' && whatsappSameAsPhone && errors.whatsapp) {
@@ -1634,7 +1647,11 @@ const PaymentPage = () => {
     const isFieldComplete = (
       (field === 'fullName' && nextValue.trim().length > 0) ||
       ((field === 'phone' || field === 'whatsapp') && isValidCheckoutPhone(nextValue)) ||
-      (field === 'addressDescription' && nextValue.trim().length >= 5)
+      (field === 'addressDescription' && isValidCheckoutAddress(nextValue, {
+        fullName: userInfo.fullName,
+        phone: userInfo.phone,
+        districtName: getDistrictDisplayName(selectedDistrict)
+      }))
     )
 
     if (isFieldComplete) {
@@ -1670,7 +1687,11 @@ const PaymentPage = () => {
         whatsapp_same_as_phone: false
       })
     }
-    if (userInfo.addressDescription.trim().length >= 5) {
+    if (isValidCheckoutAddress(userInfo.addressDescription, {
+      fullName: userInfo.fullName,
+      phone: userInfo.phone,
+      districtName: getDistrictDisplayName(selectedDistrict)
+    })) {
       trackFieldCompletedOnce('addressDescription', { field_fill_method: 'local_cache' })
     }
   }, [
@@ -1680,7 +1701,8 @@ const PaymentPage = () => {
     userInfo.fullName,
     userInfo.phone,
     userInfo.whatsapp,
-    whatsappSameAsPhone
+    whatsappSameAsPhone,
+    selectedDistrict
   ])
 
   const scrollToFirstMissingField = (missingFields) => {
@@ -1719,6 +1741,11 @@ const PaymentPage = () => {
     const whatsappValidation = validateCheckoutPhone(effectiveWhatsapp, {
       requiredMessage: 'Le numéro WhatsApp est requis'
     })
+    const addressValidation = validateCheckoutAddress(userInfo.addressDescription, {
+      fullName: userInfo.fullName,
+      phone: userInfo.phone,
+      districtName: getDistrictDisplayName(selectedDistrict)
+    })
     
     if (!userInfo.fullName.trim()) {
       newErrors.fullName = 'Le nom complet est requis'
@@ -1732,14 +1759,8 @@ const PaymentPage = () => {
       newErrors.whatsapp = whatsappValidation.error
     }
     
-    if (!userInfo.addressDescription.trim()) {
-      newErrors.addressDescription = isInlineQuantityVariant
-        ? 'Ajoutez au moins 5 caractères : quartier ou repère connu.'
-        : 'La description de l\'adresse est requise'
-    } else if (userInfo.addressDescription.trim().length < 5) {
-      newErrors.addressDescription = isInlineQuantityVariant
-        ? 'Ajoutez au moins 5 caractères : quartier ou repère connu.'
-        : 'Au moins 5 caractères requis'
+    if (!addressValidation.isValid) {
+      newErrors.addressDescription = addressValidation.error
     }
     
     setErrors(newErrors)
@@ -1798,17 +1819,23 @@ const PaymentPage = () => {
       phone: normalizedPhone,
       whatsapp: normalizedWhatsapp
     }
+    const addressValidation = validateCheckoutAddress(userInfo.addressDescription, {
+      fullName: userInfo.fullName,
+      phone: userInfo.phone,
+      districtName: getDistrictDisplayName(selectedDistrict)
+    })
 
     if (!validateForm()) {
       const missingFields = []
       if (!userInfo.fullName.trim()) missingFields.push('fullName')
       if (!isValidCheckoutPhone(userInfo.phone)) missingFields.push('phone')
       if (!whatsappSameAsPhone && !isValidCheckoutPhone(effectiveWhatsapp)) missingFields.push('whatsapp')
-      if (userInfo.addressDescription.trim().length < 5) missingFields.push('addressDescription')
+      if (!addressValidation.isValid) missingFields.push('addressDescription')
       infoStepValidationFailedRef.current = true
       trackPaymentEvent('submit_validation_failed', {
         ...getDistrictAnalyticsProps(),
         missing_fields: missingFields,
+        address_validation_reason: addressValidation.isValid ? undefined : addressValidation.reason,
         whatsapp_same_as_phone: whatsappSameAsPhone
       })
       scrollToFirstMissingField(missingFields)
@@ -1975,7 +2002,15 @@ const PaymentPage = () => {
   const totalPrice = product.price * quantity
   const fullNameReady = userInfo.fullName.trim().length > 0 && !errors.fullName
   const phoneReady = isValidCheckoutPhone(userInfo.phone) && !errors.phone
-  const addressReady = userInfo.addressDescription.trim().length >= 5 && !errors.addressDescription
+  const addressValidationState = validateCheckoutAddress(userInfo.addressDescription, {
+    fullName: userInfo.fullName,
+    phone: userInfo.phone,
+    districtName: getDistrictDisplayName(selectedDistrict)
+  })
+  const addressReady = addressValidationState.isValid && !errors.addressDescription
+  const addressMinimumHint = ['required', 'too_short'].includes(addressValidationState.reason)
+    ? 'Minimum 5 caractères'
+    : ''
 
   return (
     <div className="payment-page">
@@ -2364,7 +2399,7 @@ const PaymentPage = () => {
               )}
               <div className="address-feedback-row">
                 <div className={`address-minimum-hint ${errors.addressDescription ? 'error' : ''} ${addressReady ? 'ready' : ''}`}>
-                  {errors.addressDescription || (!addressReady ? 'Minimum 5 caractères' : '')}
+                  {errors.addressDescription || addressMinimumHint}
                 </div>
                 <div className="char-count">{userInfo.addressDescription.length}/200</div>
               </div>
