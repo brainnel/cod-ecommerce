@@ -1836,6 +1836,7 @@ const PaymentPage = () => {
         ...getDistrictAnalyticsProps(),
         missing_fields: missingFields,
         address_validation_reason: addressValidation.isValid ? undefined : addressValidation.reason,
+        rejected_address: addressValidation.isValid ? undefined : userInfo.addressDescription,
         whatsapp_same_as_phone: whatsappSameAsPhone
       })
       scrollToFirstMissingField(missingFields)
