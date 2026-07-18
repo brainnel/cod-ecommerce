@@ -63,6 +63,55 @@ const KEYBOARD_GIBBERISH = new Set([
   'qwertyuiop'
 ])
 
+const KNOWN_LOCATION_ONLY_PHRASES = new Set([
+  'abengourou', 'abidjan', 'abobo', 'aboisso', 'adjame', 'adjouffou', 'angre',
+  'anono', 'anyama', 'ayaman', 'attecoube', 'bassam', 'bingerville', 'bouafle', 'bouake',
+  'cocody', 'dabakala', 'daloa', 'danane', 'dimbokro', 'dinbokro',
+  'ferkessedougou', 'faya', 'gagnoa', 'grand bassam', 'kesse', 'koumassi',
+  'man', 'mankono', 'marcory', 'micao', 'plateau', 'port bouet', 'riviera', 'san pedro',
+  'sanpedro', 'seguela', 'songon', 'treichville', 'vavoua', 'vridi',
+  'yamoussoukro', 'yopougon'
+])
+
+const NON_ADDRESS_EXACT_PHRASES = new Set([
+  'about issif addjxbc sk',
+  'adresse ou repere',
+  'bien rf',
+  'blaise pas de',
+  'bonsoir cher frere comment vous allez',
+  'comment tu vas',
+  'comment tuvas',
+  'd y kilometres khhfjf',
+  'dgank',
+  'dhaliweenc',
+  'demain c est le roi',
+  'et ivoirien cote d ivoire',
+  'j ai pas',
+  'j aime',
+  'je peux t appeler',
+  'je veux demander pour jouer et gagner de l argent',
+  'je veux un',
+  'mot de',
+  'passerlac',
+  'pochette tactile por',
+  'ratje',
+  'salut gdyuf',
+  'salut gdyufdjjdh',
+  'stutegf',
+  'zapping actu c est comment chez'
+])
+
+const NON_ADDRESS_PATTERNS = [
+  /^(?:besoin|je veux juste voir|voila ce que la)(?: \d+h?)?$/,
+  /^ksoex salut les gars voici le document(?: de)?$/
+]
+
+const MALFORMED_EMAIL_PATTERN = /^[a-z0-9._-]*(?:gmail|yahoo|hotmail|outlook)(?:[ ._-]?com)?$/
+
+const PHONE_FILLER_PHRASES = new Set([
+  'appelez', 'au cours', 'cote d ivoire', 'la semaine', 'mon numero'
+])
+
 // Learned from words inside historical, structured Cote d'Ivoire delivery addresses.
 const COMMON_ADDRESS_BIGRAMS = new Set(`^a ^b ^c ^d ^e ^f ^g ^h ^i ^j ^k ^l ^m ^n ^o ^p ^q ^r ^s ^t ^u ^v ^w ^y ^z a$ ab ac ad ae af ag ah ai ak al am an ao ap aq ar as at au av ay az b$ ba be bi bl bo br bu c$ ca ce ch ci ck cl co ct cu d$ da de di dj do dr du dy e$ ea eb ec ed ee ef eg eh ei el em en ep er es et eu ev ex ez f$ fa fe fi fo fr g$ ga gb ge gi gl gn go gr gu h$ ha he hi ho hu hv i$ ia ib ic id ie ig ik il im in io ip iq ir is it iv ix ja je ji jo ju k$ ka ke ki ko ku l$ la le li ll lm lo lu ly m$ ma mb me mi mm mo mp mu n$ na nc nd ne ng ni nk nn no np nq nr ns nt nu ny nz o$ oa ob oc od og oi ok ol om on oo op or os ot ou ow p$ pa pe ph pi pl po pp pr ps qu r$ ra rc rd re rg ri rl rm rn ro rr rs rt ru rv ry s$ sa sc se sh si so sp sq ss st su sy t$ ta te th ti to tr ts tt tu u$ ua ub uc ud ue ug ui ul um un up ur us ut uv ux va ve vi vo vr wa we x$ y$ ya yc yo z$ za zi zo`.split(' '))
 
@@ -178,7 +227,7 @@ const isNameOnlyAddress = (words, fullName) => {
   if (nameWords.length === 0 || words.length === 0) return false
   if ([...words].sort().join(' ') === [...nameWords].sort().join(' ')) return true
   const nameWordSet = new Set(nameWords)
-  return words.length >= 2 && words.every(word => nameWordSet.has(word))
+  return words.every(word => nameWordSet.has(word))
 }
 
 export const validateCheckoutAddress = (value, context = {}) => {
@@ -200,6 +249,10 @@ export const validateCheckoutAddress = (value, context = {}) => {
     return { isValid: false, reason: 'symbols_only', error: INVALID_ADDRESS_MESSAGE }
   }
 
+  if (KNOWN_LOCATION_ONLY_PHRASES.has(normalized)) {
+    return { isValid: true, reason: '', error: '' }
+  }
+
   if (compact.length < MIN_ADDRESS_LENGTH) {
     return { isValid: false, reason: 'too_short', error: SHORT_ADDRESS_MESSAGE }
   }
@@ -212,16 +265,23 @@ export const validateCheckoutAddress = (value, context = {}) => {
     return { isValid: false, reason: 'url_or_social', error: INVALID_ADDRESS_MESSAGE }
   }
 
+  if (MALFORMED_EMAIL_PATTERN.test(normalized)) {
+    return { isValid: false, reason: 'email_or_handle', error: INVALID_ADDRESS_MESSAGE }
+  }
+
   if (phoneDigits.length >= 6 && addressDigits === phoneDigits && !/[a-z]/i.test(raw)) {
     return { isValid: false, reason: 'same_as_phone', error: INVALID_ADDRESS_MESSAGE }
   }
 
-  if (/^[\d\s+().,/#-]+$/.test(raw)) {
-    return { isValid: false, reason: 'numbers_only', error: INVALID_ADDRESS_MESSAGE }
+  const textWithoutDigits = normalizeCheckoutAddressText(raw.replace(/\d+/g, ' '))
+  if (addressDigits.length >= 8 && phoneDigits.endsWith(addressDigits) && (
+    !textWithoutDigits || PHONE_FILLER_PHRASES.has(textWithoutDigits)
+  )) {
+    return { isValid: false, reason: 'phone_with_filler', error: INVALID_ADDRESS_MESSAGE }
   }
 
-  if (fullNameCompact && compact.length >= 5 && (compact === fullNameCompact || isNameOnlyAddress(words, context.fullName))) {
-    return { isValid: false, reason: 'same_as_name', error: INVALID_ADDRESS_MESSAGE }
+  if (/^[\d\s+().,/#-]+$/.test(raw)) {
+    return { isValid: false, reason: 'numbers_only', error: INVALID_ADDRESS_MESSAGE }
   }
 
   if (String(context.fullName || '').includes('@')) {
@@ -229,6 +289,10 @@ export const validateCheckoutAddress = (value, context = {}) => {
     if (nameEmailPrefix && compact === nameEmailPrefix) {
       return { isValid: false, reason: 'same_as_name_email_prefix', error: INVALID_ADDRESS_MESSAGE }
     }
+  }
+
+  if (fullNameCompact && compact.length >= 5 && (compact === fullNameCompact || isNameOnlyAddress(words, context.fullName))) {
+    return { isValid: false, reason: 'same_as_name', error: INVALID_ADDRESS_MESSAGE }
   }
 
   if (words.length >= 3 && words.every(word => word.length === 1)) {
@@ -275,6 +339,10 @@ export const validateCheckoutAddress = (value, context = {}) => {
 
   if (words.length > 0 && NOISE_WORDS.has(words[0]) && words.slice(1).join('').length <= 2) {
     return { isValid: false, reason: 'greeting_or_noise', error: INVALID_ADDRESS_MESSAGE }
+  }
+
+  if (NON_ADDRESS_EXACT_PHRASES.has(normalized) || NON_ADDRESS_PATTERNS.some(pattern => pattern.test(normalized))) {
+    return { isValid: false, reason: 'non_address_phrase', error: INVALID_ADDRESS_MESSAGE }
   }
 
   if (isCopiedNonAddress(normalized)) {
