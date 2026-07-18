@@ -126,21 +126,59 @@ const gibberishShapeScore = (word) => {
   return score
 }
 
-const isLikelySingleWordGibberish = (raw) => {
-  const words = alphaAddressWords(raw)
-  if (words.length !== 1) return false
-
-  const word = words[0]
-  if (word.length < 5 || word.length > 24 || GIBBERISH_ALLOWLIST.has(word)) return false
-
+const uncommonTransitionRatio = (word) => {
   const padded = `^${word}$`
   let uncommonTransitions = 0
   for (let index = 0; index < padded.length - 1; index += 1) {
     if (!COMMON_ADDRESS_BIGRAMS.has(padded.slice(index, index + 2))) uncommonTransitions += 1
   }
+  return uncommonTransitions / (padded.length - 1)
+}
 
-  const uncommonRatio = uncommonTransitions / (padded.length - 1)
-  return gibberishShapeScore(word) >= 2 || uncommonRatio >= 0.20
+const isSuspiciousAlphaWord = (word) => {
+  if (word.length < 4 || GIBBERISH_ALLOWLIST.has(word)) return false
+  return gibberishShapeScore(word) >= 2 || uncommonTransitionRatio(word) >= 0.25
+}
+
+const isLikelySingleWordGibberish = (raw) => {
+  const words = alphaAddressWords(raw)
+  if (words.length !== 1) return false
+
+  const word = words[0]
+  if (word.length < 5 || GIBBERISH_ALLOWLIST.has(word)) return false
+  return gibberishShapeScore(word) >= 2 || uncommonTransitionRatio(word) >= 0.20
+}
+
+const isLikelyMultiwordGibberish = (raw) => {
+  const words = alphaAddressWords(raw)
+  const substantialWords = words.filter(word => word.length >= 4)
+  const suspiciousWords = substantialWords.filter(isSuspiciousAlphaWord)
+  if (suspiciousWords.length === 0) return false
+  if (suspiciousWords.some(word => word.length >= 8 && uncommonTransitionRatio(word) >= 0.45)) return true
+  return suspiciousWords.length >= 2 || suspiciousWords.length === substantialWords.length
+}
+
+const isCopiedNonAddress = (normalized) => {
+  const markerGroups = [
+    ['presse papiers', 'gboard'],
+    ['presse papiers', 'texte que vous copiez'],
+    ['lieu connu', 'livreur appellera', 'passer'],
+    ['adresse mail', 'www'],
+    ['tu as bien dormi'],
+    ['je suis en train de', 'je suis en vacances'],
+    ['bon weekend cordialement'],
+    ['on fait quoi de']
+  ]
+  if (markerGroups.some(group => group.every(marker => normalized.includes(marker)))) return true
+  return normalized.length >= 120 && ['je suis', 'tu as', 'vous prie', 'gros bisous'].some(phrase => normalized.includes(phrase))
+}
+
+const isNameOnlyAddress = (words, fullName) => {
+  const nameWords = normalizeCheckoutAddressText(fullName).split(' ').filter(Boolean)
+  if (nameWords.length === 0 || words.length === 0) return false
+  if ([...words].sort().join(' ') === [...nameWords].sort().join(' ')) return true
+  const nameWordSet = new Set(nameWords)
+  return words.length >= 2 && words.every(word => nameWordSet.has(word))
 }
 
 export const validateCheckoutAddress = (value, context = {}) => {
@@ -182,7 +220,7 @@ export const validateCheckoutAddress = (value, context = {}) => {
     return { isValid: false, reason: 'numbers_only', error: INVALID_ADDRESS_MESSAGE }
   }
 
-  if (fullNameCompact && compact.length >= 5 && compact === fullNameCompact) {
+  if (fullNameCompact && compact.length >= 5 && (compact === fullNameCompact || isNameOnlyAddress(words, context.fullName))) {
     return { isValid: false, reason: 'same_as_name', error: INVALID_ADDRESS_MESSAGE }
   }
 
@@ -197,16 +235,34 @@ export const validateCheckoutAddress = (value, context = {}) => {
     return { isValid: false, reason: 'isolated_letters', error: INVALID_ADDRESS_MESSAGE }
   }
 
+  const digitCount = [...compact].filter(char => /\d/.test(char)).length
+  if (digitCount >= 4 && letters.length <= 2) {
+    return { isValid: false, reason: 'phone_or_number_dominates', error: INVALID_ADDRESS_MESSAGE }
+  }
+
   if ((raw.match(/\d+/g) || []).some(part => part.length >= 8) && letters.length <= 3) {
     return { isValid: false, reason: 'phone_or_number_dominates', error: INVALID_ADDRESS_MESSAGE }
   }
 
-  const digitCount = [...compact].filter(char => /\d/.test(char)).length
   if (words.length <= 2 && digitCount >= 4 && letters.length >= 3) {
     const looksMixedGarbage = /^\d{4,}/.test(compact) || !/[aeiou]/.test(letters) || /[bcdfghjklmnpqrstvwxyz]{4,}/.test(letters)
     if (looksMixedGarbage) {
       return { isValid: false, reason: 'alphanumeric_gibberish', error: INVALID_ADDRESS_MESSAGE }
     }
+  }
+
+  if (words.length === 1 && digitCount > 0 && letters.length >= 4) {
+    const alphaWord = alphaAddressWords(raw)[0]
+    if (uncommonTransitionRatio(alphaWord) >= 0.15) {
+      return { isValid: false, reason: 'alphanumeric_gibberish', error: INVALID_ADDRESS_MESSAGE }
+    }
+  }
+
+  const nameWords = normalizeCheckoutAddressText(context.fullName).split(' ').filter(Boolean)
+  if (digitCount >= 3 && nameWords.some(nameWord => (
+    nameWord.length >= 4 && new RegExp(`^${nameWord.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\d{3,}$`).test(compact)
+  ))) {
+    return { isValid: false, reason: 'name_with_digits', error: INVALID_ADDRESS_MESSAGE }
   }
 
   if (isRepeatedPattern(compact)) {
@@ -217,8 +273,20 @@ export const validateCheckoutAddress = (value, context = {}) => {
     return { isValid: false, reason: 'greeting_or_noise', error: INVALID_ADDRESS_MESSAGE }
   }
 
+  if (words.length > 0 && NOISE_WORDS.has(words[0]) && words.slice(1).join('').length <= 2) {
+    return { isValid: false, reason: 'greeting_or_noise', error: INVALID_ADDRESS_MESSAGE }
+  }
+
+  if (isCopiedNonAddress(normalized)) {
+    return { isValid: false, reason: 'copied_non_address', error: INVALID_ADDRESS_MESSAGE }
+  }
+
   if (isLikelySingleWordGibberish(raw)) {
     return { isValid: false, reason: 'single_word_gibberish', error: INVALID_ADDRESS_MESSAGE }
+  }
+
+  if (isLikelyMultiwordGibberish(raw)) {
+    return { isValid: false, reason: 'multiword_gibberish', error: INVALID_ADDRESS_MESSAGE }
   }
 
   return { isValid: true, reason: '', error: '' }
