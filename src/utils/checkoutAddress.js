@@ -67,13 +67,23 @@ const KNOWN_LOCATION_ONLY_PHRASES = new Set([
   'abengourou', 'abidjan', 'abobo', 'aboisso', 'adjame', 'adjouffou', 'angre',
   'anono', 'anyama', 'ayaman', 'attecoube', 'bassam', 'bingerville', 'bouafle', 'bouake',
   'cocody', 'dabakala', 'daloa', 'danane', 'dimbokro', 'dinbokro',
-  'ferkessedougou', 'faya', 'gagnoa', 'grand bassam', 'kesse', 'koumassi',
-  'man', 'mankono', 'marcory', 'micao', 'plateau', 'port bouet', 'riviera', 'san pedro',
+  'ferkessedougou', 'faya', 'gagnoa', 'grand bassam', 'katiola', 'kesse', 'koumassi',
+  'man', 'mankono', 'marcory', 'micao', 'nekro', 'plateau', 'port bouet', 'riviera', 'san pedro',
   'sanpedro', 'seguela', 'songon', 'treichville', 'vavoua', 'vridi',
   'yamoussoukro', 'yopougon'
 ])
 
+const ADDRESS_STRUCTURE_WORDS = new Set([
+  'auto', 'avenue', 'boulevard', 'boutique', 'carrefour', 'chu', 'cite', 'commissariat',
+  'ecole', 'eglise', 'gare', 'ilot', 'immeuble', 'lot', 'mairie', 'maquis',
+  'marche', 'mosquee', 'pharmacie', 'quartier', 'residence', 'route', 'rue', 'zone'
+])
+
+const STREET_STRUCTURE_WORDS = new Set(['avenue', 'boulevard', 'ilot', 'lot', 'route', 'rue'])
+
 const NON_ADDRESS_EXACT_PHRASES = new Set([
+  '33lam',
+  'ad1of2',
   'about issif addjxbc sk',
   'adresse ou repere',
   'bien rf',
@@ -92,6 +102,7 @@ const NON_ADDRESS_EXACT_PHRASES = new Set([
   'je veux demander pour jouer et gagner de l argent',
   'je veux un',
   'mot de',
+  'nnkonesamba06kone com com',
   'passerlac',
   'pochette tactile por',
   'ratje',
@@ -133,7 +144,9 @@ const GIBBERISH_ALLOWLIST = new Set([
 
 export const normalizeCheckoutAddressText = (value) => (
   String(value || '')
-    .normalize('NFD')
+    // Fold compatibility glyphs (for example mathematical bold/monospace)
+    // before removing accents so visible addresses are validated as typed.
+    .normalize('NFKD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .replace(/[’']/g, ' ')
@@ -205,6 +218,69 @@ const isLikelyMultiwordGibberish = (raw) => {
   if (suspiciousWords.length === 0) return false
   if (suspiciousWords.some(word => word.length >= 8 && uncommonTransitionRatio(word) >= 0.45)) return true
   return suspiciousWords.length >= 2 || suspiciousWords.length === substantialWords.length
+}
+
+const isOneTypoFromKnownLocation = (word) => {
+  if (word.length < MIN_ADDRESS_LENGTH || word.includes(' ')) return false
+
+  const collapsedWord = word.replace(/(.)\1+/g, '$1')
+  if (KNOWN_LOCATION_ONLY_PHRASES.has(collapsedWord)) return true
+
+  for (const location of KNOWN_LOCATION_ONLY_PHRASES) {
+    if (location.includes(' ') || location.length < MIN_ADDRESS_LENGTH) continue
+    if (Math.abs(word.length - location.length) > 1) continue
+
+    if (word.length === location.length) {
+      const differences = []
+      for (let index = 0; index < word.length; index += 1) {
+        if (word[index] !== location[index]) differences.push(index)
+      }
+      if (differences.length === 1) return true
+      if (
+        differences.length === 2 &&
+        differences[1] === differences[0] + 1 &&
+        word[differences[0]] === location[differences[1]] &&
+        word[differences[1]] === location[differences[0]]
+      ) return true
+      continue
+    }
+
+    const shorter = word.length < location.length ? word : location
+    const longer = word.length < location.length ? location : word
+    let shortIndex = 0
+    let longIndex = 0
+    let differences = 0
+    while (shortIndex < shorter.length && longIndex < longer.length) {
+      if (shorter[shortIndex] === longer[longIndex]) {
+        shortIndex += 1
+        longIndex += 1
+        continue
+      }
+      differences += 1
+      longIndex += 1
+      if (differences > 1) break
+    }
+    if (differences <= 1) return true
+  }
+
+  return false
+}
+
+const hasStrongAddressStructure = (normalized) => {
+  const words = normalized.split(' ').filter(Boolean)
+  if (words.length < 3) return false
+
+  const wordSet = new Set(words)
+  const structureWords = [...ADDRESS_STRUCTURE_WORDS].filter(word => wordSet.has(word))
+  const padded = ` ${normalized} `
+  const containsKnownLocation = [...KNOWN_LOCATION_ONLY_PHRASES].some(location => padded.includes(` ${location} `))
+  const hasStreetNumber = /\d/.test(normalized) && [...STREET_STRUCTURE_WORDS].some(word => wordSet.has(word))
+
+  return (
+    (containsKnownLocation && structureWords.length > 0) ||
+    structureWords.length >= 2 ||
+    hasStreetNumber
+  )
 }
 
 const isCopiedNonAddress = (normalized) => {
@@ -347,6 +423,14 @@ export const validateCheckoutAddress = (value, context = {}) => {
 
   if (isCopiedNonAddress(normalized)) {
     return { isValid: false, reason: 'copied_non_address', error: INVALID_ADDRESS_MESSAGE }
+  }
+
+  if (isOneTypoFromKnownLocation(normalized)) {
+    return { isValid: true, reason: '', error: '' }
+  }
+
+  if (hasStrongAddressStructure(normalized)) {
+    return { isValid: true, reason: '', error: '' }
   }
 
   if (isLikelySingleWordGibberish(raw)) {
