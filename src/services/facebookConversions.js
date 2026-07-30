@@ -87,6 +87,11 @@ const buildProductEventSourceUrl = (productData = {}) => {
     return typeof window !== 'undefined' ? window.location.href : 'https://www.brainnel.com/'
   }
 
+  const bundleMatch = rawId.match(/^bundle:(\d+)$/)
+  if (bundleMatch) {
+    return `https://www.brainnel.com/bundle/${bundleMatch[1]}`
+  }
+
   if (/^https?:\/\//i.test(rawId)) {
     try {
       const url = new URL(rawId)
@@ -208,42 +213,21 @@ const sendConversionEvent = async (eventData) => {
 }
 
 /**
- * 跟踪购买事件
+ * Build matching data for the backend. Purchase itself is sent by CAPI only
+ * after automatic address, duplicate-order and blacklist screening completes.
  */
-export const trackPurchaseEvent = async (orderData, userInfo, clientInfo = {}) => {
-  try {
-    const userData = await buildUserData(userInfo, clientInfo)
-    
-    // 生成事件时间戳（Unix时间戳）
-    const eventTime = Math.floor(Date.now() / 1000)
-    
-    // 构建自定义数据
-    const customData = await buildProductEventCustomData(orderData, orderData.quantity || 1)
-    
-    // 如果有订单号，添加到自定义数据
-    if (orderData.orderNo) {
-      customData.order_id = orderData.orderNo
-    }
-    
-    const eventId = orderData.orderNo ? `purchase_${orderData.orderNo}` : `purchase_${eventTime}`
-    const eventData = {
-      event_name: 'Purchase',
-      event_time: eventTime,
-      user_data: userData,
-      custom_data: customData,
-      event_source_url: buildProductEventSourceUrl(orderData),
-      action_source: 'website',
-      event_id: eventId
-    }
+export const buildMetaPurchaseContext = async (orderData, userInfo, clientInfo = {}) => ({
+  event_time: Math.floor(Date.now() / 1000),
+  user_data: await buildUserData(userInfo, clientInfo),
+  event_source_url: buildProductEventSourceUrl(orderData)
+})
 
-    trackBrowserPixelEvent('Purchase', customData, eventId)
-    return await sendConversionEvent(eventData)
-    
-  } catch (error) {
-    console.error('❌ 跟踪购买事件失败:', error)
-    return { success: false, error: error.message }
-  }
-}
+// Compatibility for dead/older page modules: never send Purchase from the browser.
+export const trackPurchaseEvent = async (orderData, userInfo, clientInfo = {}) => ({
+  success: true,
+  deferred: true,
+  context: await buildMetaPurchaseContext(orderData, userInfo, clientInfo)
+})
 
 const buildProductEventCustomData = async (productData = {}, fallbackQuantity = 1) => {
   const productId = getProductId(productData)
@@ -385,7 +369,7 @@ export const setFacebookClickId = (fbclid) => {
 }
 
 export default {
-  trackPurchaseEvent,
+  buildMetaPurchaseContext,
   trackViewContentEvent,
   trackAddToCartEvent,
   getClientInfo,

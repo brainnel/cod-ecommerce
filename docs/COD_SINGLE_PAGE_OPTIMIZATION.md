@@ -472,6 +472,17 @@ ORDER BY CASE WHEN d.sort_order = 0 THEN 999999 ELSE d.sort_order END ASC, d.nam
 
 ## 已完成改动
 
+### 2026-07-30 Meta Purchase 自动筛查后回传
+
+- 网页 COD 不再在下单接口成功后立即用浏览器 Pixel 回传 `Purchase`。
+- 前端只把 `fbp`、`fbc`、哈希后的电话/姓名、事件时间和来源页随订单请求传给后端；这些信息不参与订单校验，也不会阻塞订单创建。
+- 即使旧浏览器未能生成前端匹配信息，网页 COD 订单也会建立 outbox，并由后端用订单手机号、姓名和请求 IP/UA 兜底，避免正常订单漏回传。
+- 后端新增持久化 Purchase outbox，等待 120 秒，让地址范围检查、24 小时重复订单清理和客户黑名单检查先完成。
+- 只有仍处于本地待履约状态的正常网页 COD 订单才通过主 Pixel 的 CAPI 回传标准 `Purchase`。
+- 自动取消订单和测试品订单会在 outbox 中标记为 `skipped`，不回传 `Purchase`；普通订单事件名仍是 `Purchase`，不改变 Meta 优化目标。
+- 老前端缓存若继续请求 `/facebook-conversions` 发送 `Purchase`，后端会把它转为延迟筛查事件，不再即时转发。
+- 非购买类 Meta Pixel/CAPI 事件、Google Ads 购买事件和签收后的 `CODDelivered` 事件保持原逻辑。
+
 ### 2026-07-19 地址乱填规则增量复验
 
 - 复查地址校验上线后的完整订单和拦截事件，并继续观察到科特迪瓦时间 2026-07-18 23:53。

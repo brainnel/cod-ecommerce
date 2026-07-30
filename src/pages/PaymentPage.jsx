@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { FiCreditCard, FiMapPin, FiSearch, FiX } from 'react-icons/fi'
 import { districtAPI, orderAPI, bundleAPI } from '../services/api'
 import { useAdId } from '../hooks/useAdTrackingHooks.js'
-import { trackPurchaseEvent, getClientInfo } from '../services/facebookConversions'
+import { buildMetaPurchaseContext, getClientInfo } from '../services/facebookConversions'
 import { trackGoogleAdsPurchaseConversion } from '../services/googleAdsConversions'
 import {
   buildCheckoutProductProperties,
@@ -1867,6 +1867,15 @@ const PaymentPage = () => {
         throw new Error('Delivery location is missing')
       }
 
+      let metaPurchaseContext = null
+      try {
+        metaPurchaseContext = await buildMetaPurchaseContext({
+          productId: product.product_id
+        }, effectiveUserInfo, clientInfo)
+      } catch (metaContextError) {
+        console.warn('Meta购买匹配信息生成失败，不影响下单:', metaContextError)
+      }
+
       if (isBundleFlow && bundle) {
         // Bundle flow: backend builds child SKU items from bundle definition.
         const bundleOrderData = {
@@ -1881,7 +1890,8 @@ const PaymentPage = () => {
           currency: "FCFA",
           is_web: 1,
           quantity,
-          ad_id: adId
+          ad_id: adId,
+          meta_purchase_context: metaPurchaseContext
         }
         response = await bundleAPI.createBundleOrder(bundle.id, bundleOrderData)
       } else {
@@ -1906,7 +1916,8 @@ const PaymentPage = () => {
           discount_amount: 0,
           currency: "FCFA",
           is_web: 1,
-          ad_id: adId
+          ad_id: adId,
+          meta_purchase_context: metaPurchaseContext
         }
 
         response = await orderAPI.createOrder(orderData)
@@ -1923,18 +1934,6 @@ const PaymentPage = () => {
           whatsapp_same_as_phone: whatsappSameAsPhone
         })
         infoStepOrderSuccessRef.current = true
-
-        try {
-          trackPurchaseEvent({
-            productId: product.product_id,
-            quantity: quantity,
-            totalPrice: product.price * quantity,
-            unitPrice: product.price,
-            orderNo: response.data.order_no || response.data.order_id
-          }, effectiveUserInfo, clientInfo).catch(err => console.warn('Facebook事件失败:', err))
-        } catch (fbError) {
-          console.warn('Facebook事件错误:', fbError)
-        }
 
         try {
           trackGoogleAdsPurchaseConversion({
