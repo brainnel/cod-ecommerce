@@ -51,6 +51,7 @@ import {
   buildCheckoutDistrictCacheEntry,
   getCachedManualMarkerForDistrict,
   isSameCheckoutDistrict,
+  isSameCheckoutSubarea,
   loadCheckoutLocationMemory,
   saveCheckoutLocationMemory
 } from '../utils/checkoutLocationCache'
@@ -428,6 +429,20 @@ const PaymentPage = () => {
       subarea
     )
   )
+
+  const getCachedSubarea = (district) => {
+    const cachedSubarea = cachedLocationMemory?.lastSubarea
+    const districtMemoryEntry = buildDistrictMemoryEntry(district)
+    if (
+      !cachedSubarea
+      || !isSameCheckoutDistrict(districtMemoryEntry, cachedSubarea.district)
+    ) return null
+
+    if (cachedSubarea.isFallback) return OTHER_SUBAREA
+    return (district?.subareas || []).find((subarea) => (
+      isSameCheckoutSubarea(subarea, cachedSubarea)
+    )) || null
+  }
 
   const getCustomMarkerForPaymentState = (overrides = {}) => {
     const resolvedMarker = 'customMarker' in overrides ? overrides.customMarker : customMarker
@@ -967,10 +982,59 @@ const PaymentPage = () => {
     singlePageCachedDistrictAppliedRef.current = true
 
     const districtCenter = getDistrictCenterMarker(cachedDistrict)
+    const cachedSubarea = getCachedSubarea(cachedDistrict)
     const districtProps = {
       ...getDistrictAnalyticsProps(cachedDistrict),
       checkout_single_page: true,
       district_from_cache: true
+    }
+
+    if (cachedSubarea) {
+      const autoMarker = getSubareaCenterMarker(cachedSubarea, cachedDistrict)
+      const markerSource = cachedSubarea.isFallback
+        ? 'district_center_auto_skip'
+        : 'subarea_center_auto_skip'
+      const zoneProps = {
+        ...districtProps,
+        ...getSubareaAnalyticsProps(cachedSubarea),
+        subarea_from_cache: true,
+        location_method: markerSource,
+        location_auto_skip_map: true,
+        location_fallback_requires_address_detail: cachedSubarea.isFallback || undefined
+      }
+
+      setSelectedDistrict(cachedDistrict)
+      setSelectedSubarea(cachedSubarea)
+      setSubareaDistrict(null)
+      setMapCenter(autoMarker)
+      setMapZoom(cachedSubarea.isFallback ? 14 : 15)
+      setCustomMarker(autoMarker)
+      setMarkerSelectionSource(markerSource)
+      setShowSinglePageDistrictPicker(false)
+
+      updateCheckoutContext(product, {
+        quantity,
+        total_price: product.price * quantity,
+        ad_id: adId,
+        ...checkoutQuantityExperiment,
+        ...zoneProps
+      })
+      trackPaymentEvent('district_selected', districtProps)
+      trackPaymentEvent('subarea_selected', zoneProps)
+      trackPaymentEvent('location_selected', zoneProps)
+      trackPaymentEvent('location_confirmed', zoneProps)
+      saveCheckoutPaymentState(getPaymentNavigationState({
+        selectedDistrict: cachedDistrict,
+        selectedSubarea: cachedSubarea,
+        subareaDistrict: null,
+        customMarker: autoMarker,
+        markerSelectionSource: markerSource,
+        mapCenter: autoMarker,
+        mapZoom: cachedSubarea.isFallback ? 14 : 15,
+        locationSearchQuery: '',
+        locationSearchStatus: 'idle'
+      }))
+      return
     }
 
     setSelectedDistrict(cachedDistrict)
@@ -1010,6 +1074,7 @@ const PaymentPage = () => {
     product,
     quantity,
     districts,
+    cachedLocationMemory,
     adId,
     checkoutQuantityExperiment
   ])
@@ -1017,7 +1082,10 @@ const PaymentPage = () => {
   const rememberAndTrackDistrictSelection = (district, extra = {}) => {
     const districtMemoryEntry = buildDistrictMemoryEntry(district)
     if (districtMemoryEntry) {
-      rememberCheckoutLocation({ lastDistrict: districtMemoryEntry })
+      rememberCheckoutLocation({
+        lastDistrict: districtMemoryEntry,
+        lastSubarea: null
+      })
     }
 
     setSelectedDistrict(district)
@@ -1038,6 +1106,17 @@ const PaymentPage = () => {
     if (!district || !subarea) return
     if (!options.districtAlreadyTracked) {
       rememberAndTrackDistrictSelection(district)
+    }
+
+    const districtMemoryEntry = buildDistrictMemoryEntry(district)
+    if (districtMemoryEntry) {
+      rememberCheckoutLocation({
+        lastDistrict: districtMemoryEntry,
+        lastSubarea: {
+          ...subarea,
+          district: districtMemoryEntry
+        }
+      })
     }
 
     const autoMarker = getSubareaCenterMarker(subarea, district)
