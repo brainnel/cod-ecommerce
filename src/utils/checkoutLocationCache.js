@@ -32,6 +32,30 @@ const normalizeCoordinate = (value) => {
 
 const normalizeMarkerLabel = (value) => normalizeText(value).slice(0, 120)
 
+const buildCheckoutSubareaCacheEntry = (subarea) => {
+  if (!subarea || typeof subarea !== 'object') return null
+
+  const subareaId = normalizeId(subarea.subareaId ?? subarea.id)
+  const name = normalizeText(subarea.name || subarea.subareaName)
+  const isFallback = Boolean(subarea.isFallback ?? subarea.is_fallback)
+  const cacheKey = isFallback
+    ? 'fallback:other'
+    : subareaId
+      ? `id:${subareaId}`
+      : name
+        ? `name:${normalizeLabel(name)}`
+        : ''
+
+  if (!cacheKey) return null
+
+  return {
+    cacheKey,
+    subareaId,
+    name,
+    isFallback
+  }
+}
+
 const isValidMarker = (marker) => {
   if (!marker || typeof marker !== 'object') return false
   const lat = normalizeCoordinate(marker.lat)
@@ -132,6 +156,7 @@ const normalizeManualMarkerEntry = (entry) => {
     label: normalizeMarkerLabel(entry.label),
     placeId: normalizeText(entry.placeId),
     district,
+    subarea: buildCheckoutSubareaCacheEntry(entry.subarea),
     updatedAt: normalizeText(entry.updatedAt)
   }
 }
@@ -179,6 +204,7 @@ export const saveCheckoutLocationMemory = (locationMemory, storage = getDefaultS
         label: normalizeMarkerLabel(marker.label),
         placeId: normalizeText(marker.placeId),
         district,
+        subarea: buildCheckoutSubareaCacheEntry(marker.subarea),
         updatedAt: now
       }
     }
@@ -201,9 +227,17 @@ export const isSameCheckoutDistrict = (district, cachedDistrict) => {
   return Boolean(districtKey && cachedKey && districtKey === cachedKey)
 }
 
-export const getCachedManualMarkerForDistrict = (district, locationMemory) => {
+export const getCachedManualMarkerForDistrict = (district, locationMemory, subarea = null) => {
   const manualMarker = locationMemory?.manualMarker
   if (!manualMarker || !isSameCheckoutDistrict(district, manualMarker.district)) return null
+
+  if (subarea) {
+    const expectedSubarea = buildCheckoutSubareaCacheEntry(subarea)
+    const cachedSubarea = buildCheckoutSubareaCacheEntry(manualMarker.subarea)
+    if (!expectedSubarea || !cachedSubarea || expectedSubarea.cacheKey !== cachedSubarea.cacheKey) {
+      return null
+    }
+  }
 
   return {
     lat: manualMarker.lat,
