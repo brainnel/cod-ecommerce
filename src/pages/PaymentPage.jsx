@@ -1,15 +1,6 @@
 import { lazy, Suspense, useState, useEffect, useMemo, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import {
-  FiCheck,
-  FiChevronLeft,
-  FiChevronRight,
-  FiCreditCard,
-  FiMapPin,
-  FiMoreHorizontal,
-  FiSearch,
-  FiX
-} from 'react-icons/fi'
+import { FiCreditCard, FiMapPin, FiSearch, FiX } from 'react-icons/fi'
 import { districtAPI, orderAPI, bundleAPI } from '../services/api'
 import { useAdId } from '../hooks/useAdTrackingHooks.js'
 import { buildMetaPurchaseContext, getClientInfo } from '../services/facebookConversions'
@@ -51,7 +42,6 @@ import {
   buildCheckoutDistrictCacheEntry,
   getCachedManualMarkerForDistrict,
   isSameCheckoutDistrict,
-  isSameCheckoutSubarea,
   loadCheckoutLocationMemory,
   saveCheckoutLocationMemory
 } from '../utils/checkoutLocationCache'
@@ -76,14 +66,6 @@ const LOCATION_SEARCH_GENERIC_LABELS = new Set([
 const getDistrictDisplayName = (district) => (
   district?.display_name || district?.name || ''
 )
-
-const OTHER_SUBAREA = Object.freeze({
-  id: null,
-  name: 'Autre quartier',
-  isFallback: true
-})
-
-const getSubareaDisplayName = (subarea) => subarea?.name || ''
 
 const normalizeLocationSearchText = (value) => (
   String(value || '')
@@ -269,6 +251,7 @@ const PaymentPage = () => {
   const isSinglePageVariant = isSinglePageCheckoutVariant(checkoutQuantityExperiment)
   const isSinglePageReviewVariant = isSinglePageReviewCheckoutVariant(checkoutQuantityExperiment)
   const hasMapSearchFeature = isMapSearchVariant || isSinglePageVariant || isAddressFirstVariant
+  const hasInitialSinglePageCachedDistrict = isSinglePageVariant && Boolean(initialLastDistrictRef.current)
 
   // 三步流程：1=选大区, 2=地图标记, 3=填写信息
   const [currentStep, setCurrentStep] = useState(() => getCheckoutStepFromSearch(location.search))
@@ -278,11 +261,9 @@ const PaymentPage = () => {
   // 步顢1：大区选择
   const [districts, setDistricts] = useState([])
   const [selectedDistrict, setSelectedDistrict] = useState(() => paymentRouteState.selectedDistrict || null)
-  const [selectedSubarea, setSelectedSubarea] = useState(() => paymentRouteState.selectedSubarea || null)
-  const [subareaDistrict, setSubareaDistrict] = useState(() => paymentRouteState.subareaDistrict || null)
   const [showSinglePageDistrictPicker, setShowSinglePageDistrictPicker] = useState(() => {
-    if (paymentRouteState.selectedDistrict || paymentRouteState.subareaDistrict) return false
-    if (initialLastDistrictRef.current) return false
+    if (paymentRouteState.selectedDistrict) return false
+    if (hasInitialSinglePageCachedDistrict) return false
     return true
   })
 
@@ -324,17 +305,14 @@ const PaymentPage = () => {
   const singlePageCachedDistrictPending = (
     isSinglePageVariant
     && !showSinglePageDistrictPicker
-    && !subareaDistrict
-    && !(selectedDistrict && selectedSubarea)
-    && Boolean(paymentRouteState.selectedDistrict || initialLastDistrictRef.current)
+    && !selectedDistrict
+    && Boolean(initialLastDistrictRef.current)
   )
   const singlePageInfoVisible = (
     isSinglePageVariant
-    && selectedDistrict
-    && selectedSubarea
+    && (selectedDistrict || singlePageCachedDistrictPending)
     && currentStep !== 2
     && !showSinglePageDistrictPicker
-    && !subareaDistrict
   )
   const isSinglePageOptionalMapStep = isSinglePageVariant && currentStep === 2
   const showDistrictSection = currentStep === 1 || (isSinglePageVariant && currentStep !== 2)
@@ -364,7 +342,6 @@ const PaymentPage = () => {
     if (source === 'manual_cached') return 'manual_map_cached'
     if (source === 'district_center_fallback') return 'district_center_fallback'
     if (source === 'district_center_auto_skip') return 'district_center_auto_skip'
-    if (source === 'subarea_center_auto_skip') return 'subarea_center_auto_skip'
     return source || null
   }
 
@@ -385,7 +362,6 @@ const PaymentPage = () => {
     if (!marker) return
 
     const district = options.district || selectedDistrict
-    const subarea = 'subarea' in options ? options.subarea : selectedSubarea
     const districtMemoryEntry = buildDistrictMemoryEntry(district)
     const markerSource = options.markerSelectionSource || 'manual'
     const nextMapCenter = options.mapCenter || marker
@@ -401,8 +377,7 @@ const PaymentPage = () => {
           source: 'manual',
           label: markerLabel,
           placeId: markerPlaceId,
-          district: districtMemoryEntry,
-          subarea
+          district: districtMemoryEntry
         }
       })
     }
@@ -422,27 +397,9 @@ const PaymentPage = () => {
     }))
   }
 
-  const getCachedManualMarker = (district, subarea = null) => (
-    getCachedManualMarkerForDistrict(
-      buildDistrictMemoryEntry(district),
-      cachedLocationMemory,
-      subarea
-    )
+  const getCachedManualMarker = (district) => (
+    getCachedManualMarkerForDistrict(buildDistrictMemoryEntry(district), cachedLocationMemory)
   )
-
-  const getCachedSubarea = (district) => {
-    const cachedSubarea = cachedLocationMemory?.lastSubarea
-    const districtMemoryEntry = buildDistrictMemoryEntry(district)
-    if (
-      !cachedSubarea
-      || !isSameCheckoutDistrict(districtMemoryEntry, cachedSubarea.district)
-    ) return null
-
-    if (cachedSubarea.isFallback) return OTHER_SUBAREA
-    return (district?.subareas || []).find((subarea) => (
-      isSameCheckoutSubarea(subarea, cachedSubarea)
-    )) || null
-  }
 
   const getCustomMarkerForPaymentState = (overrides = {}) => {
     const resolvedMarker = 'customMarker' in overrides ? overrides.customMarker : customMarker
@@ -453,17 +410,13 @@ const PaymentPage = () => {
     if (!isManualMarker) return resolvedMarker
 
     const resolvedDistrict = 'selectedDistrict' in overrides ? overrides.selectedDistrict : selectedDistrict
-    const resolvedSubarea = 'selectedSubarea' in overrides ? overrides.selectedSubarea : selectedSubarea
     const resolvedSearchStatus = overrides.locationSearchStatus || locationSearchStatus
     const resolvedSearchQuery = (
       'locationSearchQuery' in overrides
         ? overrides.locationSearchQuery
         : locationSearchQuery
     )
-    const cachedManualMarker = getCachedManualMarker(
-      resolvedDistrict,
-      isSinglePageVariant ? resolvedSubarea : null
-    )
+    const cachedManualMarker = getCachedManualMarker(resolvedDistrict)
     const cachedLabel = cachedManualMarker?.label || ''
     const selectedSearchLabel = resolvedSearchStatus === 'selected' ? resolvedSearchQuery : ''
     const markerLabel = resolvedMarker.label || cachedLabel || selectedSearchLabel
@@ -539,15 +492,6 @@ const PaymentPage = () => {
     }
   }
 
-  const getSubareaAnalyticsProps = (subarea = selectedSubarea) => {
-    if (!subarea) return {}
-    return {
-      subarea_id: subarea.id ? String(subarea.id) : null,
-      subarea_name: getSubareaDisplayName(subarea) || null,
-      subarea_fallback: Boolean(subarea.isFallback)
-    }
-  }
-
   const getDistrictCenterMarker = (district = selectedDistrict) => {
     const districtLat = Number.parseFloat(district?.latitude)
     const districtLng = Number.parseFloat(district?.longitude)
@@ -557,19 +501,6 @@ const PaymentPage = () => {
       lat: Number.isFinite(districtLat) ? districtLat : fallbackCenter.lat,
       lng: Number.isFinite(districtLng) ? districtLng : fallbackCenter.lng
     }
-  }
-
-  const getSubareaCenterMarker = (subarea = selectedSubarea, district = selectedDistrict) => {
-    const subareaLat = Number.parseFloat(subarea?.center_latitude)
-    const subareaLng = Number.parseFloat(subarea?.center_longitude)
-    if (!subarea?.isFallback && Number.isFinite(subareaLat) && Number.isFinite(subareaLng)) {
-      return {
-        lat: subareaLat,
-        lng: subareaLng,
-        label: `${getSubareaDisplayName(subarea)}, ${getDistrictDisplayName(district)}`
-      }
-    }
-    return getDistrictCenterMarker(district)
   }
 
   const getDeliveryMarkerForOrder = () => {
@@ -592,7 +523,6 @@ const PaymentPage = () => {
       is_meta_in_app_browser: browserContext.is_meta_in_app_browser,
       location_entry_mode: 'map_only',
       ...getDistrictAnalyticsProps(),
-      ...getSubareaAnalyticsProps(),
       ...extra
     }
   }
@@ -680,7 +610,6 @@ const PaymentPage = () => {
       showInfoSection,
       isSinglePageVariant,
       selectedDistrict,
-      selectedSubarea,
       userInfo,
       whatsappSameAsPhone,
       markerSelectionSource,
@@ -728,8 +657,6 @@ const PaymentPage = () => {
       checkoutQuantityExperiment,
       quantityConfirmed: inlineQuantityConfirmedRef.current,
       selectedDistrict,
-      selectedSubarea,
-      subareaDistrict,
       markerSelectionSource,
       mapCenter,
       mapZoom,
@@ -800,8 +727,6 @@ const PaymentPage = () => {
     routeQuantityConfirmed,
     checkoutQuantityExperiment,
     selectedDistrict,
-    selectedSubarea,
-    subareaDistrict,
     customMarker,
     markerSelectionSource,
     mapCenter,
@@ -906,10 +831,7 @@ const PaymentPage = () => {
 
     const requestedStep = getCheckoutStepFromSearch(location.search)
     const hasStepInUrl = hasCheckoutStepInSearch(location.search)
-    const hasCompletedSinglePageZone = !isSinglePageVariant || Boolean(selectedDistrict && selectedSubarea)
-    const maxAllowedStep = selectedDistrict && hasCompletedSinglePageZone
-      ? (customMarker ? 3 : 2)
-      : 1
+    const maxAllowedStep = selectedDistrict ? (customMarker ? 3 : 2) : (singlePageCachedDistrictPending ? 3 : 1)
     const nextStep = Math.min(requestedStep, maxAllowedStep)
     const canonicalSearch = buildCheckoutStepSearch(nextStep, location.search)
 
@@ -921,7 +843,7 @@ const PaymentPage = () => {
     if (currentStep !== nextStep) {
       setCurrentStep(nextStep)
     }
-  }, [location.search, product, quantity, selectedDistrict, selectedSubarea, customMarker, currentStep, isSinglePageVariant])
+  }, [location.search, product, quantity, selectedDistrict, customMarker, currentStep, singlePageCachedDistrictPending])
 
   // 加载大区列表（扁平化）
   useEffect(() => {
@@ -960,18 +882,16 @@ const PaymentPage = () => {
     if (
       !isSinglePageVariant
       || singlePageCachedDistrictAppliedRef.current
-      || selectedSubarea
-      || subareaDistrict
+      || selectedDistrict
       || currentStep === 2
       || !product
       || !quantity
       || districts.length === 0
-      || !(selectedDistrict || initialLastDistrictRef.current)
+      || !initialLastDistrictRef.current
     ) return
 
-    const cachedDistrictEntry = selectedDistrict || initialLastDistrictRef.current
     const cachedDistrict = districts.find((district) => (
-      isSameCheckoutDistrict(buildDistrictMemoryEntry(district), cachedDistrictEntry)
+      isSameCheckoutDistrict(buildDistrictMemoryEntry(district), initialLastDistrictRef.current)
     ))
     if (!cachedDistrict) {
       singlePageCachedDistrictAppliedRef.current = true
@@ -981,69 +901,32 @@ const PaymentPage = () => {
 
     singlePageCachedDistrictAppliedRef.current = true
 
-    const districtCenter = getDistrictCenterMarker(cachedDistrict)
-    const cachedSubarea = getCachedSubarea(cachedDistrict)
+    const districtCenter = {
+      lat: parseFloat(cachedDistrict.latitude),
+      lng: parseFloat(cachedDistrict.longitude)
+    }
+    const cachedManualMarker = getCachedManualMarker(cachedDistrict)
+    const autoMarker = cachedManualMarker || districtCenter
+    const autoMarkerSource = cachedManualMarker ? 'manual_cached' : 'district_center_auto_skip'
+    const autoMapZoom = cachedManualMarker ? 15 : 14
     const districtProps = {
       ...getDistrictAnalyticsProps(cachedDistrict),
       checkout_single_page: true,
       district_from_cache: true
     }
-
-    if (cachedSubarea) {
-      const autoMarker = getSubareaCenterMarker(cachedSubarea, cachedDistrict)
-      const markerSource = cachedSubarea.isFallback
-        ? 'district_center_auto_skip'
-        : 'subarea_center_auto_skip'
-      const zoneProps = {
-        ...districtProps,
-        ...getSubareaAnalyticsProps(cachedSubarea),
-        subarea_from_cache: true,
-        location_method: markerSource,
-        location_auto_skip_map: true,
-        location_fallback_requires_address_detail: cachedSubarea.isFallback || undefined
-      }
-
-      setSelectedDistrict(cachedDistrict)
-      setSelectedSubarea(cachedSubarea)
-      setSubareaDistrict(null)
-      setMapCenter(autoMarker)
-      setMapZoom(cachedSubarea.isFallback ? 14 : 15)
-      setCustomMarker(autoMarker)
-      setMarkerSelectionSource(markerSource)
-      setShowSinglePageDistrictPicker(false)
-
-      updateCheckoutContext(product, {
-        quantity,
-        total_price: product.price * quantity,
-        ad_id: adId,
-        ...checkoutQuantityExperiment,
-        ...zoneProps
-      })
-      trackPaymentEvent('district_selected', districtProps)
-      trackPaymentEvent('subarea_selected', zoneProps)
-      trackPaymentEvent('location_selected', zoneProps)
-      trackPaymentEvent('location_confirmed', zoneProps)
-      saveCheckoutPaymentState(getPaymentNavigationState({
-        selectedDistrict: cachedDistrict,
-        selectedSubarea: cachedSubarea,
-        subareaDistrict: null,
-        customMarker: autoMarker,
-        markerSelectionSource: markerSource,
-        mapCenter: autoMarker,
-        mapZoom: cachedSubarea.isFallback ? 14 : 15,
-        locationSearchQuery: '',
-        locationSearchStatus: 'idle'
-      }))
-      return
+    const locationProps = {
+      ...districtProps,
+      location_method: cachedManualMarker ? 'manual_map_cached' : 'district_center_auto_skip',
+      location_cache_used: cachedManualMarker ? true : undefined,
+      location_auto_skip_map: true,
+      location_fallback_requires_address_detail: cachedManualMarker ? undefined : true
     }
 
     setSelectedDistrict(cachedDistrict)
-    setSelectedSubarea(null)
-    setSubareaDistrict(cachedDistrict)
-    setMapCenter(districtCenter)
-    setMapZoom(14)
-    setCustomMarker(null)
-    setMarkerSelectionSource('none')
+    setMapCenter(autoMarker)
+    setMapZoom(autoMapZoom)
+    setCustomMarker(autoMarker)
+    setMarkerSelectionSource(autoMarkerSource)
     setShowSinglePageDistrictPicker(false)
 
     updateCheckoutContext(product, {
@@ -1054,38 +937,33 @@ const PaymentPage = () => {
       ...districtProps
     })
     trackPaymentEvent('district_selected', districtProps)
+    trackPaymentEvent('location_selected', locationProps)
+    trackPaymentEvent('location_confirmed', locationProps)
     saveCheckoutPaymentState(getPaymentNavigationState({
       selectedDistrict: cachedDistrict,
-      selectedSubarea: null,
-      subareaDistrict: cachedDistrict,
-      customMarker: null,
-      markerSelectionSource: 'none',
-      mapCenter: districtCenter,
-      mapZoom: 14,
-      locationSearchQuery: '',
-      locationSearchStatus: 'idle'
+      customMarker: autoMarker,
+      markerSelectionSource: autoMarkerSource,
+      mapCenter: autoMarker,
+      mapZoom: autoMapZoom,
+      locationSearchQuery: cachedManualMarker?.label || '',
+      locationSearchStatus: cachedManualMarker?.label ? 'selected' : 'idle'
     }))
   }, [
     isSinglePageVariant,
     selectedDistrict,
-    selectedSubarea,
-    subareaDistrict,
     currentStep,
     product,
     quantity,
     districts,
-    cachedLocationMemory,
     adId,
     checkoutQuantityExperiment
   ])
 
-  const rememberAndTrackDistrictSelection = (district, extra = {}) => {
+  // 选择大区
+  const handleSelectDistrict = (district) => {
     const districtMemoryEntry = buildDistrictMemoryEntry(district)
     if (districtMemoryEntry) {
-      rememberCheckoutLocation({
-        lastDistrict: districtMemoryEntry,
-        lastSubarea: null
-      })
+      rememberCheckoutLocation({ lastDistrict: districtMemoryEntry })
     }
 
     setSelectedDistrict(district)
@@ -1096,121 +974,7 @@ const PaymentPage = () => {
       ...checkoutQuantityExperiment,
       ...getDistrictAnalyticsProps(district)
     })
-    trackPaymentEvent('district_selected', {
-      ...getDistrictAnalyticsProps(district),
-      ...extra
-    })
-  }
-
-  const finalizeSinglePageSubarea = (district, subarea, options = {}) => {
-    if (!district || !subarea) return
-    if (!options.districtAlreadyTracked) {
-      rememberAndTrackDistrictSelection(district)
-    }
-
-    const districtMemoryEntry = buildDistrictMemoryEntry(district)
-    if (districtMemoryEntry) {
-      rememberCheckoutLocation({
-        lastDistrict: districtMemoryEntry,
-        lastSubarea: {
-          ...subarea,
-          district: districtMemoryEntry
-        }
-      })
-    }
-
-    const autoMarker = getSubareaCenterMarker(subarea, district)
-    const autoMarkerSource = subarea.isFallback
-      ? 'district_center_auto_skip'
-      : 'subarea_center_auto_skip'
-    const locationMethod = subarea.isFallback
-      ? 'district_center_auto_skip'
-      : 'subarea_center_auto_skip'
-    const zoneProps = {
-      ...getDistrictAnalyticsProps(district),
-      ...getSubareaAnalyticsProps(subarea),
-      location_method: locationMethod,
-      location_auto_skip_map: true,
-      location_fallback_requires_address_detail: subarea.isFallback || undefined,
-      checkout_single_page: true
-    }
-
-    setSelectedDistrict(district)
-    setSelectedSubarea(subarea)
-    setSubareaDistrict(null)
-    setShowSinglePageDistrictPicker(false)
-    setCustomMarker(autoMarker)
-    setMarkerSelectionSource(autoMarkerSource)
-    setMapCenter(autoMarker)
-    setMapZoom(subarea.isFallback ? 14 : 15)
-    setLocationSearchQuery('')
-    setLocationSearchResults([])
-    setLocationSearchStatus('idle')
-    setLocationSearchMessage('')
-
-    updateCheckoutContext(product, {
-      quantity,
-      total_price: product.price * quantity,
-      ad_id: adId,
-      ...checkoutQuantityExperiment,
-      ...getDistrictAnalyticsProps(district),
-      ...getSubareaAnalyticsProps(subarea)
-    })
-    trackPaymentEvent('subarea_selected', zoneProps)
-    trackPaymentEvent('location_selected', zoneProps)
-    trackPaymentEvent('location_confirmed', zoneProps)
-    saveCheckoutPaymentState(getPaymentNavigationState({
-      selectedDistrict: district,
-      selectedSubarea: subarea,
-      subareaDistrict: null,
-      customMarker: autoMarker,
-      markerSelectionSource: autoMarkerSource,
-      mapCenter: autoMarker,
-      mapZoom: subarea.isFallback ? 14 : 15,
-      locationSearchQuery: '',
-      locationSearchStatus: 'idle'
-    }))
-  }
-
-  // 选择大区
-  const handleSelectDistrict = (district) => {
-    if (isSinglePageVariant) {
-      rememberAndTrackDistrictSelection(district)
-      const districtCenter = getDistrictCenterMarker(district)
-
-      setSelectedDistrict(district)
-      setSelectedSubarea(null)
-      setCustomMarker(null)
-      setMarkerSelectionSource('none')
-      setMapCenter(districtCenter)
-      setMapZoom(14)
-      setLocationSearchQuery('')
-      setLocationSearchResults([])
-      setLocationSearchStatus('idle')
-      setLocationSearchMessage('')
-      setShowSinglePageDistrictPicker(false)
-
-      if (Array.isArray(district.subareas) && district.subareas.length > 0) {
-        setSubareaDistrict(district)
-        saveCheckoutPaymentState(getPaymentNavigationState({
-          selectedDistrict: district,
-          selectedSubarea: null,
-          subareaDistrict: district,
-          customMarker: null,
-          markerSelectionSource: 'none',
-          mapCenter: districtCenter,
-          mapZoom: 14,
-          locationSearchQuery: '',
-          locationSearchStatus: 'idle'
-        }))
-        return
-      }
-
-      finalizeSinglePageSubarea(district, OTHER_SUBAREA, { districtAlreadyTracked: true })
-      return
-    }
-
-    rememberAndTrackDistrictSelection(district)
+    trackPaymentEvent('district_selected', getDistrictAnalyticsProps(district))
 
     // 直接使用大区自己的坐标作为地图中心
     const districtCenter = {
@@ -1219,6 +983,39 @@ const PaymentPage = () => {
     }
     setMapCenter(districtCenter)
     setMapZoom(14)  // 大区级别，用更高的缩放
+
+    if (isSinglePageVariant) {
+      const cachedManualMarker = getCachedManualMarker(district)
+      const autoMarker = cachedManualMarker || districtCenter
+      const autoMarkerSource = cachedManualMarker ? 'manual_cached' : 'district_center_auto_skip'
+      const autoMapZoom = cachedManualMarker ? 15 : 14
+
+      setCustomMarker(autoMarker)
+      setMarkerSelectionSource(autoMarkerSource)
+      setMapCenter(autoMarker)
+      setMapZoom(autoMapZoom)
+      setShowSinglePageDistrictPicker(false)
+      const singlePageProps = {
+        ...getDistrictAnalyticsProps(district),
+        location_method: cachedManualMarker ? 'manual_map_cached' : 'district_center_auto_skip',
+        location_cache_used: cachedManualMarker ? true : undefined,
+        location_auto_skip_map: true,
+        location_fallback_requires_address_detail: cachedManualMarker ? undefined : true,
+        checkout_single_page: true
+      }
+      trackPaymentEvent('location_selected', singlePageProps)
+      trackPaymentEvent('location_confirmed', singlePageProps)
+      saveCheckoutPaymentState(getPaymentNavigationState({
+        selectedDistrict: district,
+        customMarker: autoMarker,
+        markerSelectionSource: autoMarkerSource,
+        mapCenter: autoMarker,
+        mapZoom: autoMapZoom,
+        locationSearchQuery: cachedManualMarker?.label || '',
+        locationSearchStatus: cachedManualMarker?.label ? 'selected' : 'idle'
+      }))
+      return
+    }
 
     if (isAddressFirstVariant) {
       setCustomMarker(districtCenter)
@@ -1269,20 +1066,6 @@ const PaymentPage = () => {
     })
   }
 
-  const handleSelectSubarea = (subarea) => {
-    if (!subareaDistrict) return
-    finalizeSinglePageSubarea(subareaDistrict, subarea, { districtAlreadyTracked: true })
-  }
-
-  const handleChangeDistrict = () => {
-    setSelectedDistrict(null)
-    setSelectedSubarea(null)
-    setSubareaDistrict(null)
-    setCustomMarker(null)
-    setMarkerSelectionSource('none')
-    setShowSinglePageDistrictPicker(true)
-  }
-
   // 地图标记
   const handleMapClick = (marker) => {
     setMarkerSelectionSource('manual')
@@ -1294,7 +1077,6 @@ const PaymentPage = () => {
     })
     trackPaymentEvent('location_selected', {
       ...getDistrictAnalyticsProps(),
-      ...getSubareaAnalyticsProps(),
       location_method: 'manual_map'
     })
   }
@@ -1470,7 +1252,6 @@ const PaymentPage = () => {
       if (trigger === 'submit') {
         trackPaymentEvent('location_search_failed', {
           ...getDistrictAnalyticsProps(),
-          ...getSubareaAnalyticsProps(),
           location_search_error: placeResponse.status || 'no_result',
           location_search_query_length: query.length
         })
@@ -1484,7 +1265,6 @@ const PaymentPage = () => {
     if (trigger === 'submit') {
       trackPaymentEvent('location_search_results', {
         ...getDistrictAnalyticsProps(),
-        ...getSubareaAnalyticsProps(),
         location_search_query_length: query.length,
         location_search_result_count: nextResults.length
       })
@@ -1546,7 +1326,6 @@ const PaymentPage = () => {
         setLocationSearchMessage('Impossible de placer ce résultat. Touchez la carte directement.')
         trackPaymentEvent('location_search_failed', {
           ...getDistrictAnalyticsProps(),
-          ...getSubareaAnalyticsProps(),
           location_search_error: status || 'place_detail_failed',
           location_search_query_length: locationSearchQuery.trim().length
         })
@@ -1573,13 +1352,11 @@ const PaymentPage = () => {
 
       trackPaymentEvent('location_search_selected', {
         ...getDistrictAnalyticsProps(),
-        ...getSubareaAnalyticsProps(),
         location_search_result_index: index + 1,
         location_search_result_count: locationSearchResults.length
       })
       trackPaymentEvent('location_selected', {
         ...getDistrictAnalyticsProps(),
-        ...getSubareaAnalyticsProps(),
         location_method: 'manual_map',
         location_selection_source: 'search_result'
       })
@@ -1655,10 +1432,7 @@ const PaymentPage = () => {
 
   useEffect(() => {
     if (currentStep !== 2 || !selectedDistrict) return
-    const cachedManualMarker = getCachedManualMarker(
-      selectedDistrict,
-      isSinglePageVariant ? selectedSubarea : null
-    )
+    const cachedManualMarker = getCachedManualMarker(selectedDistrict)
     if (
       customMarker &&
       (markerSelectionSourceRef.current === 'manual' || markerSelectionSourceRef.current === 'manual_cached')
@@ -1719,16 +1493,7 @@ const PaymentPage = () => {
       locationSearchQuery: cachedManualMarker.label || locationSearchQuery,
       locationSearchStatus: cachedManualMarker.label || locationSearchQuery ? 'selected' : 'idle'
     }))
-  }, [
-    currentStep,
-    selectedDistrict,
-    selectedSubarea,
-    customMarker,
-    markerSelectionSource,
-    cachedLocationMemory,
-    locationSearchQuery,
-    isSinglePageVariant
-  ])
+  }, [currentStep, selectedDistrict, customMarker, markerSelectionSource, cachedLocationMemory, locationSearchQuery])
 
   // 确认标记，进入步骤3
   const handleConfirmMarker = () => {
@@ -1738,7 +1503,6 @@ const PaymentPage = () => {
     }
     trackPaymentEvent('location_confirmed', {
       ...getDistrictAnalyticsProps(),
-      ...getSubareaAnalyticsProps(),
       location_method: getLocationMethodForMarkerSource(markerSelectionSourceRef.current),
       location_cache_used: markerSelectionSourceRef.current === 'manual_cached'
     })
@@ -1763,7 +1527,6 @@ const PaymentPage = () => {
 
     const fallbackProps = {
       ...getDistrictAnalyticsProps(selectedDistrict),
-      ...getSubareaAnalyticsProps(selectedSubarea),
       location_method: 'district_center_fallback',
       location_fallback_requires_address_detail: true,
       location_fallback_after_manual_map: hadManualMapSelection
@@ -1799,35 +1562,6 @@ const PaymentPage = () => {
       setMapZoom(15)
       nextMapCenter = customMarker
       nextMapZoom = 15
-    } else if (isSinglePageVariant) {
-      const cachedSubareaMarker = getCachedManualMarker(selectedDistrict, selectedSubarea)
-      if (cachedSubareaMarker) {
-        setCustomMarker(cachedSubareaMarker)
-        setMarkerSelectionSource('manual_cached')
-        setMapCenter(cachedSubareaMarker)
-        setMapZoom(15)
-        nextMarker = cachedSubareaMarker
-        nextMarkerSource = 'manual_cached'
-        nextMapCenter = cachedSubareaMarker
-        nextMapZoom = 15
-        trackPaymentEvent('location_selected', {
-          ...getDistrictAnalyticsProps(selectedDistrict),
-          ...getSubareaAnalyticsProps(selectedSubarea),
-          location_method: 'manual_map_cached',
-          location_cache_used: true,
-          location_auto_skip_map_requested: true
-        })
-      } else {
-        const zoneCenter = getSubareaCenterMarker(selectedSubarea, selectedDistrict)
-        setCustomMarker(zoneCenter)
-        setMarkerSelectionSource(selectedSubarea?.isFallback ? 'district_center_auto_skip' : 'subarea_center_auto_skip')
-        setMapCenter(zoneCenter)
-        setMapZoom(selectedSubarea?.isFallback ? 14 : 15)
-        nextMarker = zoneCenter
-        nextMarkerSource = selectedSubarea?.isFallback ? 'district_center_auto_skip' : 'subarea_center_auto_skip'
-        nextMapCenter = zoneCenter
-        nextMapZoom = selectedSubarea?.isFallback ? 14 : 15
-      }
     } else {
       const cachedManualMarker = getCachedManualMarker(selectedDistrict)
       if (cachedManualMarker) {
@@ -1860,7 +1594,6 @@ const PaymentPage = () => {
 
     trackPaymentEvent('location_auto_skip_map_requested', {
       ...getDistrictAnalyticsProps(selectedDistrict),
-      ...getSubareaAnalyticsProps(selectedSubarea),
       previous_location_method: previousLocationMethod || null,
       kept_existing_marker: shouldKeepExistingMarker
     })
@@ -2111,12 +1844,7 @@ const PaymentPage = () => {
       return
     }
 
-    if (
-      singlePageCachedDistrictPending
-      || !selectedDistrict
-      || (isSinglePageVariant && !selectedSubarea)
-      || !customMarker
-    ) {
+    if (singlePageCachedDistrictPending || !selectedDistrict || !customMarker) {
       releaseOrderSubmitLock()
       return
     }
@@ -2152,8 +1880,6 @@ const PaymentPage = () => {
         // Bundle flow: backend builds child SKU items from bundle definition.
         const bundleOrderData = {
           district_id: selectedDistrict.id,
-          subarea_id: selectedSubarea?.id || undefined,
-          subarea_is_other: Boolean(selectedSubarea?.isFallback),
           full_name: userInfo.fullName,
           phone: `225${normalizedPhone}`,
           whatsapp: `225${normalizedWhatsapp}`,
@@ -2178,8 +1904,6 @@ const PaymentPage = () => {
             total_price: product.price * quantity
           }],
           district_id: selectedDistrict.id,
-          subarea_id: selectedSubarea?.id || undefined,
-          subarea_is_other: Boolean(selectedSubarea?.isFallback),
           full_name: userInfo.fullName,
           phone: `225${normalizedPhone}`,
           whatsapp: `225${normalizedWhatsapp}`,
@@ -2227,7 +1951,6 @@ const PaymentPage = () => {
         quantity,
         userInfo: effectiveUserInfo,
         selectedLocation: selectedDistrict,
-        selectedSubarea,
         totalPrice: product.price * quantity,
         orderResponse: response.data,
         checkoutQuantityExperiment
@@ -2327,7 +2050,7 @@ const PaymentPage = () => {
 
         {/* 步顢1: 选择大区 */}
         {showDistrictSection && (
-          <div className={`section district-section ${isSinglePageVariant ? 'single-page-district-section' : ''} ${(selectedDistrict || singlePageCachedDistrictPending) ? 'has-selected-district' : ''} ${subareaDistrict ? 'has-subarea-picker' : ''}`}>
+          <div className={`section district-section ${isSinglePageVariant ? 'single-page-district-section' : ''} ${(selectedDistrict || singlePageCachedDistrictPending) ? 'has-selected-district' : ''}`}>
             {!isSinglePageVariant && (
               <h2 className="section-title">Sélectionnez votre district</h2>
             )}
@@ -2382,13 +2105,12 @@ const PaymentPage = () => {
                 </div>
               </div>
             )}
-            {isSinglePageVariant && selectedDistrict && selectedSubarea && !showSinglePageDistrictPicker && !subareaDistrict ? (
+            {isSinglePageVariant && selectedDistrict && !showSinglePageDistrictPicker ? (
               <div className="selected-district-summary">
                 <div className="selected-district-icon"><FiMapPin aria-hidden="true" /></div>
                 <div className="selected-district-copy">
                   <span className="selected-district-label">Zone de livraison</span>
                   <strong>{getDistrictDisplayName(selectedDistrict)} - {selectedDistrict.city_name}</strong>
-                  <span className="selected-subarea-name">{getSubareaDisplayName(selectedSubarea)}</span>
                   {wasLastSelectedDistrictOnEntry(selectedDistrict) && (
                     <span className="selected-district-note">Choisi la dernière fois</span>
                   )}
@@ -2396,53 +2118,10 @@ const PaymentPage = () => {
                 <button
                   type="button"
                   className="selected-district-change"
-                  onClick={handleChangeDistrict}
+                  onClick={() => setShowSinglePageDistrictPicker(true)}
                 >
                   Changer
                 </button>
-              </div>
-            ) : subareaDistrict ? (
-              <div className="subarea-picker">
-                <div className="subarea-picker-head">
-                  <button
-                    type="button"
-                    className="subarea-back"
-                    onClick={handleChangeDistrict}
-                    aria-label="Revenir aux communes"
-                  >
-                    <FiChevronLeft aria-hidden="true" />
-                  </button>
-                  <div className="subarea-heading">
-                    <span>{getDistrictDisplayName(subareaDistrict)}</span>
-                    <strong>Choisissez votre quartier</strong>
-                  </div>
-                </div>
-                <div className="subarea-list">
-                  {(subareaDistrict.subareas || []).map((subarea) => (
-                    <button
-                      type="button"
-                      className="subarea-option"
-                      key={subarea.id}
-                      onClick={() => handleSelectSubarea(subarea)}
-                    >
-                      <span className="subarea-option-marker"><FiMapPin aria-hidden="true" /></span>
-                      <span>{getSubareaDisplayName(subarea)}</span>
-                      <FiCheck className="subarea-option-check" aria-hidden="true" />
-                    </button>
-                  ))}
-                  <button
-                    type="button"
-                    className="subarea-option subarea-option-other"
-                    onClick={() => handleSelectSubarea(OTHER_SUBAREA)}
-                  >
-                    <span className="subarea-option-marker"><FiMoreHorizontal aria-hidden="true" /></span>
-                    <span className="subarea-option-other-copy">
-                      <strong>Autre quartier</strong>
-                      <small>Ma zone n'est pas dans la liste</small>
-                    </span>
-                    <FiChevronRight className="subarea-option-check" aria-hidden="true" />
-                  </button>
-                </div>
               </div>
             ) : singlePageCachedDistrictPending ? (
               <div className="selected-district-summary selected-district-summary-loading">
