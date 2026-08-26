@@ -1,17 +1,11 @@
 export const DEFAULT_META_SITE_ORIGIN = 'https://www.brainnel.com'
 
-export const ALLOWED_META_SITE_ORIGINS = new Set([
-  'https://brainnel.com',
-  'https://www.brainnel.com',
-  'https://brainnel-vite.com',
-  'https://www.brainnel-vite.com'
-])
-
 export const resolveMetaSiteOrigin = (candidateOrigin) => {
   try {
     const parsed = new URL(candidateOrigin)
     const hasCredentials = Boolean(parsed.username || parsed.password)
-    return !hasCredentials && ALLOWED_META_SITE_ORIGINS.has(parsed.origin)
+    const isWebOrigin = parsed.protocol === 'http:' || parsed.protocol === 'https:'
+    return !hasCredentials && isWebOrigin
       ? parsed.origin
       : DEFAULT_META_SITE_ORIGIN
   } catch {

@@ -8,23 +8,24 @@ import {
 } from '../src/utils/metaEventSource.js'
 
 
-test('keeps each supported production origin', () => {
+test('keeps any valid web origin without a domain allowlist', () => {
   for (const origin of [
     'https://brainnel.com',
     'https://www.brainnel.com',
     'https://brainnel-vite.com',
-    'https://www.brainnel-vite.com'
+    'https://www.brainnel-vite.com',
+    'https://future-campaign.example',
+    'http://localhost:5173'
   ]) {
     assert.equal(resolveMetaSiteOrigin(origin), origin)
   }
 })
 
-test('rejects insecure, lookalike, credential and port origins', () => {
+test('rejects non-web, credential and invalid origins', () => {
   for (const origin of [
-    'http://brainnel-vite.com',
-    'https://brainnel-vite.com.evil.example',
     'https://user@brainnel-vite.com',
-    'https://brainnel-vite.com:444',
+    'ftp://brainnel-vite.com',
+    'javascript:alert(1)',
     'not-a-url'
   ]) {
     assert.equal(resolveMetaSiteOrigin(origin), DEFAULT_META_SITE_ORIGIN)
@@ -61,12 +62,19 @@ test('uses the current page for events without a product and removes fragments',
   )
 })
 
-test('falls back to the canonical legacy site outside production hosts', () => {
+test('uses a future campaign domain without code changes', () => {
   assert.equal(
     buildMetaEventSourceUrl('123', {
-      origin: 'https://evil.example',
-      href: 'https://evil.example/product/123'
+      origin: 'https://future-campaign.example',
+      href: 'https://future-campaign.example/product/123'
     }),
+    'https://future-campaign.example/product/123'
+  )
+})
+
+test('falls back only when the runtime URL is invalid', () => {
+  assert.equal(
+    buildMetaEventSourceUrl('123', { origin: 'invalid', href: 'invalid' }),
     'https://www.brainnel.com/product/123'
   )
 })
