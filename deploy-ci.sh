@@ -32,16 +32,32 @@ if [ ! -d "dist" ] || [ ! -f "dist/index.html" ]; then
     exit 1
 fi
 
-echo "📁 备份当前网站..."
-sudo cp -r /var/www/brainnel.com /var/www/brainnel.com.backup.$(date +%Y%m%d_%H%M%S)
+# 双站点发布: 同一份 dist 发布到两个域名的 webroot
+SITES="/var/www/brainnel.com /var/www/brainnel-vite.com"
+BACKUP_TS=$(date +%Y%m%d_%H%M%S)
 
-echo "🚚 部署新版本..."
-sudo rm -rf /var/www/brainnel.com/*
-sudo cp -r ./dist/* /var/www/brainnel.com/
+for SITE in $SITES; do
+    if [ ! -d "$SITE" ]; then
+        echo "⚠️  $SITE 不存在，跳过（如为新站点请先在服务器创建目录和 nginx 配置）"
+        continue
+    fi
+    echo "📁 备份 $SITE ..."
+    sudo cp -r "$SITE" "$SITE.backup.$BACKUP_TS"
 
-echo "🔐 设置权限..."
-sudo chown -R www-data:www-data /var/www/brainnel.com
-sudo chmod -R 755 /var/www/brainnel.com
+    echo "🚚 部署新版本到 $SITE ..."
+    sudo rm -rf "$SITE"/*
+    sudo cp -r ./dist/* "$SITE"/
+
+    echo "🔐 设置权限 $SITE ..."
+    sudo chown -R www-data:www-data "$SITE"
+    sudo chmod -R 755 "$SITE"
+
+    # 每个站点只保留最近 5 份备份
+    ls -1dt "$SITE".backup.* 2>/dev/null | tail -n +6 | while read -r OLD; do
+        sudo rm -rf "$OLD"
+        echo "🧹 清理旧备份: $OLD"
+    done
+done
 
 echo "🔄 验证并重新加载 Nginx..."
 if sudo nginx -t; then
@@ -53,13 +69,15 @@ else
 fi
 
 echo "🌐 测试网站访问..."
-HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://www.brainnel.com || echo "000")
-if [ "$HTTP_STATUS" = "200" ]; then
-    echo "✅ 网站访问正常 (HTTP $HTTP_STATUS)"
-else
-    echo "⚠️  网站可能有问题 (HTTP $HTTP_STATUS)"
-fi
+for URL in https://www.brainnel.com https://brainnel-vite.com; do
+    HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL" || echo "000")
+    if [ "$HTTP_STATUS" = "200" ]; then
+        echo "✅ $URL 访问正常 (HTTP $HTTP_STATUS)"
+    else
+        echo "⚠️  $URL 可能有问题 (HTTP $HTTP_STATUS)"
+    fi
+done
 
 echo "✅ CI/CD 部署完成！"
-echo "🌐 网站地址：https://www.brainnel.com"
+echo "🌐 网站地址：https://www.brainnel.com + https://brainnel-vite.com"
 echo "📊 部署时间：$(date)"
