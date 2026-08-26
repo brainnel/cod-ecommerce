@@ -4,6 +4,7 @@
  */
 
 import { getCurrentConfig } from '../config/api.config.js'
+import { buildMetaEventSourceUrl } from '../utils/metaEventSource.js'
 
 // Facebook 转化 API 配置
 const FACEBOOK_CONFIG = {
@@ -77,36 +78,7 @@ const getProductId = (productData = {}) => (
 )
 
 const buildProductEventSourceUrl = (productData = {}) => {
-  const productId = getProductId(productData)
-  if (!productId) {
-    return typeof window !== 'undefined' ? window.location.href : 'https://www.brainnel.com/'
-  }
-
-  const rawId = productId.toString().trim()
-  if (!rawId) {
-    return typeof window !== 'undefined' ? window.location.href : 'https://www.brainnel.com/'
-  }
-
-  const bundleMatch = rawId.match(/^bundle:(\d+)$/)
-  if (bundleMatch) {
-    return `https://www.brainnel.com/bundle/${bundleMatch[1]}`
-  }
-
-  if (/^https?:\/\//i.test(rawId)) {
-    try {
-      const url = new URL(rawId)
-      const productPath = url.pathname.match(/^\/product\/[^/?#]+/)?.[0]
-      if (productPath) {
-        return `https://www.brainnel.com${productPath}`
-      }
-    } catch (error) {
-      console.warn('商品事件来源链接解析失败:', error)
-    }
-  }
-
-  const productPath = rawId.startsWith('/product/') ? rawId : `/product/${rawId}`
-  const cleanPath = productPath.split('?')[0].split('#')[0]
-  return `https://www.brainnel.com${cleanPath}`
+  return buildMetaEventSourceUrl(getProductId(productData))
 }
 
 /**
