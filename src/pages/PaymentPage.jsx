@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, useEffect, useMemo, useRef } from 'react'
+import { lazy, Suspense, useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { FiCreditCard, FiMapPin, FiSearch, FiX } from 'react-icons/fi'
 import { districtAPI, orderAPI, bundleAPI } from '../services/api'
@@ -38,6 +38,7 @@ import {
   isValidCheckoutAddress,
   validateCheckoutAddress
 } from '../utils/checkoutAddress'
+import { validateCheckoutDeliveryArea } from '../utils/checkoutDeliveryArea'
 import {
   buildCheckoutDistrictCacheEntry,
   getCachedManualMarkerForDistrict,
@@ -298,6 +299,11 @@ const PaymentPage = () => {
   }))
   const [whatsappSameAsPhone] = useState(true)
   const [errors, setErrors] = useState({})
+  const [deliveryAreaWarning, setDeliveryAreaWarning] = useState(null)
+  const deliveryAreaShownRef = useRef(new Set())
+  const deliveryAreaBlockedRef = useRef(new Set())
+  const deliveryAreaHadWarningRef = useRef(false)
+  const deliveryAreaTrackerRef = useRef(null)
   const orderSubmitLockRef = useRef(false)
   const touchSubmitHandledRef = useRef(false)
   const [isPlacingOrder, setIsPlacingOrder] = useState(false)
@@ -535,6 +541,35 @@ const PaymentPage = () => {
       sessionId: checkoutSessionId
     })
   }
+  deliveryAreaTrackerRef.current = trackPaymentEvent
+
+  const updateDeliveryAreaWarning = useCallback((address, trigger) => {
+    const validation = validateCheckoutDeliveryArea(address)
+    setDeliveryAreaWarning(validation.isValid ? null : validation)
+    if (validation.isValid) return
+    deliveryAreaHadWarningRef.current = true
+    const key = `${validation.matchedLocation}:${validation.matchReason}`
+    if (deliveryAreaShownRef.current.has(key)) return
+    deliveryAreaShownRef.current.add(key)
+    deliveryAreaTrackerRef.current?.('delivery_area_warning_shown', {
+      matched_location: validation.matchedLocation,
+      match_reason: validation.matchReason,
+      delivery_area_rule_version: validation.ruleVersion,
+      warning_trigger: trigger
+    })
+  }, [])
+
+  useEffect(() => {
+    if (!showInfoSection) return
+    if (validateCheckoutDeliveryArea(userInfo.addressDescription).isValid) {
+      setDeliveryAreaWarning(null)
+      return
+    }
+    const timer = window.setTimeout(() => {
+      updateDeliveryAreaWarning(userInfo.addressDescription, 'input_pause')
+    }, 600)
+    return () => window.clearTimeout(timer)
+  }, [showInfoSection, userInfo.addressDescription, updateDeliveryAreaWarning])
 
   const getAddressLengthBucket = (length) => {
     if (length <= 0) return '0'
@@ -1639,6 +1674,13 @@ const PaymentPage = () => {
     })
     if (errors[field] && shouldClearFieldError) {
       setErrors(prev => ({ ...prev, [field]: '' }))
+    } else if (field === 'addressDescription' && errors.addressDescription) {
+      const validation = validateCheckoutAddress(nextValue, {
+        fullName: userInfo.fullName,
+        phone: userInfo.phone,
+        districtName: getDistrictDisplayName(selectedDistrict)
+      })
+      setErrors(prev => ({ ...prev, addressDescription: validation.error }))
     }
     if (field === 'phone' && whatsappSameAsPhone && errors.whatsapp) {
       setErrors(prev => ({ ...prev, whatsapp: '' }))
@@ -1706,7 +1748,7 @@ const PaymentPage = () => {
   ])
 
   const scrollToFirstMissingField = (missingFields) => {
-    if (!isInlineQuantityVariant || missingFields.length === 0) return
+    if (missingFields.length === 0) return
 
     const field = missingFields[0]
     const fieldNode = fieldRefs.current[field]
@@ -1832,11 +1874,27 @@ const PaymentPage = () => {
       if (!whatsappSameAsPhone && !isValidCheckoutPhone(effectiveWhatsapp)) missingFields.push('whatsapp')
       if (!addressValidation.isValid) missingFields.push('addressDescription')
       infoStepValidationFailedRef.current = true
+      const outsideDeliveryArea = addressValidation.reason === 'outside_delivery_area'
+      if (outsideDeliveryArea) {
+        updateDeliveryAreaWarning(userInfo.addressDescription, 'submit')
+        const key = `${addressValidation.matchedLocation}:${addressValidation.matchReason}`
+        if (!deliveryAreaBlockedRef.current.has(key)) {
+          deliveryAreaBlockedRef.current.add(key)
+          trackPaymentEvent('delivery_area_submit_blocked', {
+            matched_location: addressValidation.matchedLocation,
+            match_reason: addressValidation.matchReason,
+            delivery_area_rule_version: addressValidation.ruleVersion
+          })
+        }
+      }
       trackPaymentEvent('submit_validation_failed', {
         ...getDistrictAnalyticsProps(),
         missing_fields: missingFields,
         address_validation_reason: addressValidation.isValid ? undefined : addressValidation.reason,
-        rejected_address: addressValidation.isValid ? undefined : userInfo.addressDescription,
+        rejected_address: addressValidation.isValid || outsideDeliveryArea ? undefined : userInfo.addressDescription,
+        matched_location: addressValidation.matchedLocation,
+        match_reason: addressValidation.matchReason,
+        delivery_area_rule_version: addressValidation.ruleVersion,
         whatsapp_same_as_phone: whatsappSameAsPhone
       })
       scrollToFirstMissingField(missingFields)
@@ -1931,8 +1989,14 @@ const PaymentPage = () => {
           ...getDistrictAnalyticsProps(),
           order_no: response.data.order_no || response.data.order_id || null,
           order_status: response.status,
-          whatsapp_same_as_phone: whatsappSameAsPhone
+          whatsapp_same_as_phone: whatsappSameAsPhone,
+          delivery_area_warning_resolved: deliveryAreaHadWarningRef.current
         })
+        if (deliveryAreaHadWarningRef.current) {
+          trackPaymentEvent('delivery_area_corrected_order_success', {
+            order_no: response.data.order_no || response.data.order_id || null
+          })
+        }
         infoStepOrderSuccessRef.current = true
 
         try {
@@ -2007,7 +2071,8 @@ const PaymentPage = () => {
     phone: userInfo.phone,
     districtName: getDistrictDisplayName(selectedDistrict)
   })
-  const addressReady = addressValidationState.isValid && !errors.addressDescription
+  const displayedAddressError = errors.addressDescription || deliveryAreaWarning?.error
+  const addressReady = addressValidationState.isValid && !displayedAddressError
   const addressMinimumHint = ['required', 'too_short'].includes(addressValidationState.reason)
     ? 'Minimum 5 caractères'
     : ''
@@ -2381,9 +2446,12 @@ const PaymentPage = () => {
               <textarea
                 id="addressDescription"
                 ref={(node) => { fieldRefs.current.addressDescription = node }}
-                className={`form-textarea ${errors.addressDescription ? 'error' : ''} ${isInlineQuantityVariant && addressReady ? 'address-ready' : ''}`}
+                className={`form-textarea ${displayedAddressError ? 'error' : ''} ${isInlineQuantityVariant && addressReady ? 'address-ready' : ''}`}
                 value={userInfo.addressDescription}
                 onChange={(e) => handleInputChange('addressDescription', e.target.value)}
+                onBlur={() => updateDeliveryAreaWarning(userInfo.addressDescription, 'blur')}
+                aria-invalid={Boolean(displayedAddressError)}
+                aria-describedby="checkout-address-feedback"
                 placeholder={isCodTrustVariant
                   ? 'Ex: Cocody Riviera 3, près de la Pharmacie Sainte Marie, portail bleu'
                   : isInlineQuantityVariant
@@ -2398,8 +2466,12 @@ const PaymentPage = () => {
                 </div>
               )}
               <div className="address-feedback-row">
-                <div className={`address-minimum-hint ${errors.addressDescription ? 'error' : ''} ${addressReady ? 'ready' : ''}`}>
-                  {errors.addressDescription || addressMinimumHint}
+                <div
+                  id="checkout-address-feedback"
+                  className={`address-minimum-hint ${displayedAddressError ? 'error' : ''} ${addressReady ? 'ready' : ''}`}
+                  aria-live="polite"
+                >
+                  {displayedAddressError || addressMinimumHint}
                 </div>
                 <div className="char-count">{userInfo.addressDescription.length}/200</div>
               </div>

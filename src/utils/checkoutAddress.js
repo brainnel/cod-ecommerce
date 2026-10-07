@@ -1,3 +1,5 @@
+import { validateCheckoutDeliveryArea } from './checkoutDeliveryArea.js'
+
 const MIN_ADDRESS_LENGTH = 5
 
 const INVALID_ADDRESS_MESSAGE = 'Indiquez une adresse de livraison claire : quartier et repère connu.'
@@ -64,9 +66,9 @@ const KEYBOARD_GIBBERISH = new Set([
 ])
 
 const KNOWN_LOCATION_ONLY_PHRASES = new Set([
-  'abengourou', 'abidjan', 'abobo', 'aboisso', 'adjame', 'adjouffou', 'angre',
+  'abatta', 'abengourou', 'abidjan', 'abobo', 'aboisso', 'adjame', 'adjouffou', 'angre',
   'anono', 'anyama', 'ayaman', 'attecoube', 'bassam', 'bingerville', 'bouafle', 'bouake',
-  'cocody', 'dabakala', 'daloa', 'danane', 'dimbokro', 'dinbokro',
+  'cocody', 'dabakala', 'daloa', 'danane', 'dimbokro', 'dinbokro', 'djorobite',
   'ferkessedougou', 'faya', 'gagnoa', 'grand bassam', 'katiola', 'kesse', 'koumassi',
   'man', 'mankono', 'marcory', 'micao', 'nekro', 'plateau', 'port bouet', 'riviera', 'san pedro',
   'sanpedro', 'seguela', 'songon', 'treichville', 'vavoua', 'vridi',
@@ -74,8 +76,8 @@ const KNOWN_LOCATION_ONLY_PHRASES = new Set([
 ])
 
 const ADDRESS_STRUCTURE_WORDS = new Set([
-  'auto', 'avenue', 'boulevard', 'boutique', 'carrefour', 'chu', 'cite', 'commissariat',
-  'ecole', 'eglise', 'gare', 'ilot', 'immeuble', 'lot', 'mairie', 'maquis',
+  'auto', 'avenue', 'boulevard', 'boutique', 'carrefour', 'chu', 'cite', 'cyte', 'commissariat',
+  'college', 'ecole', 'ecoles', 'scolaire', 'eglise', 'gare', 'ilot', 'immeuble', 'lot', 'mairie', 'maquis',
   'marche', 'mosquee', 'pharmacie', 'quartier', 'residence', 'route', 'rue', 'zone'
 ])
 
@@ -268,7 +270,7 @@ const isOneTypoFromKnownLocation = (word) => {
 
 const hasStrongAddressStructure = (normalized) => {
   const words = normalized.split(' ').filter(Boolean)
-  if (words.length < 3) return false
+  if (words.length < 2) return false
 
   const wordSet = new Set(words)
   const structureWords = [...ADDRESS_STRUCTURE_WORDS].filter(word => wordSet.has(word))
@@ -307,6 +309,8 @@ const isNameOnlyAddress = (words, fullName) => {
 }
 
 export const validateCheckoutAddress = (value, context = {}) => {
+  const deliveryArea = validateCheckoutDeliveryArea(value, context)
+  if (!deliveryArea.isValid) return deliveryArea
   const raw = String(value || '').trim()
   const normalized = normalizeCheckoutAddressText(raw)
   const words = addressWords(raw)
@@ -333,7 +337,8 @@ export const validateCheckoutAddress = (value, context = {}) => {
     return { isValid: false, reason: 'too_short', error: SHORT_ADDRESS_MESSAGE }
   }
 
-  if (/[\w.+-]+@[\w.-]+(?:\.[a-z]{2,})?/i.test(raw) || raw.includes('@')) {
+  const emailOnly = /^\s*[\w.+-]+@[\w.-]+(?:\.[a-z]{2,})?\s*$/i.test(raw)
+  if (emailOnly || ((/[\w.+-]+@[\w.-]+(?:\.[a-z]{2,})?/i.test(raw) || raw.includes('@')) && !hasStrongAddressStructure(normalized))) {
     return { isValid: false, reason: 'email_or_handle', error: INVALID_ADDRESS_MESSAGE }
   }
 
