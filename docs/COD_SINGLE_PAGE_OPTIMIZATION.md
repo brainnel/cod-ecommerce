@@ -489,6 +489,19 @@ ORDER BY CASE WHEN d.sort_order = 0 THEN 999999 ELSE d.sort_order END ASC, d.nam
 
 ## 已完成改动
 
+### 2026-10-10 Meta 匹配参数与可追踪诊断
+
+- 用户授权只调整埋点层，不改下单界面、自动取消/黑名单/重复订单规则、广告或 Meta 托管 CAPI 设置。
+- 匹配版本 `20261010.1`：页面启动时采集 URL 原始 `fbclid`，同次点击复用首次 fbc；Cookie/第一方本域存储用于路由跳转与刷新，不跨域共享，不添加域名白名单。保持点击编号大小写及完整内容，不编造或截断点击编号。
+- `_fbc` Cookie 由 Pixel 管理，我们只读取；新增独立的本域缓存键作补充，不创建同名 host-only Cookie 遮蔽 Pixel 的父域 Cookie。
+- 采集阶段保留基准摘要，随事件/订单发送 `_meta_diagnostics`。后端 Purchase outbox 保留脱敏摘要供接收/发送对照；向 Meta 和 CODDelivered 上下文发送前剥离内部字段。
+- 网页转发、订单 Purchase 和 App 事件共用 IP 解析/匹配参数校验：仅信任 localhost nginx 与已核实 Cloudflare 网段，XFF 从右侧真实来源判断，不接受公网直连伪造的转发头，不发送内网/CDN/当前 API 服务器 IP，保留真实 IPv6。生产依赖 uvicorn 仅信任本机反向代理，不能配置 `forwarded-allow-ips=*`；API 地址变化时同步 `META_SERVER_IPS`。
+- 格式异常的 fbc/fbp 只省略该匹配字段，不丢弃事件、不修写点击编号，不重发历史事件。语法合规不能证明点击编号的真实性。
+- 浏览/加购的 event_id 改为每次行为唯一，两端复用；Purchase 仍固定 `purchase_<order_no>`。浏览/加购币种统一为实际 XOF。
+- 新日志前缀 `Meta matching audit:`：Purchase 全量、其他事件按 event_id 确定性抽样 10%；只含事件/参数摘要、来源、IP 版本与一致性布尔值，不输出原始 IP、fbc、手机号、令牌。移除 App CAPI 原来整包含令牌的日志。网页哈希不可用时省略字段，不发送明文兜底。
+- 当前 Pixel 还存在“使用 Meta 的转化 API”托管来源。仅验证自建通道不足以宣布告警消失；必须分来源看 Meta 诊断、去重及近期受影响比例。不通过忽略告警、伪造身份/IP 或增加下单必填项刷分。
+- 验收顺序：本机单元/模拟浏览器回归 → 后端先发布并验收新请求 IP/字段 → 前端发布两个域名 → 对照新版本订单采集/发送摘要与 Meta 接收回执 → 再观察 Meta 近三天诊断窗口。托管通道不擅自关闭。
+
 ### 2026-10-09 Purchase 恢复网页 Pixel + 后端 CAPI 双端上报
 
 - 验证：前端 19 项、后端 12 项测试及 4 个全模拟浏览器用例通过；2026-10-10 按用户要求发布 `main`，不推送 `test`。

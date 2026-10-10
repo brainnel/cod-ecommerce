@@ -6,6 +6,7 @@
 import { getCurrentConfig } from '../config/api.config.js'
 import { buildMetaEventSourceUrl } from '../utils/metaEventSource.js'
 import { normalizeMetaPhone, trackBrowserPurchase } from '../utils/metaPurchase.js'
+import { collectMetaMatching, createMetaEventId, matchingDiagnostics } from '../utils/metaMatching.js'
 
 // Facebook 转化 API 配置
 const FACEBOOK_CONFIG = {
@@ -56,13 +57,13 @@ const hashUserData = async (data) => {
       const hashArray = Array.from(new Uint8Array(hashBuffer))
       return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
     } catch (error) {
-      console.warn('浏览器端哈希处理失败，返回原始数据:', error)
-      return normalized
+      console.warn('浏览器端哈希处理失败，省略该匹配字段')
+      return null
     }
   }
   
-  // 如果没有 crypto API，返回标准化数据（实际生产中应该在服务器端处理）
-  return normalized
+  // Never send plaintext matching data when hashing is unavailable.
+  return null
 }
 
 const toCatalogContentId = async (productId) => {
@@ -135,6 +136,14 @@ const buildUserData = async (userInfo = {}, clientInfo = {}) => {
     userData.fbp = clientInfo.fbp
   }
   
+  for (const field of Object.keys(userData)) {
+    if (Array.isArray(userData[field])) {
+      userData[field] = userData[field].filter(Boolean)
+      if (!userData[field].length) delete userData[field]
+    }
+  }
+  // Internal-only, stripped by the backend before CAPI. No raw PII in diagnostics.
+  userData._meta_diagnostics = await matchingDiagnostics(clientInfo)
   return userData
 }
 
@@ -155,7 +164,7 @@ const sendConversionEvent = async (eventData) => {
   try {
     if (config.LOG_REQUESTS) {
       console.log('📊 Facebook 转化事件数据:', {
-        data: JSON.stringify(requestData, null, 2)
+        event: eventData.event_name, eventId: eventData.event_id
       })
     }
     
@@ -204,7 +213,7 @@ const buildProductEventCustomData = async (productData = {}, fallbackQuantity = 
   const totalPrice = parseFloat(productData.totalPrice || unitPrice * quantity || 0)
 
   return {
-    currency: 'XAF',
+    currency: 'XOF',
     value: totalPrice,
     content_type: 'product',
     content_ids: catalogContentId ? [catalogContentId] : [],
@@ -228,7 +237,7 @@ export const trackViewContentEvent = async (productData, clientInfo = {}) => {
     }
 
     const eventTime = Math.floor(Date.now() / 1000)
-    const eventId = `view_content_${productId}_${eventTime}`
+    const eventId = createMetaEventId('view_content')
     const customData = await buildProductEventCustomData(productData, 1)
     const eventData = {
       event_name: 'ViewContent',
@@ -260,7 +269,7 @@ export const trackAddToCartEvent = async (productData, clientInfo = {}) => {
 
     const eventTime = Math.floor(Date.now() / 1000)
     const quantity = parseInt(productData.quantity || 1)
-    const eventId = `add_to_cart_${productId}_${eventTime}`
+    const eventId = createMetaEventId('add_to_cart')
     const customData = await buildProductEventCustomData(productData, quantity)
     const eventData = {
       event_name: 'AddToCart',
@@ -295,17 +304,7 @@ export const getClientInfo = () => {
   // 尝试获取Facebook点击ID和浏览器ID
   try {
     // 从URL参数或Cookie获取fbclid
-    const urlParams = new URLSearchParams(window.location.search)
-    const fbclid = urlParams.get('fbclid') || getCookie('_fbc')
-    if (fbclid) {
-      clientInfo.fbc = fbclid.startsWith('fb.') ? fbclid : `fb.1.${Date.now()}.${fbclid}`
-    }
-    
-    // 从Cookie获取Facebook浏览器ID
-    const fbp = getCookie('_fbp')
-    if (fbp) {
-      clientInfo.fbp = fbp
-    }
+    Object.assign(clientInfo, collectMetaMatching())
     
   } catch (error) {
     console.warn('获取客户端信息时出错:', error)
@@ -314,31 +313,9 @@ export const getClientInfo = () => {
   return clientInfo
 }
 
-/**
- * 获取Cookie值
- */
-const getCookie = (name) => {
-  const value = `; ${document.cookie}`
-  const parts = value.split(`; ${name}=`)
-  if (parts.length === 2) return parts.pop().split(';').shift()
-  return null
-}
-
-/**
- * 设置Facebook点击ID到Cookie
- */
-export const setFacebookClickId = (fbclid) => {
-  if (fbclid) {
-    const fbc = fbclid.startsWith('fb.') ? fbclid : `fb.1.${Date.now()}.${fbclid}`
-    // 设置Cookie，有效期7天
-    document.cookie = `_fbc=${fbc}; max-age=604800; path=/`
-  }
-}
-
 export default {
   buildMetaPurchaseContext,
   trackViewContentEvent,
   trackAddToCartEvent,
-  getClientInfo,
-  setFacebookClickId
+  getClientInfo
 }

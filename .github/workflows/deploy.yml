@@ -26,7 +26,10 @@ jobs:
       run: npm run lint || echo "Linting failed but continuing..."
       
     - name: Build project
-      run: npm run build:prod
+      # Match the Web Crypto APIs used by supported production browsers in Node 18.
+      env:
+        NODE_OPTIONS: --experimental-global-webcrypto
+      run: npm test && npm run build:prod
       
     - name: Deploy to server
       uses: appleboy/ssh-action@v1.0.3
