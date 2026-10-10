@@ -489,6 +489,16 @@ ORDER BY CASE WHEN d.sort_order = 0 THEN 999999 ELSE d.sort_order END ASC, d.nam
 
 ## 已完成改动
 
+### 2026-10-09 Purchase 恢复网页 Pixel + 后端 CAPI 双端上报
+
+- 验证：前端 19 项、后端 12 项测试及 4 个全模拟浏览器用例通过；2026-10-10 按用户要求发布 `main`，不推送 `test`。
+- 仅调整 Meta `Purchase`，不回退页面、地址校验、取消规则、Google Ads 或 `CODDelivered`。
+- 单品/组合品订单接口成功后，网页旁路触发 Pixel `Purchase`，不等待上报、不阻塞成功页；金额和商品明细使用订单接口的真实返回值，组合品使用子商品，不使用 `bundle:*` 虚拟商品编号。
+- 网页 `eventID` 与原有 outbox `event_id` 统一为 `purchase_<order_no>`，两端币种均为 `XOF`，目录 ID 均为 `/product/<product_id>` 的 SHA-256。网页不再额外调用旧转换接口发送第三路 Purchase。
+- 后端持久化、120 秒筛查、重试和取消单跳过保持不变。网页恢复创建成功即回传，因此随后取消的订单可能已发送浏览器 Purchase，不能再声称两端都只统计筛查后有效单。
+- 修正 CI 手机号哈希：保留 `225` 后的有效前导 `0`；后端 Purchase 发送时优先用数据库订单手机号重算哈希，兼容仍带旧错误哈希的缓存网页。历史已发送事件不重发。
+- 新增单品、组合品、同订单并发去重、Pixel 不可用/异常、缺失订单号和手机号回归测试。
+
 ### 2026-07-30 Meta Purchase 自动筛查后回传
 
 - 网页 COD 不再在下单接口成功后立即用浏览器 Pixel 回传 `Purchase`。

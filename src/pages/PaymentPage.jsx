@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { FiCreditCard, FiMapPin, FiSearch, FiX } from 'react-icons/fi'
 import { districtAPI, orderAPI, bundleAPI } from '../services/api'
 import { useAdId } from '../hooks/useAdTrackingHooks.js'
-import { buildMetaPurchaseContext, getClientInfo } from '../services/facebookConversions'
+import { buildMetaPurchaseContext, getClientInfo, trackPurchaseEvent } from '../services/facebookConversions'
 import { trackGoogleAdsPurchaseConversion } from '../services/googleAdsConversions'
 import {
   buildCheckoutProductProperties,
@@ -1998,6 +1998,14 @@ const PaymentPage = () => {
           })
         }
         infoStepOrderSuccessRef.current = true
+
+        // Fire-and-forget: tracking must not delay navigation or fail the order.
+        // Both single and bundle responses contain the authoritative order items.
+        try {
+          void trackPurchaseEvent(response.data).catch(() => {})
+        } catch {
+          // The durable backend outbox remains the independent fallback.
+        }
 
         try {
           trackGoogleAdsPurchaseConversion({

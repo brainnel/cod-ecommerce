@@ -5,6 +5,7 @@
 
 import { getCurrentConfig } from '../config/api.config.js'
 import { buildMetaEventSourceUrl } from '../utils/metaEventSource.js'
+import { normalizeMetaPhone, trackBrowserPurchase } from '../utils/metaPurchase.js'
 
 // Facebook 转化 API 配置
 const FACEBOOK_CONFIG = {
@@ -93,14 +94,8 @@ const buildUserData = async (userInfo = {}, clientInfo = {}) => {
   }
   
   if (userInfo.phone) {
-    // 电话号码格式化（去除非数字字符，添加科特迪瓦国际区号）
-    let phone = userInfo.phone.toString().replace(/\D/g, '')
-    if (phone.startsWith('0')) {
-      phone = '225' + phone.substring(1)
-    } else if (!phone.startsWith('225')) {
-      phone = '225' + phone
-    }
-    userData.ph = [await hashUserData(phone)]
+    const phone = normalizeMetaPhone(userInfo.phone)
+    if (phone) userData.ph = [await hashUserData(phone)]
   }
 
   const fullNameParts = userInfo.fullName?.trim().split(/\s+/).filter(Boolean) || []
@@ -185,8 +180,8 @@ const sendConversionEvent = async (eventData) => {
 }
 
 /**
- * Build matching data for the backend. Purchase itself is sent by CAPI only
- * after automatic address, duplicate-order and blacklist screening completes.
+ * Build matching data for the existing screened CAPI outbox. The browser also
+ * sends Purchase after creation with the same purchase_<order_no> event ID.
  */
 export const buildMetaPurchaseContext = async (orderData, userInfo, clientInfo = {}) => ({
   event_time: Math.floor(Date.now() / 1000),
@@ -194,12 +189,12 @@ export const buildMetaPurchaseContext = async (orderData, userInfo, clientInfo =
   event_source_url: buildProductEventSourceUrl(orderData)
 })
 
-// Compatibility for dead/older page modules: never send Purchase from the browser.
-export const trackPurchaseEvent = async (orderData, userInfo, clientInfo = {}) => ({
-  success: true,
-  deferred: true,
-  context: await buildMetaPurchaseContext(orderData, userInfo, clientInfo)
-})
+// Browser only: the order endpoint already schedules CAPI. Do not add a third
+// Purchase request through /facebook-conversions or create a new event ID.
+export const trackPurchaseEvent = (createdOrder) => trackBrowserPurchase(
+  createdOrder,
+  typeof window !== 'undefined' ? window.fbq : undefined
+)
 
 const buildProductEventCustomData = async (productData = {}, fallbackQuantity = 1) => {
   const productId = getProductId(productData)
