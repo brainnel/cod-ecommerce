@@ -1,7 +1,7 @@
 import { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Swiper, SwiperSlide } from 'swiper/react'
-import { Pagination, Navigation, Autoplay } from 'swiper/modules'
+import { Pagination, Navigation, Autoplay, A11y, Keyboard } from 'swiper/modules'
 import { bundleAPI } from '../services/api'
 import {
   beginCheckoutFunnel,
@@ -28,6 +28,8 @@ import { saveCheckoutPaymentState } from '../utils/checkoutPaymentStateCache'
 import { preloadPaymentPage, schedulePaymentPagePreload } from '../utils/preloadRoutes'
 import { getProductImageLoadingPolicy } from '../utils/productImageLoadingPolicy'
 import Countdown from './Countdown'
+import { isClarityLanding, getStoredLandingReviews, getBundleSeparatePurchasePrice, getBundleItemUnitPrice } from '../utils/landingPresentation'
+import { ClarityHeader, ClaritySummary, ClarityPurchaseBar, ClarityAftercare, ClarityReviews } from './landing/LandingClarity'
 
 import 'swiper/css'
 import 'swiper/css/pagination'
@@ -93,11 +95,12 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
   const landingEngagementRef = useRef(null)
   const checkoutQuantityExperiment = useMemo(() => getCheckoutQuantityExperiment(), [])
   const imageLoadingPolicy = useMemo(() => getProductImageLoadingPolicy(), [])
+  const clarityLanding = isClarityLanding()
   const isCheckoutOptimizationVariant = isInlineCheckoutVariant(checkoutQuantityExperiment)
   const isCodTrustLanding = isCodTrustLandingVariant(checkoutQuantityExperiment)
   const isAddressFirstLanding = isAddressFirstCheckoutVariant(checkoutQuantityExperiment)
     || isSinglePageCheckoutVariant(checkoutQuantityExperiment)
-  const bundleSwiperModules = [Pagination, Navigation, Autoplay]
+  const bundleSwiperModules = [Pagination, Navigation, Autoplay, A11y, Keyboard]
 
   const bundleProduct = useMemo(() => {
     if (!bundle) return null
@@ -112,7 +115,7 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
       reviews: bundle.reviews || bundle.product_reviews || []
     }
   }, [bundle])
-  const bundleReviews = useMemo(() => getDisplayProductReviews(bundleProduct), [bundleProduct])
+  const bundleReviews = useMemo(() => clarityLanding ? getStoredLandingReviews(bundleProduct) : getDisplayProductReviews(bundleProduct), [bundleProduct, clarityLanding])
 
   useLayoutEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
@@ -383,6 +386,8 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
     : false
   const renderBundleItem = (item, index) => {
     const itemDisplayName = getBundleItemDisplayName(item)
+    const unitPrice = clarityLanding ? getBundleItemUnitPrice(item) : null
+    const priceDescriptionId = `bundle-item-${bundle.id}-${index}-unit-price`
     return (
       <li key={`bundle-item-${item.product_id}-${index}`} className="bundle-item">
         <button
@@ -390,6 +395,7 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
           className="bundle-item-link"
           onClick={() => navigate(`/product/${item.product_id}${getLocalPreviewBrowserContextParam('', '?')}`)}
           aria-label={`Voir ${itemDisplayName}`}
+          aria-describedby={unitPrice !== null ? priceDescriptionId : undefined}
         >
           {item.cover_image_url ? (
             <img
@@ -402,7 +408,12 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
             <div className="bundle-item-image bundle-item-image-placeholder" />
           )}
           <div className="bundle-item-meta">
-            <div className="bundle-item-name">{itemDisplayName}</div>
+            {clarityLanding ? <div className="bundle-item-copy">
+              <div className="bundle-item-name">{itemDisplayName}</div>
+              {unitPrice !== null && <div className="bundle-item-unit-price" id={priceDescriptionId}>
+                Achat séparé : <strong>{formatFcfa(unitPrice)} FCFA</strong>
+              </div>}
+            </div> : <div className="bundle-item-name">{itemDisplayName}</div>}
             <div className="bundle-item-qty">×{item.quantity || 1}</div>
           </div>
         </button>
@@ -410,10 +421,24 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
     )
   }
 
+  const quantitySelector = (
+    <div className="bundle-quantity-row">
+      <label className="bundle-quantity-label" htmlFor="bundle-quantity">Quantité</label>
+      <div className="bundle-quantity-controls">
+        <button type="button" className="bundle-quantity-btn" aria-label="Diminuer la quantité"
+          onClick={() => handleQtyChange(quantity - 1)} disabled={quantity <= 1}>−</button>
+        <input id="bundle-quantity" type="number" className="bundle-quantity-input" value={quantity} min="1" max="99"
+          onChange={(e) => handleQtyChange(parseInt(e.target.value, 10) || 1)} />
+        <button type="button" className="bundle-quantity-btn" aria-label="Augmenter la quantité"
+          onClick={() => handleQtyChange(quantity + 1)} disabled={quantity >= 99}>+</button>
+      </div>
+    </div>
+  )
+
   return (
-    <div className="product-detail bundle-detail">
+    <div className={`product-detail bundle-detail${clarityLanding ? ' landing-clarity' : ''}`}>
       {/* 顶部标题栏 */}
-      <div className="product-header">
+      {clarityLanding ? <ClarityHeader onHome={() => navigate('/')} /> : <div className="product-header">
         <button
           type="button"
           className="back-btn"
@@ -434,7 +459,7 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
         >
           <img src={logoImage} alt="Brainnel" className="logo-image" />
         </div>
-      </div>
+      </div>}
 
       <div className="product-detail-main">
         {/* 主图 */}
@@ -446,7 +471,9 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
               slidesPerView={1}
               pagination={{ clickable: true }}
               navigation={true}
-              autoplay={bundleGalleryAutoplay}
+              autoplay={clarityLanding ? false : bundleGalleryAutoplay}
+              keyboard={{ enabled: clarityLanding, onlyInViewport: true }}
+              a11y={clarityLanding ? { prevSlideMessage: 'Image précédente', nextSlideMessage: 'Image suivante', paginationBulletMessage: 'Voir l’image {{index}}' } : false}
               lazyPreloadPrevNext={imageLoadingPolicy.lazyPreloadPrevNext}
               speed={450}
               className="main-swiper"
@@ -462,7 +489,7 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
                       decoding="async"
                     />
                     {index > 0 && <div className="swiper-lazy-preloader" aria-hidden="true" />}
-                    {index === 0 && displayDiscount > 0 && (
+                    {!clarityLanding && index === 0 && displayDiscount > 0 && (
                       <div className="discount-badge">
                         -{displayDiscount}%
                       </div>
@@ -479,7 +506,11 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
         </div>
 
         <div className="product-purchase-panel">
-          <div className="product-info">
+          {clarityLanding ? (
+            <ClaritySummary name={bundle.title_fr} price={bundle.cfa_price} referencePrice={getBundleSeparatePurchasePrice(bundle)} isBundle>
+              {quantitySelector}
+            </ClaritySummary>
+          ) : <div className="product-info">
             <h1 className="product-title">{bundle.title_fr}</h1>
 
             <div className="price-section">
@@ -529,9 +560,9 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
               <span>Total :</span>
               <strong>{formatFcfa(totalPrice)} FCFA</strong>
             </div>
-          </div>
+          </div>}
 
-          {!isCheckoutOptimizationVariant && <ServiceInfo variant="classic" />}
+          {!clarityLanding && !isCheckoutOptimizationVariant && <ServiceInfo variant="classic" />}
 
           {/* 包含产品列表 */}
           {items.length > 0 && (
@@ -543,7 +574,7 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
             </div>
           )}
 
-          <div className="bottom-actions">
+          {clarityLanding ? <ClarityPurchaseBar price={totalPrice} quantity={quantity} onOrder={handleBuyNow} /> : <div className="bottom-actions">
             {isCheckoutOptimizationVariant && (
               <div className={`cta-trust-note ${isCodTrustLanding ? 'cod-trust' : ''}`}>
                 {isCodTrustLanding
@@ -554,7 +585,7 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
             <button type="button" className="buy-now-btn" onClick={handleBuyNow}>
               Acheter maintenant - Paiement à la livraison
             </button>
-          </div>
+          </div>}
         </div>
       </div>
 
@@ -570,15 +601,15 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
           >
             Détails
           </button>
-          <button
+          {(!clarityLanding || bundleReviews.length > 0) && <button
             type="button"
             role="tab"
             aria-selected={activeBundleInfoTab === 'reviews'}
             className={`product-info-tab reviews-tab ${activeBundleInfoTab === 'reviews' ? 'active' : ''}`}
             onClick={() => handleBundleInfoTabClick('reviews')}
           >
-            Avis clients réels
-          </button>
+            {clarityLanding ? 'Avis' : 'Avis clients réels'}
+          </button>}
         </div>
 
         {activeBundleInfoTab === 'details' ? (
@@ -605,10 +636,11 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
               </div>
             )}
           </div>
-        ) : (
+        ) : clarityLanding ? <ClarityReviews reviews={bundleReviews} /> : (
           <ProductReviewsPanel reviews={bundleReviews} />
         )}
       </div>
+      {clarityLanding && <ClarityAftercare />}
     </div>
   )
 }

@@ -35,10 +35,7 @@ function switchEnv(env) {
     console.log(`✅ 已切换到 ${env === 'dev' ? '开发' : '生产'} 环境`)
     console.log(`📁 使用配置文件: ${envFiles[env]}`)
     
-    // 读取并显示当前配置
-    const config = fs.readFileSync(targetFile, 'utf8')
-    console.log('📋 当前配置:')
-    console.log(config)
+    // Do not print environment values into local or deployment logs.
   } catch (error) {
     console.error('❌ 切换环境失败:', error.message)
     process.exit(1)
@@ -65,8 +62,7 @@ function showCurrentEnv() {
     console.log(`   环境: ${env === 'development' ? '开发环境' : '生产环境'} (${env})`)
     console.log(`   API地址: ${url}`)
   } else {
-    console.log('📋 当前 .env 文件内容:')
-    console.log(content)
+    console.log('📋 .env 配置已存在；未识别到环境/地址字段，不输出配置值。')
   }
 }
 

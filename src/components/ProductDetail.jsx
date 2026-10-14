@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useLayoutEffect, useMemo } from 'react';
 import { Swiper, SwiperSlide } from 'swiper/react';
-import { Pagination, Navigation, Autoplay } from 'swiper/modules';
+import { Pagination, Navigation, Autoplay, A11y, Keyboard } from 'swiper/modules';
 import { useNavigate } from 'react-router-dom';
 import { FiStar } from 'react-icons/fi';
 import { productAPI } from '../services/api';
@@ -31,6 +31,8 @@ import {
 import { saveCheckoutPaymentState } from '../utils/checkoutPaymentStateCache';
 import { preloadPaymentPage, schedulePaymentPagePreload } from '../utils/preloadRoutes';
 import { getProductImageLoadingPolicy } from '../utils/productImageLoadingPolicy';
+import { isClarityLanding, getStoredLandingReviews } from '../utils/landingPresentation';
+import { ClarityHeader, ClaritySummary, ClarityPurchaseBar, ClarityAftercare, ClarityReviews } from './landing/LandingClarity';
 
 const PRODUCT_UNAVAILABLE_BACKEND_MESSAGE = '此商品已下架，请查看其它商品';
 const PRODUCT_UNAVAILABLE_MESSAGE_FR = "Ce produit n'est plus disponible. Veuillez consulter d'autres produits.";
@@ -262,6 +264,7 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
   const landingEngagementRef = useRef(null);
   const checkoutQuantityExperiment = useMemo(() => getCheckoutQuantityExperiment(), []);
   const imageLoadingPolicy = useMemo(() => getProductImageLoadingPolicy(), []);
+  const clarityLanding = isClarityLanding();
   const isCheckoutOptimizationVariant = isInlineCheckoutVariant(checkoutQuantityExperiment);
   const isCodTrustLanding = isCodTrustLandingVariant(checkoutQuantityExperiment);
   const isAddressFirstLanding = isAddressFirstCheckoutVariant(checkoutQuantityExperiment)
@@ -278,8 +281,8 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
     ...productMainImages.map((src) => ({ src, type: 'main' })),
     ...promotedDetailImages.map((src) => ({ src, type: 'detail-preview' }))
   ];
-  const productReviews = useMemo(() => getDisplayProductReviews(product), [product]);
-  const productSwiperModules = [Pagination, Navigation, Autoplay];
+  const productReviews = useMemo(() => clarityLanding ? getStoredLandingReviews(product) : getDisplayProductReviews(product), [product, clarityLanding]);
+  const productSwiperModules = [Pagination, Navigation, Autoplay, A11y, Keyboard];
   const productGalleryAutoplay = galleryImages.length > 1 && imageLoadingPolicy.autoplayEnabled
     ? {
         delay: 3500,
@@ -621,9 +624,9 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
   };
 
   return (
-    <div className="product-detail">
+    <div className={`product-detail${clarityLanding ? ' landing-clarity' : ''}`}>
       {/* 顶部标题栏 */}
-      <div className="product-header">
+      {clarityLanding ? <ClarityHeader onHome={() => navigate('/')} /> : <div className="product-header">
         <button
           type="button"
           className="back-btn"
@@ -644,7 +647,7 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
         >
           <img src={logoImage} alt="Brainnel" className="logo-image" />
         </div>
-      </div>
+      </div>}
 
       <div className="product-detail-main">
         {/* 产品图片轮播 */}
@@ -655,7 +658,9 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
             slidesPerView={1}
             pagination={{ clickable: true }}
             navigation={true}
-            autoplay={productGalleryAutoplay}
+            autoplay={clarityLanding ? false : productGalleryAutoplay}
+            keyboard={{ enabled: clarityLanding, onlyInViewport: true }}
+            a11y={clarityLanding ? { prevSlideMessage: 'Image précédente', nextSlideMessage: 'Image suivante', paginationBulletMessage: 'Voir l’image {{index}}' } : false}
             lazyPreloadPrevNext={imageLoadingPolicy.lazyPreloadPrevNext}
             speed={450}
             className="main-swiper"
@@ -671,7 +676,7 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
                     decoding="async"
                   />
                   {index > 0 && <div className="swiper-lazy-preloader" aria-hidden="true" />}
-                  {index === 0 && product.off > 0 && (
+                  {!clarityLanding && index === 0 && product.off > 0 && (
                     <div className="discount-badge">
                       -{formatDiscount(product.off)}%
                     </div>
@@ -684,7 +689,15 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
 
         <div className="product-purchase-panel">
           {/* 产品信息 */}
-          <div className="product-info">
+          {clarityLanding ? (
+            <ClaritySummary name={product.name_fr} price={product.price} referencePrice={product.original_price}>
+              {product.skus?.[0]?.name_fr && product.skus[0].name_fr !== product.name_fr && (
+                <div className="clarity-model"><span>Modèle</span><strong>{product.skus[0].name_fr}</strong></div>
+              )}
+              <ProductVariants variants={variants} currentProductId={product.product_id}
+                onVariantSelect={(id) => navigate(`/product/${id}`)} />
+            </ClaritySummary>
+          ) : <div className="product-info">
             <h1 className="product-title">{product.name_fr}</h1>
 
             {/* 价格信息 */}
@@ -726,13 +739,13 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
               }}
             />
 
-          </div>
+          </div>}
 
           {/* 服务信息 */}
-          {!isCheckoutOptimizationVariant && <ServiceInfo variant="classic" />}
+          {!clarityLanding && !isCheckoutOptimizationVariant && <ServiceInfo variant="classic" />}
 
           {/* 底部操作按钮 */}
-          <div className="bottom-actions">
+          {clarityLanding ? <ClarityPurchaseBar price={product.price} onOrder={handleBuyNowClick} /> : <div className="bottom-actions">
             {isCheckoutOptimizationVariant && (
               <div className={`cta-trust-note ${isCodTrustLanding ? 'cod-trust' : ''}`}>
                 {isCodTrustLanding
@@ -747,7 +760,7 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
             >
               Commander maintenant - Paiement à la livraison
             </button>
-          </div>
+          </div>}
         </div>
       </div>
 
@@ -763,15 +776,15 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
           >
             Détails
           </button>
-          <button
+          {(!clarityLanding || productReviews.length > 0) && <button
             type="button"
             role="tab"
             aria-selected={activeProductInfoTab === 'reviews'}
             className={`product-info-tab reviews-tab ${activeProductInfoTab === 'reviews' ? 'active' : ''}`}
             onClick={() => handleProductInfoTabClick('reviews')}
           >
-            Avis clients réels
-          </button>
+            {clarityLanding ? 'Avis' : 'Avis clients réels'}
+          </button>}
         </div>
 
         {activeProductInfoTab === 'details' ? (
@@ -799,7 +812,7 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
               </div>
             )}
           </div>
-        ) : (
+        ) : clarityLanding ? <ClarityReviews reviews={productReviews} /> : (
           <div className="product-tab-panel reviews-panel" role="tabpanel">
             <div className="reviews-summary">
               <div>
@@ -843,6 +856,7 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
           </div>
         )}
       </div>
+      {clarityLanding && <ClarityAftercare />}
 
       {/* 数量选择弹窗 */}
       <QuantityModal

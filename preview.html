@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Brainnel · 落地页本地评审</title>
+  <style>
+    *{box-sizing:border-box}body{margin:0;background:#f5f4ef;color:#25271f;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}button,select,a{font:inherit}button{cursor:pointer}header{padding:22px 32px;border-bottom:1px solid #dedfd6;display:flex;justify-content:space-between;align-items:center;gap:16px}.brand{font-size:24px;font-weight:800;letter-spacing:-1px}.brand span{color:#d94a08}.status{font-size:12px;color:#34664b}main{max-width:1050px;margin:32px auto;padding:0 28px;display:grid;grid-template-columns:minmax(220px,1fr) 410px;gap:64px;align-items:start}.eyebrow{font-size:11px;letter-spacing:2px;color:#66735e;font-weight:700}.intro h1{font-size:38px;line-height:1.2;letter-spacing:-1px;margin:16px 0}.intro>p{font-size:14px;line-height:1.9;color:#606456;max-width:440px}.evidence{border-top:1px solid #d7d9ce;border-bottom:1px solid #d7d9ce;padding:20px 0;margin:28px 0;display:flex;gap:32px}.evidence strong{display:block;font-size:29px;letter-spacing:-1px}.evidence span{font-size:12px;color:#73766b}.changes{padding:0;list-style:none;counter-reset:steps}.changes li{counter-increment:steps;padding:16px 0 16px 34px;position:relative;border-bottom:1px solid #e0e2d8;font-size:13px;line-height:1.8}.changes li:before{content:"0" counter(steps);position:absolute;left:0;top:18px;font-size:11px;color:#87907d}.changes strong{display:block;font-size:15px}.note{font-size:12px!important;color:#717568!important}.controls{display:flex;gap:8px;margin-bottom:12px;align-items:center;flex-wrap:wrap}.switch{display:flex;background:#e8e9e0;padding:3px;border-radius:7px}.switch button{padding:8px 14px;border:0;background:transparent;color:#606655;border-radius:5px;font-size:12px}.switch button[aria-pressed=true]{background:#fff;color:#24291e;box-shadow:0 1px 5px #0001;font-weight:700}select{flex:1;min-width:100px;border:1px solid #d5d8ca;border-radius:6px;padding:8px;background:transparent;font-size:12px}.device{background:#fff;border:1px solid #d6d9cc;padding:9px;border-radius:22px;box-shadow:0 16px 50px #23311510;width:410px}.device-top{height:20px;display:flex;justify-content:center;align-items:center;gap:6px;color:#8d9284;font-size:9px}.dot{width:4px;height:4px;background:#61976a;border-radius:50%}iframe{border:0;display:block;width:390px;height:740px;border-radius:0 0 14px 14px;background:white}.open{display:flex;justify-content:space-between;margin-top:12px;gap:12px;font-size:12px;color:#6f7566}.open a{color:#366747;text-underline-offset:3px}.safe{margin-top:14px;font-size:11px;line-height:1.7;color:#73786a}:focus-visible{outline:3px solid #3e7252;outline-offset:3px}@media(max-width:800px){header{padding:18px}main{grid-template-columns:1fr;gap:24px;padding:0 14px;margin:24px auto;max-width:450px}.intro h1{font-size:29px}.intro .changes,.intro .evidence{display:none}.device{max-width:100%;width:410px}iframe{width:100%;height:740px}.intro>p{margin-bottom:0}.status{font-size:10px}}@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
+  </style>
+</head>
+<body>
+  <header><div class="brand">brainnel<span>.</span> <span style="font-size:12px;color:#727867;letter-spacing:0;font-weight:500;margin-left:12px">落地页评审</span></div><div class="status">仅本地 · 未上线 · 真实下单已禁用</div></header>
+  <main>
+    <section class="intro">
+      <div class="eyebrow">CONVERSION REVIEW / 2026.10.14</div>
+      <h1>让第一屏，<br>把下单说清楚。</h1>
+      <p>10 月 5 日的主要线索是广告组合变化，不是当天改坏了页面。新复制系列的低意愿流量，需要更清楚的商品、价格与购买承诺。</p>
+      <div class="evidence"><div><strong>$4.46</strong><span>10/5 新复制系列 CPA</span></div><div><strong>$2.77</strong><span>同日其他广告 CPA</span></div></div>
+      <ol class="changes">
+        <li><strong>主图放大，信息不重复</strong>去掉图片额外留白，完整展示商品；首屏保留真实价格、免费配送与货到付款，用途说明留在详情区。</li>
+        <li><strong>按钮短一点，点击区大一点</strong>56px 高的 Commander，旁边始终可见总价；不再把一整句塞进按钮。</li>
+        <li><strong>少干扰，不增加步骤</strong>取消自动轮播、倒计时和模拟评价；原来的地区、地址、电话与下单流程保持不变。</li>
+      </ol>
+      <p class="note">这是一版待验证的优化，不承诺改按钮就能抵消流量变化。若确认上线，建议固定商品与广告进行小流量对照，主看常规订单成本，而不只看按钮点击率。</p>
+    </section>
+    <section aria-label="交互式手机预览">
+      <div class="controls"><div class="switch" aria-label="页面版本"><button id="new" aria-pressed="true">新版</button><button id="old" aria-pressed="false">原版</button></div><select id="product" aria-label="预览商品"><option value="/product/941136159889">滤油壶 · 单品</option><option value="/bundle/137">护肤套装 · 组合品</option></select></div>
+      <div class="device"><div class="device-top"><span class="dot"></span>LOCAL PREVIEW / 390 PX</div><iframe id="phone" title="Brainnel 手机端交互预览" src="/product/941136159889"></iframe></div>
+      <div class="open"><span id="version">新版 · 首屏清晰版</span><a id="full" href="/product/941136159889" target="_blank" rel="noopener">完整页面 ↗</a></div>
+      <div class="safe">可点下单、选择地区、查看表单。测试请求全部留在本地；不会创建真实订单或发送广告事件。</div>
+    </section>
+  </main>
+  <script>
+    let original = false;
+    function update(){const path=document.querySelector('#product').value+(original?'?landing_design=original':'');document.querySelector('#phone').src=path;document.querySelector('#full').href=path;document.querySelector('#new').setAttribute('aria-pressed',String(!original));document.querySelector('#old').setAttribute('aria-pressed',String(original));document.querySelector('#version').textContent=original?'原版 · 当前线上样式':'新版 · 首屏清晰版';}
+    document.querySelector('#new').addEventListener('click',()=>{original=false;update()});document.querySelector('#old').addEventListener('click',()=>{original=true;update()});document.querySelector('#product').addEventListener('change',update);
+  </script>
+</body>
+</html>

@@ -39,6 +39,7 @@ export const getCurrentConfig = () => {
   const config = {
     ...baseConfig,
     BASE_URL: import.meta.env.VITE_API_BASE_URL || baseConfig.BASE_URL,
+    FACEBOOK_API_URL: import.meta.env.VITE_FACEBOOK_API_URL || baseConfig.FACEBOOK_API_URL,
     LOG_REQUESTS: import.meta.env.VITE_ENABLE_CONSOLE_LOGS === 'true' ? baseConfig.LOG_REQUESTS : false,
     LOG_RESPONSES: import.meta.env.VITE_ENABLE_CONSOLE_LOGS === 'true' ? baseConfig.LOG_RESPONSES : false
   }

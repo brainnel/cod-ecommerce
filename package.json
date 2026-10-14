@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "test": "node --test tests/*.test.js",
     "preview": "vite preview",
+    "preview:local": "vite --mode preview-local",
     "env:dev": "node scripts/env-manager.cjs dev",
     "env:prod": "node scripts/env-manager.cjs prod",
     "env:status": "node scripts/env-manager.cjs status",

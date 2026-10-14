@@ -16,7 +16,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '18'
+        node-version: '22'
         cache: 'npm'
     
     - name: Install dependencies
@@ -26,9 +26,6 @@ jobs:
       run: npm run lint || echo "Linting failed but continuing..."
       
     - name: Build project
-      # Match the Web Crypto APIs used by supported production browsers in Node 18.
-      env:
-        NODE_OPTIONS: --experimental-global-webcrypto
       run: npm test && npm run build:prod
       
     - name: Deploy to server
