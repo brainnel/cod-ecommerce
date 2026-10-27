@@ -658,3 +658,11 @@ ORDER BY CASE WHEN d.sort_order = 0 THEN 999999 ELSE d.sort_order END ASC, d.nam
 - 地图高度改为移动端视口自适应，并在地图下方预留固定按钮高度，避免按钮遮住地图底部 10%-20%。
 - 针对 720px 以下的小高度手机追加压缩规则：收紧顶部流程条、定位提示、按钮高度，并把地图高度按 `100dvh` 动态下调，保证小屏也能同时看到地图和“Suivant”按钮。
 - 继续压缩小屏定位页非核心区域：移动端标题栏和 3 步流程条变薄，`Cocody - Abidjan` 从独立卡片改成地图下方轻量信息行，避免浮层遮挡地图道路信息。
+
+### 2026-10-27 完成页客户 WhatsApp 群入口
+
+- 用户选定精简单列的第 1 版，并要求删除 `Facultatif · Votre numéro peut être visible des membres.`。完成页使用白底和单一绿色入群主按钮；配送、货到付款、可展开订单详情、独立客服及 App 下载仍保留。
+- 客户群链接集中在 `src/config/customerCommunity.js`，保留用户给定邀请链接的全部查询参数。采用真实 anchor，点击时先保存原有 2 小时完成页 session 缓存，再记录独立事件 `order_success_whatsapp_group_click`；埋点失败不能阻断导航。
+- 点击不等于真实入群。新事件沿用现有原始事件接收接口，未修改后端，也未新增漏斗报表卡片。
+- 不改 `PaymentPage.jsx`、`facebookConversions.js`、`metaPurchase.js` 或后端 Purchase；保持现有单品/组合品双端 Purchase 与 event ID 去重。开发预览不预加载下载接口、不记录完成页点击。
+- 验证：41 项主测试（含 9 项完成页测试）及 5 项地址规则测试通过；320px/390px/桌面布局和详情展开通过。WhatsApp 外站在本机网络超时，链接及参数已经核对，未实际入群或发送消息。

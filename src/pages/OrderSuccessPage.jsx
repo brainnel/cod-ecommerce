@@ -1,22 +1,15 @@
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useMemo } from 'react'
 import {
-  FiCheckCircle,
-  FiClock,
+  FiCheck,
+  FiChevronDown,
   FiCreditCard,
-  FiDownload,
-  FiGift,
-  FiHome,
-  FiMap,
-  FiMapPin,
-  FiMessageCircle,
-  FiPhone,
   FiTruck,
-  FiUser
 } from 'react-icons/fi'
 import { FaWhatsapp } from 'react-icons/fa'
 import { appDownloadAPI } from '../services/api'
 import { trackCheckoutEvent } from '../services/checkoutFunnelAnalytics'
+import { WHATSAPP_CUSTOMER_GROUP_URL, WHATSAPP_GROUP_CLICK_EVENT } from '../config/customerCommunity'
 import './OrderSuccessPage.css'
 
 const FALLBACK_DOWNLOAD_LINKS = {
@@ -148,7 +141,7 @@ const OrderSuccessPage = () => {
   }, [orderSuccessState, previewState])
 
   useEffect(() => {
-    if (hasLoadedDownloadLinks) return
+    if (previewState || hasLoadedDownloadLinks) return
 
     appDownloadAPI.getDownloadLinks()
       .then((links) => {
@@ -158,7 +151,7 @@ const OrderSuccessPage = () => {
       .catch((error) => {
         console.warn('app download links preload failed:', error)
       })
-  }, [])
+  }, [previewState])
 
   // 如果没有订单信息，重定向回首页
   useEffect(() => {
@@ -167,17 +160,18 @@ const OrderSuccessPage = () => {
     }
   }, [product, quantity, userInfo, selectedLocation, navigate])
 
-  const formatPrice = (price) => {
-    return price.toString()
-  }
-
-
   const trackSuccessPageAction = (eventName) => {
-    trackCheckoutEvent(eventName, {
-      page_name: 'order_success',
-      order_id: orderResponse?.order_id ? String(orderResponse.order_id) : null,
-      order_no: orderResponse?.order_no || null
-    })
+    if (previewState) return
+    try {
+      trackCheckoutEvent(eventName, {
+        page_name: 'order_success',
+        order_id: orderResponse?.order_id ? String(orderResponse.order_id) : null,
+        order_no: orderResponse?.order_no || null
+      })
+    } catch (error) {
+      // Analytics must never prevent opening WhatsApp or the app store.
+      console.warn('order success action tracking failed:', error)
+    }
   }
 
   const handleDownloadApp = () => {
@@ -198,124 +192,79 @@ const OrderSuccessPage = () => {
     window.location.assign(whatsappUrl)
   }
 
+  const handleWhatsAppGroup = () => {
+    // Preserve the confirmation page when the customer returns from WhatsApp.
+    if (!previewState) saveCachedOrderSuccessState(orderSuccessState)
+    trackSuccessPageAction(WHATSAPP_GROUP_CLICK_EVENT)
+    // The anchor navigates normally; a click is not a confirmed group membership.
+  }
+
   if (!product || !quantity || !userInfo || !selectedLocation) {
     return (
-      <div className="order-success-page">
-        <div className="order-success-header">
-          <button type="button" className="back-btn" aria-label="Retour à l'accueil" onClick={() => navigate('/')}>
-            <FiHome aria-hidden="true" />
-          </button>
-          <h1 className="header-title">Commande confirmée</h1>
-        </div>
+      <div className="order-success-page" aria-busy="true">
+        <p className="os-loading">Chargement de votre commande…</p>
       </div>
     )
   }
 
+  const amount = Number(totalPrice ?? product.price * quantity)
+  const formattedAmount = Number.isFinite(amount) ? amount.toLocaleString('fr-FR', { maximumFractionDigits: 0 }) : '—'
+  const productImage = Array.isArray(product.image_url) ? product.image_url[0] : product.image_url
+  const displayPhone = (phone) => phone ? `+${String(phone).replace(/^\+/, '')}` : '—'
+
   return (
     <div className="order-success-page">
-      {/* 顶部标题栏 */}
-      <div className="order-success-header">
-        <button type="button" className="back-btn" aria-label="Retour à l'accueil" onClick={() => navigate('/')}>
-          <FiHome aria-hidden="true" />
-        </button>
-        <h1 className="header-title">Commande confirmée</h1>
-      </div>
-
-      <div className="success-content">
-        {/* 成功图标和标题 */}
-        <div className="success-header">
-          <div className="success-icon">
-            <FiCheckCircle aria-label="Succès" />
-          </div>
-          <h2 className="success-title">Commande confirmée !</h2>
-          <p className="success-subtitle">
-            Nous vous livrerons dans les prochaines 24 à 48 heures. Le livreur vous contactera à l'avance par téléphone ou WhatsApp.
-          </p>
-          <div className="success-promise-grid">
-            <div className="success-promise-item">
-              <FiTruck aria-hidden="true" />
-              <span>Livraison gratuite à Abidjan</span>
-            </div>
-            <div className="success-promise-item">
-              <FiCreditCard aria-hidden="true" />
-              <span>Cash ou Wave à la réception</span>
-            </div>
-          </div>
-        </div>
-
-        {/* 订单摘要 */}
-        <div className="order-summary">
-          <div className="order-item">
-            <img 
-              src={product.image_url?.[0]} 
-              alt={product.name_fr} 
-              className="item-image"
-              loading="lazy"
-              decoding="async"
-            />
-            <div className="item-details">
-              <div className="item-name">{product.name_fr}</div>
-              <div className="item-info">Quantité: {quantity} • {formatPrice(totalPrice)} FCFA</div>
-            </div>
-          </div>
-        </div>
-
-        {/* 订单信息 */}
-        <div className="order-info-section">
-          <h3 className="info-section-title">Informations de livraison</h3>
-          
-          <div className="info-row">
-            <div className="info-label"><span className="info-label-icon"><FiUser /></span>Nom complet</div>
-            <div className="info-value">{userInfo.fullName}</div>
-          </div>
-          
-          <div className="info-row">
-            <div className="info-label"><span className="info-label-icon"><FiPhone /></span>Téléphone</div>
-            <div className="info-value">+{userInfo.phone}</div>
-          </div>
-          
-          <div className="info-row">
-            <div className="info-label"><span className="info-label-icon"><FiMessageCircle /></span>WhatsApp</div>
-            <div className="info-value">+{userInfo.whatsapp}</div>
-          </div>
-          
-          {userInfo.addressDescription && (
-            <div className="info-row address-row">
-              <div className="info-label"><span className="info-label-icon"><FiMapPin /></span>Adresse</div>
-              <div className="info-value">{userInfo.addressDescription}</div>
-            </div>
-          )}
-          
-          {selectedLocation && (
-            <div className="info-row">
-              <div className="info-label"><span className="info-label-icon"><FiMap /></span>District</div>
-              <div className="info-value">{selectedLocation.name}</div>
-            </div>
-          )}
-
-          <div className="info-row">
-            <div className="info-label"><span className="info-label-icon"><FiClock /></span>Horaires</div>
-            <div className="info-value">8:00 - 21:00</div>
-          </div>
-        </div>
-
-        {/* 操作按钮 */}
-        <div className="success-actions">
-          <div className="download-action-block">
-            <div className="download-benefit-pill">
-              <FiGift aria-hidden="true" />
-              <span>Offres spéciales sur votre prochaine commande</span>
-            </div>
-            <button type="button" className="download-btn" onClick={handleDownloadApp}>
-              <FiDownload aria-hidden="true" />
-              <span>Télécharger l'app Brainnel</span>
-            </button>
-          </div>
-          <button type="button" className="whatsapp-btn" onClick={handleWhatsAppContact}>
-            <FaWhatsapp aria-hidden="true" />
-            <span>Nous contacter sur WhatsApp</span>
+      <div className="os-container">
+        <header className="os-brand-header">
+          <button type="button" className="os-brand" aria-label="Retour à l’accueil Brainnel" onClick={() => navigate('/')}>
+            <img src="/logo.png" width="24" height="24" alt="" /><span>brainnel</span>
           </button>
-        </div>
+          {orderResponse?.order_no && <span className="os-order-reference">{orderResponse.order_no}</span>}
+        </header>
+
+        <main>
+          <section className="os-confirmation" aria-labelledby="os-confirmation-title">
+            <span className="os-check"><FiCheck aria-hidden="true" /></span>
+            <h1 id="os-confirmation-title">Commande confirmée</h1>
+            <p>Merci pour votre confiance.</p>
+          </section>
+
+          <section className="os-community" aria-labelledby="os-community-title">
+            <h2 id="os-community-title">Le groupe clients Brainnel</h2>
+            <p>Nouveautés et offres clients, sur WhatsApp.</p>
+            <a className="os-join-group" href={WHATSAPP_CUSTOMER_GROUP_URL} onClick={handleWhatsAppGroup} aria-label="Rejoindre le groupe WhatsApp Brainnel">
+              <FaWhatsapp aria-hidden="true" /><span>Rejoindre le groupe</span>
+            </a>
+          </section>
+
+          <section className="os-delivery" aria-label="Livraison et paiement">
+            <div><FiTruck aria-hidden="true" /><p><strong>Livraison gratuite sous 48 h</strong><span>À domicile, à Abidjan. Le livreur vous appellera.</span></p></div>
+            <div><FiCreditCard aria-hidden="true" /><p><strong>Paiement à la livraison</strong><span>En cash ou avec Wave.</span></p></div>
+          </section>
+
+          <details className="os-order-details">
+            <summary><span>Votre commande</span><strong>{formattedAmount} FCFA</strong><FiChevronDown aria-hidden="true" /></summary>
+            <div className="os-detail-content">
+              <div className="os-product">
+                {productImage && <img src={productImage} alt="" loading="lazy" decoding="async" />}
+                <div><strong>{product.name_fr}</strong><span>Quantité : {quantity}</span></div>
+              </div>
+              <dl className="os-recipient">
+                <div><dt>Nom complet</dt><dd>{userInfo.fullName}</dd></div>
+                <div><dt>Téléphone</dt><dd>{displayPhone(userInfo.phone)}</dd></div>
+                <div><dt>WhatsApp</dt><dd>{displayPhone(userInfo.whatsapp)}</dd></div>
+                {userInfo.addressDescription && <div><dt>Adresse</dt><dd>{userInfo.addressDescription}</dd></div>}
+                <div><dt>District</dt><dd>{selectedLocation.name}</dd></div>
+                <div><dt>Horaires</dt><dd>8:00 - 21:00</dd></div>
+              </dl>
+            </div>
+          </details>
+
+          <nav className="os-secondary" aria-label="Autres options">
+            <button type="button" onClick={handleWhatsAppContact}>Service client</button><span aria-hidden="true">·</span>
+            <button type="button" onClick={handleDownloadApp}>L’app Brainnel</button>
+          </nav>
+        </main>
       </div>
     </div>
   )
