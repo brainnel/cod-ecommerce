@@ -9,7 +9,7 @@ import {
 import { FaWhatsapp } from 'react-icons/fa'
 import { appDownloadAPI } from '../services/api'
 import { trackCheckoutEvent } from '../services/checkoutFunnelAnalytics'
-import { WHATSAPP_CUSTOMER_GROUP_URL, WHATSAPP_GROUP_CLICK_EVENT } from '../config/customerCommunity'
+import { getWhatsAppCustomerGroup, WHATSAPP_GROUP_CLICK_EVENT } from '../config/customerCommunity'
 import './OrderSuccessPage.css'
 
 const FALLBACK_DOWNLOAD_LINKS = {
@@ -129,6 +129,10 @@ const OrderSuccessPage = () => {
     [location.state, previewState, cachedInitialSuccessState]
   )
   const { product, quantity, userInfo, selectedLocation, totalPrice, orderResponse } = orderSuccessState
+  const whatsappGroup = getWhatsAppCustomerGroup({
+    phone: userInfo?.phone,
+    orderId: orderResponse?.order_no || orderResponse?.order_id
+  })
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
@@ -160,13 +164,14 @@ const OrderSuccessPage = () => {
     }
   }, [product, quantity, userInfo, selectedLocation, navigate])
 
-  const trackSuccessPageAction = (eventName) => {
+  const trackSuccessPageAction = (eventName, properties = {}) => {
     if (previewState) return
     try {
       trackCheckoutEvent(eventName, {
         page_name: 'order_success',
         order_id: orderResponse?.order_id ? String(orderResponse.order_id) : null,
-        order_no: orderResponse?.order_no || null
+        order_no: orderResponse?.order_no || null,
+        ...properties
       })
     } catch (error) {
       // Analytics must never prevent opening WhatsApp or the app store.
@@ -195,7 +200,7 @@ const OrderSuccessPage = () => {
   const handleWhatsAppGroup = () => {
     // Preserve the confirmation page when the customer returns from WhatsApp.
     if (!previewState) saveCachedOrderSuccessState(orderSuccessState)
-    trackSuccessPageAction(WHATSAPP_GROUP_CLICK_EVENT)
+    trackSuccessPageAction(WHATSAPP_GROUP_CLICK_EVENT, { whatsapp_group_id: whatsappGroup.id })
     // The anchor navigates normally; a click is not a confirmed group membership.
   }
 
@@ -232,7 +237,7 @@ const OrderSuccessPage = () => {
           <section className="os-community" aria-labelledby="os-community-title">
             <h2 id="os-community-title">Le groupe clients Brainnel</h2>
             <p>Nouveautés et offres clients, sur WhatsApp.</p>
-            <a className="os-join-group" href={WHATSAPP_CUSTOMER_GROUP_URL} onClick={handleWhatsAppGroup} aria-label="Rejoindre le groupe WhatsApp Brainnel">
+            <a className="os-join-group" href={whatsappGroup.url} onClick={handleWhatsAppGroup} aria-label="Rejoindre le groupe WhatsApp Brainnel">
               <FaWhatsapp aria-hidden="true" /><span>Rejoindre le groupe</span>
             </a>
           </section>

@@ -5,7 +5,7 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { MemoryRouter } from 'react-router-dom'
 import { createServer } from 'vite'
-import { WHATSAPP_CUSTOMER_GROUP_URL, WHATSAPP_GROUP_CLICK_EVENT } from '../src/config/customerCommunity.js'
+import { getWhatsAppCustomerGroup, WHATSAPP_GROUP_CLICK_EVENT } from '../src/config/customerCommunity.js'
 
 let server
 let OrderSuccessPage
@@ -32,15 +32,14 @@ const render = (state) => renderToStaticMarkup(createElement(MemoryRouter, {
   initialEntries: [{ pathname: '/order-success', state }]
 }, createElement(OrderSuccessPage)))
 
-test('customer group URL preserves the exact approved invite and every parameter', () => {
-  assert.equal(WHATSAPP_CUSTOMER_GROUP_URL, 'https://chat.whatsapp.com/J9FXDmYfDxw82BKo3Nzy57?s=cl&p=i&mlu=4&ilr=4&iam=0')
+test('customer group click keeps the existing analytics event', () => {
   assert.equal(WHATSAPP_GROUP_CLICK_EVENT, 'order_success_whatsapp_group_click')
   assert.ok(WHATSAPP_GROUP_CLICK_EVENT.length <= 50)
 })
 
 test('production component puts the real group link before delivery and removes rejected copy', () => {
   const html = render(example)
-  assert.ok(html.includes(`href="${WHATSAPP_CUSTOMER_GROUP_URL.replaceAll('&', '&amp;')}"`))
+  assert.ok(html.includes(`href="${getWhatsAppCustomerGroup({ phone: example.userInfo.phone }).url}"`))
   assert.ok(html.indexOf('os-community') < html.indexOf('os-delivery'))
   assert.equal((html.match(/class="os-join-group"/g) || []).length, 1)
   assert.doesNotMatch(html, /Facultatif|visible des membres|bons plans/)
@@ -87,6 +86,7 @@ test('recent session cache restores the confirmation after returning from WhatsA
     assert.match(html, /Commande confirmée/)
     assert.match(html, /FL-TEST-ONLY/)
     assert.match(html, /os-join-group/)
+    assert.ok(html.includes(`href="${getWhatsAppCustomerGroup({ phone: example.userInfo.phone }).url}"`))
     assert.match(render({ ...example, orderResponse: { order_no: 'FL-NEWER-ORDER' } }), /FL-NEWER-ORDER/)
   } finally {
     if (previousWindow === undefined) delete globalThis.window
@@ -111,7 +111,7 @@ test('expired or malformed cached state does not pretend an order succeeded', (t
 test('completion page never imports or emits Purchase and keeps a normal non-blocking anchor', async () => {
   const source = await readFile(new URL('../src/pages/OrderSuccessPage.jsx', import.meta.url), 'utf8')
   assert.doesNotMatch(source, /trackPurchase|facebookConversions|fbq\(/)
-  assert.match(source, /href=\{WHATSAPP_CUSTOMER_GROUP_URL\} onClick=\{handleWhatsAppGroup\}/)
-  assert.match(source, /saveCachedOrderSuccessState\(orderSuccessState\)[\s\S]*trackSuccessPageAction\(WHATSAPP_GROUP_CLICK_EVENT\)/)
+  assert.match(source, /href=\{whatsappGroup.url\} onClick=\{handleWhatsAppGroup\}/)
+  assert.match(source, /saveCachedOrderSuccessState\(orderSuccessState\)[\s\S]*trackSuccessPageAction\(WHATSAPP_GROUP_CLICK_EVENT, \{ whatsapp_group_id: whatsappGroup.id \}\)/)
   assert.match(source, /ORDER_SUCCESS_STATE_TTL_MS = 2 \* 60 \* 60 \* 1000/)
 })
