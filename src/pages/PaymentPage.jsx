@@ -39,6 +39,7 @@ import {
   validateCheckoutAddress
 } from '../utils/checkoutAddress'
 import { validateCheckoutDeliveryArea } from '../utils/checkoutDeliveryArea'
+import { clampCheckoutQuantity, getCheckoutQuantityLimit } from '../utils/checkoutQuantity'
 import {
   buildCheckoutDistrictCacheEntry,
   getCachedManualMarkerForDistrict,
@@ -121,18 +122,6 @@ const buildCheckoutStepSearch = (step, currentSearch = '') => {
   }
 
   return `?${params.toString()}`
-}
-
-const getProductStockLimit = (product) => {
-  const stock = Number(product?.stock)
-  return Number.isFinite(stock) && stock > 0 ? Math.floor(stock) : 99
-}
-
-const clampQuantity = (value, product) => {
-  const parsedQuantity = Number.parseInt(value, 10)
-  const stockLimit = getProductStockLimit(product)
-  if (!Number.isFinite(parsedQuantity)) return 1
-  return Math.min(Math.max(parsedQuantity, 1), stockLimit)
 }
 
 const getBrowserContext = () => {
@@ -257,7 +246,9 @@ const PaymentPage = () => {
   // 三步流程：1=选大区, 2=地图标记, 3=填写信息
   const [currentStep, setCurrentStep] = useState(() => getCheckoutStepFromSearch(location.search))
   const [loading, setLoading] = useState(false)
-  const [quantity, setQuantity] = useState(() => clampQuantity(routeQuantity || 1, product))
+  const [rawQuantity, setQuantity] = useState(() => clampCheckoutQuantity(routeQuantity || 1, product))
+  // Normalize synchronously so restored routes, totals and order payloads agree.
+  const quantity = clampCheckoutQuantity(rawQuantity, product)
 
   // 步顢1：大区选择
   const [districts, setDistricts] = useState([])
@@ -660,7 +651,7 @@ const PaymentPage = () => {
   }, [userInfo, whatsappSameAsPhone])
 
   const handleInlineQuantityChange = (nextQuantity) => {
-    const normalizedQuantity = clampQuantity(nextQuantity, product)
+    const normalizedQuantity = clampCheckoutQuantity(nextQuantity, product)
     if (normalizedQuantity === quantity) return
 
     const previousQuantity = quantity
@@ -858,7 +849,7 @@ const PaymentPage = () => {
 
   useEffect(() => {
     if (!product) return
-    setQuantity((currentQuantity) => clampQuantity(currentQuantity || routeQuantity || 1, product))
+    setQuantity((currentQuantity) => clampCheckoutQuantity(currentQuantity || routeQuantity || 1, product))
   }, [product, routeQuantity])
 
   useEffect(() => {
@@ -2157,7 +2148,7 @@ const PaymentPage = () => {
                       className="inline-quantity-input"
                       value={quantity}
                       min="1"
-                      max={getProductStockLimit(product)}
+                      max={getCheckoutQuantityLimit(product)}
                       onChange={(event) => handleInlineQuantityChange(event.target.value)}
                       aria-label="Quantité"
                     />
@@ -2165,7 +2156,7 @@ const PaymentPage = () => {
                       type="button"
                       className="inline-quantity-btn"
                       onClick={() => handleInlineQuantityChange(quantity + 1)}
-                      disabled={quantity >= getProductStockLimit(product)}
+                      disabled={quantity >= getCheckoutQuantityLimit(product)}
                       aria-label="Augmenter la quantité"
                     >
                       +

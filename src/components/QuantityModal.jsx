@@ -10,12 +10,14 @@ import {
   updateCheckoutContext
 } from '../services/checkoutFunnelAnalytics'
 import { getLocalPreviewBrowserContextParam } from '../utils/checkoutBrowserContextPreview'
+import { clampCheckoutQuantity, getCheckoutQuantityLimit } from '../utils/checkoutQuantity'
 import './QuantityModal.css'
 
 const QuantityModal = ({ isOpen, onClose, product, checkoutQuantityExperiment }) => {
   const navigate = useNavigate()
-  const [quantity, setQuantity] = useState(1)
+  const [rawQuantity, setQuantity] = useState(1)
   const [isClosing, setIsClosing] = useState(false)
+  const quantity = clampCheckoutQuantity(rawQuantity, product)
 
   if (!isOpen) return null
 
@@ -28,8 +30,9 @@ const QuantityModal = ({ isOpen, onClose, product, checkoutQuantityExperiment })
   }
 
   const handleQuantityChange = (newQuantity) => {
-    if (newQuantity >= 1 && newQuantity <= product.stock) {
-      setQuantity(newQuantity)
+    // Keep this legacy modal's existing no-stock behavior; only lower its cap.
+    if (Number(product.stock) > 0) {
+      setQuantity(clampCheckoutQuantity(newQuantity, product))
     }
   }
 
@@ -137,12 +140,12 @@ const QuantityModal = ({ isOpen, onClose, product, checkoutQuantityExperiment })
               onChange={(e) => handleQuantityChange(parseInt(e.target.value) || 1)}
               className="quantity-input"
               min="1"
-              max={product.stock}
+              max={product.stock > 0 ? getCheckoutQuantityLimit(product) : product.stock}
             />
             <button 
               className="quantity-btn"
               onClick={() => handleQuantityChange(quantity + 1)}
-              disabled={quantity >= product.stock}
+              disabled={quantity >= getCheckoutQuantityLimit(product) || quantity >= product.stock}
             >
               +
             </button>

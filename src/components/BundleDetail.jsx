@@ -27,6 +27,7 @@ import {
 import { saveCheckoutPaymentState } from '../utils/checkoutPaymentStateCache'
 import { preloadPaymentPage, schedulePaymentPagePreload } from '../utils/preloadRoutes'
 import { getProductImageLoadingPolicy } from '../utils/productImageLoadingPolicy'
+import { clampCheckoutQuantity, getCheckoutQuantityLimit } from '../utils/checkoutQuantity'
 import Countdown from './Countdown'
 import { isClarityLanding, getStoredLandingReviews, getBundleSeparatePurchasePrice, getBundleItemUnitPrice } from '../utils/landingPresentation'
 import { ClarityHeader, ClaritySummary, ClarityPurchaseBar, ClarityAftercare, ClarityReviews } from './landing/LandingClarity'
@@ -89,7 +90,7 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
   const [bundle, setBundle] = useState(initialBundle)
   const [loading, setLoading] = useState(!initialBundle)
   const [error, setError] = useState(null)
-  const [quantity, setQuantity] = useState(1)
+  const [rawQuantity, setQuantity] = useState(1)
   const [activeBundleInfoTab, setActiveBundleInfoTab] = useState('details')
   const viewTrackedBundleRef = useRef(null)
   const landingEngagementRef = useRef(null)
@@ -115,6 +116,7 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
       reviews: bundle.reviews || bundle.product_reviews || []
     }
   }, [bundle])
+  const quantity = clampCheckoutQuantity(rawQuantity, bundleProduct)
   const bundleReviews = useMemo(() => clarityLanding ? getStoredLandingReviews(bundleProduct) : getDisplayProductReviews(bundleProduct), [bundleProduct, clarityLanding])
 
   useLayoutEffect(() => {
@@ -288,9 +290,7 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
   }
 
   const handleQtyChange = (next) => {
-    if (next >= 1 && next <= 99) {
-      setQuantity(next)
-    }
+    setQuantity(clampCheckoutQuantity(next, bundleProduct))
   }
 
   const handleBuyNow = () => {
@@ -427,10 +427,10 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
       <div className="bundle-quantity-controls">
         <button type="button" className="bundle-quantity-btn" aria-label="Diminuer la quantité"
           onClick={() => handleQtyChange(quantity - 1)} disabled={quantity <= 1}>−</button>
-        <input id="bundle-quantity" type="number" className="bundle-quantity-input" value={quantity} min="1" max="99"
+        <input id="bundle-quantity" type="number" className="bundle-quantity-input" value={quantity} min="1" max={getCheckoutQuantityLimit(bundleProduct)}
           onChange={(e) => handleQtyChange(parseInt(e.target.value, 10) || 1)} />
         <button type="button" className="bundle-quantity-btn" aria-label="Augmenter la quantité"
-          onClick={() => handleQtyChange(quantity + 1)} disabled={quantity >= 99}>+</button>
+          onClick={() => handleQtyChange(quantity + 1)} disabled={quantity >= getCheckoutQuantityLimit(bundleProduct)}>+</button>
       </div>
     </div>
   )
@@ -542,14 +542,14 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
                   className="bundle-quantity-input"
                   value={quantity}
                   min="1"
-                  max="99"
+                  max={getCheckoutQuantityLimit(bundleProduct)}
                   onChange={(e) => handleQtyChange(parseInt(e.target.value, 10) || 1)}
                 />
                 <button
                   type="button"
                   className="bundle-quantity-btn"
                   onClick={() => handleQtyChange(quantity + 1)}
-                  disabled={quantity >= 99}
+                  disabled={quantity >= getCheckoutQuantityLimit(bundleProduct)}
                 >
                   +
                 </button>
