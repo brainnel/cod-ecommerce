@@ -1,5 +1,6 @@
 // Active invites refreshed from the 2026-11-03 workbook. Remove full groups from this pool.
-// Temporarily paused on 2026-10-29: VIP 7, 14, 18, 21, 22, 24, 27, 28.
+// VIP 14 and 28 restored with owner approval on 2026-11-03.
+// Still paused: VIP 7, 18, 21, 22, 24, 27.
 // Restore only after the owner confirms recovery; original invites remain in Git history.
 export const WHATSAPP_CUSTOMER_GROUPS = [
   { id: 'vip-6', url: 'https://chat.whatsapp.com/GQ9QZYGU5flEs89cMGgZbR' },
@@ -9,6 +10,7 @@ export const WHATSAPP_CUSTOMER_GROUPS = [
   { id: 'vip-11', url: 'https://chat.whatsapp.com/KdhaTxeQqNc3isDTJv0otu' },
   { id: 'vip-12', url: 'https://chat.whatsapp.com/KHgeQor7H5sEwcXhdTjw6J' },
   { id: 'vip-13', url: 'https://chat.whatsapp.com/EVZ4b4KWATKID7lJWdXLIa' },
+  { id: 'vip-14', url: 'https://chat.whatsapp.com/FE3anudbW1R0EfXrT8kbCU' },
   { id: 'vip-15', url: 'https://chat.whatsapp.com/FZ05Ezu0GQbEVlgMTCYQrU' },
   { id: 'vip-16', url: 'https://chat.whatsapp.com/Lbll8XiUvYP0AOjlowGzpt' },
   { id: 'vip-17', url: 'https://chat.whatsapp.com/EwO6DR3u1eFCJCOVonhwpG' },
@@ -17,6 +19,7 @@ export const WHATSAPP_CUSTOMER_GROUPS = [
   { id: 'vip-23', url: 'https://chat.whatsapp.com/HXem9u10sTf8l8LQ9LzW1k' },
   { id: 'vip-25', url: 'https://chat.whatsapp.com/IvQOCCZEkP4GbNLTd3R1ld' },
   { id: 'vip-26', url: 'https://chat.whatsapp.com/DjjeJQDAstB6a8UkT3Mdai' },
+  { id: 'vip-28', url: 'https://chat.whatsapp.com/BZ384nEiPATHA6cPlY03oG' },
   { id: 'vip-29', url: 'https://chat.whatsapp.com/G18xd22mAyo0ylyadLNJCW' },
   { id: 'vip-30', url: 'https://chat.whatsapp.com/DeQFc844fGwHCVUzHmc8Rb' },
   { id: 'vip-31', url: 'https://chat.whatsapp.com/DxvIO3CNo2uFEyOcHGMUdY' },
