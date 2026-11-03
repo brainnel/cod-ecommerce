@@ -1,15 +1,17 @@
 import { useLocation, useNavigate } from 'react-router-dom'
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   FiCheck,
   FiChevronDown,
   FiCreditCard,
   FiTruck,
 } from 'react-icons/fi'
-import { FaWhatsapp } from 'react-icons/fa'
 import { appDownloadAPI } from '../services/api'
 import { trackCheckoutEvent } from '../services/checkoutFunnelAnalytics'
 import { getWhatsAppCustomerGroup, WHATSAPP_GROUP_CLICK_EVENT } from '../config/customerCommunity'
+import { buildApiUrl } from '../config/api.config'
+import { startCustomerCommunitySync } from '../services/customerCommunity'
+import WhatsAppCommunity from '../components/WhatsAppCommunity'
 import './OrderSuccessPage.css'
 
 const FALLBACK_DOWNLOAD_LINKS = {
@@ -129,10 +131,21 @@ const OrderSuccessPage = () => {
     [location.state, previewState, cachedInitialSuccessState]
   )
   const { product, quantity, userInfo, selectedLocation, totalPrice, orderResponse } = orderSuccessState
+  const [whatsappGroups, setWhatsAppGroups] = useState([])
   const whatsappGroup = getWhatsAppCustomerGroup({
     phone: userInfo?.phone,
-    orderId: orderResponse?.order_no || orderResponse?.order_id
+    orderId: orderResponse?.order_no || orderResponse?.order_id,
+    groups: whatsappGroups,
   })
+
+  useEffect(() => {
+    if (!product || !quantity || !userInfo || !selectedLocation) return
+    const sync = startCustomerCommunitySync({
+      url: buildApiUrl('/api/customer-community'),
+      onGroups: setWhatsAppGroups,
+    })
+    return () => sync.stop()
+  }, [product, quantity, userInfo, selectedLocation])
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
@@ -198,6 +211,7 @@ const OrderSuccessPage = () => {
   }
 
   const handleWhatsAppGroup = () => {
+    if (!whatsappGroup) return
     // Preserve the confirmation page when the customer returns from WhatsApp.
     if (!previewState) saveCachedOrderSuccessState(orderSuccessState)
     trackSuccessPageAction(WHATSAPP_GROUP_CLICK_EVENT, { whatsapp_group_id: whatsappGroup.id })
@@ -234,13 +248,7 @@ const OrderSuccessPage = () => {
             <p>Merci pour votre confiance.</p>
           </section>
 
-          <section className="os-community" aria-labelledby="os-community-title">
-            <h2 id="os-community-title">Le groupe clients Brainnel</h2>
-            <p>Nouveautés et offres clients, sur WhatsApp.</p>
-            <a className="os-join-group" href={whatsappGroup.url} onClick={handleWhatsAppGroup} aria-label="Rejoindre le groupe WhatsApp Brainnel">
-              <FaWhatsapp aria-hidden="true" /><span>Rejoindre le groupe</span>
-            </a>
-          </section>
+          <WhatsAppCommunity group={whatsappGroup} onJoin={handleWhatsAppGroup} />
 
           <section className="os-delivery" aria-label="Livraison et paiement">
             <div><FiTruck aria-hidden="true" /><p><strong>Livraison gratuite sous 48 h</strong><span>À domicile, à Abidjan. Le livreur vous appellera.</span></p></div>

@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { getWhatsAppCustomerGroup, WHATSAPP_CUSTOMER_GROUPS } from '../src/config/customerCommunity.js'
+import { getWhatsAppCustomerGroup, parseCustomerCommunityGroups } from '../src/config/customerCommunity.js'
 
-test('active URLs match the 2026-11-03 workbook including the two approved recovered groups', () => {
-  const expectedInvites = [
+// The initial live pool is test data only, never a production fallback.
+const expectedInvites = [
     [6, 'GQ9QZYGU5flEs89cMGgZbR'], [8, 'KFRHTaa2xXRCfIb6zUJ7DO'],
     [9, 'DhVmBef4cHKBjMTASXgJih'], [10, 'GECixpFrwyhFZPQhpL8fN6'],
     [11, 'KdhaTxeQqNc3isDTJv0otu'], [12, 'KHgeQor7H5sEwcXhdTjw6J'],
@@ -17,9 +17,13 @@ test('active URLs match the 2026-11-03 workbook including the two approved recov
     [30, 'DeQFc844fGwHCVUzHmc8Rb'], [31, 'DxvIO3CNo2uFEyOcHGMUdY'],
     [32, 'G976iLIGILM4Zv9CQxQRm8'],
   ]
-  assert.deepEqual(WHATSAPP_CUSTOMER_GROUPS, expectedInvites.map(([number, invite]) => ({
+const WHATSAPP_CUSTOMER_GROUPS = expectedInvites.map(([number, invite]) => ({
     id: `vip-${number}`, url: `https://chat.whatsapp.com/${invite}`
-  })))
+  }))
+const select = (input = {}) => getWhatsAppCustomerGroup({ ...input, groups: WHATSAPP_CUSTOMER_GROUPS })
+
+test('live response validates and numeric sorting preserves the original 21-group assignment', () => {
+  assert.deepEqual(parseCustomerCommunityGroups({ groups: [...WHATSAPP_CUSTOMER_GROUPS].reverse() }), WHATSAPP_CUSTOMER_GROUPS)
 })
 
 test('active pool contains only the 21 approved groups, excluding six paused groups and the full group', () => {
@@ -40,18 +44,18 @@ test('active pool contains only the 21 approved groups, excluding six paused gro
 })
 
 test('phone formatting, country prefix and later orders keep the same assignment', () => {
-  const expected = getWhatsAppCustomerGroup({ phone: '0700000123', orderId: 'FL-1' })
+  const expected = select({ phone: '0700000123', orderId: 'FL-1' })
   for (const phone of ['0700000123', '07 00 00 01 23', '+2250700000123', '2250700000123', '002250700000123']) {
-    assert.equal(getWhatsAppCustomerGroup({ phone, orderId: 'BD-2' }), expected)
+    assert.equal(select({ phone, orderId: 'BD-2' }), expected)
   }
 })
 
 test('missing phone uses a stable order fallback and never the retired invite', () => {
   for (const input of [{ orderId: 'FL-123' }, { phone: '', orderId: 'BD-456' }, {}, undefined]) {
-    assert.equal(getWhatsAppCustomerGroup(input), getWhatsAppCustomerGroup(input))
-    assert.ok(WHATSAPP_CUSTOMER_GROUPS.includes(getWhatsAppCustomerGroup(input)))
+    assert.equal(select(input), select(input))
+    assert.ok(WHATSAPP_CUSTOMER_GROUPS.includes(select(input)))
   }
-  const groups = new Set(Array.from({ length: 1000 }, (_, i) => getWhatsAppCustomerGroup({ orderId: `FL-${i}` }).id))
+  const groups = new Set(Array.from({ length: 1000 }, (_, i) => select({ orderId: `FL-${i}` }).id))
   assert.equal(groups.size, 21)
 })
 
@@ -62,11 +66,28 @@ test('sequential and dispersed customer numbers spread across all groups within 
     for (let i = 0; i < sampleSize; i += 1) {
       const suffix = sequence === 'sequential' ? i : (Math.imul(i, 7919) >>> 0) % 100000000
       const phone = `${['01', '05', '07'][i % 3]}${String(suffix).padStart(8, '0')}`
-      counts[getWhatsAppCustomerGroup({ phone }).id] += 1
+      counts[select({ phone }).id] += 1
     }
     for (const [id, count] of Object.entries(counts)) {
       const expected = sampleSize / WHATSAPP_CUSTOMER_GROUPS.length
       assert.ok(Math.abs(count - expected) < expected * 0.15, `${sequence} ${id}: ${count}`)
     }
   }
+})
+
+test('empty pool is intentional and there is no bundled fallback', () => {
+  assert.deepEqual(parseCustomerCommunityGroups({ groups: [] }), [])
+  assert.equal(getWhatsAppCustomerGroup({ phone: '0700000123', groups: [] }), null)
+  assert.equal(getWhatsAppCustomerGroup({ phone: '0700000123' }), null)
+  assert.equal(getWhatsAppCustomerGroup(), null)
+})
+
+test('malformed response, unsafe URL and duplicate IDs or invites reject the whole snapshot', () => {
+  const first = WHATSAPP_CUSTOMER_GROUPS[0]
+  for (const payload of [null, {}, { groups: null }, { groups: [null] },
+    { groups: [first, { ...first, url: WHATSAPP_CUSTOMER_GROUPS[1].url }] },
+    { groups: [first, { ...first, id: 'vip-999' }] },
+    ...['javascript:alert(1)', 'https://evil.example/' + 'a'.repeat(22), first.url + '?x=1', first.url.toLowerCase() + '/'].map(url => ({ groups: [{ ...first, url }] })),
+    ...['vip-0', 'vip-01', 'vip--1', 'vip-9007199254740992', '<b>1</b>'].map(id => ({ groups: [{ ...first, id }] })),
+  ]) assert.throws(() => parseCustomerCommunityGroups(payload), /Invalid community configuration/)
 })

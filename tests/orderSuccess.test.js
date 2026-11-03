@@ -5,10 +5,11 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { MemoryRouter } from 'react-router-dom'
 import { createServer } from 'vite'
-import { getWhatsAppCustomerGroup, WHATSAPP_GROUP_CLICK_EVENT } from '../src/config/customerCommunity.js'
+import { WHATSAPP_GROUP_CLICK_EVENT } from '../src/config/customerCommunity.js'
 
 let server
 let OrderSuccessPage
+let WhatsAppCommunity
 const example = {
   product: { product_id: 'test-only', name_fr: 'Produit de démonstration', price: 10500, image_url: ['/logo.png'] },
   quantity: 1,
@@ -25,6 +26,7 @@ before(async () => {
     logLevel: 'error'
   })
   OrderSuccessPage = (await server.ssrLoadModule('/src/pages/OrderSuccessPage.jsx')).default
+  WhatsAppCommunity = (await server.ssrLoadModule('/src/components/WhatsAppCommunity.jsx')).default
 })
 after(async () => { await server?.close() })
 
@@ -37,14 +39,23 @@ test('customer group click keeps the existing analytics event', () => {
   assert.ok(WHATSAPP_GROUP_CLICK_EVENT.length <= 50)
 })
 
-test('production component puts the real group link before delivery and removes rejected copy', () => {
+test('confirmation renders before optional configuration loads, without any hardcoded invite', () => {
   const html = render(example)
-  assert.ok(html.includes(`href="${getWhatsAppCustomerGroup({ phone: example.userInfo.phone }).url}"`))
-  assert.ok(html.indexOf('os-community') < html.indexOf('os-delivery'))
-  assert.equal((html.match(/class="os-join-group"/g) || []).length, 1)
+  assert.match(html, /Commande confirmée/)
+  assert.doesNotMatch(html, /os-join-group|chat.whatsapp.com/)
   assert.doesNotMatch(html, /Facultatif|visible des membres|bons plans/)
   assert.match(html, /Service client/)
   assert.match(html, /L’app Brainnel/)
+})
+
+test('configured community uses its live link and retains the approved minimal design', () => {
+  const url = 'https://chat.whatsapp.com/GQ9QZYGU5flEs89cMGgZbR'
+  const html = renderToStaticMarkup(createElement(WhatsAppCommunity, { group: { id: 'vip-6', url }, onJoin: () => {} }))
+  assert.ok(html.includes(`href="${url}"`))
+  assert.equal((html.match(/class="os-join-group"/g) || []).length, 1)
+  assert.match(html, /Le groupe clients Brainnel|Nouveautés et offres clients/)
+  assert.doesNotMatch(html, /Facultatif|visible des membres|bons plans/)
+  assert.equal(renderToStaticMarkup(createElement(WhatsAppCommunity, { group: null })), '')
 })
 
 test('single product retains the full order and recipient information under details', () => {
@@ -85,8 +96,7 @@ test('recent session cache restores the confirmation after returning from WhatsA
     const html = render(undefined)
     assert.match(html, /Commande confirmée/)
     assert.match(html, /FL-TEST-ONLY/)
-    assert.match(html, /os-join-group/)
-    assert.ok(html.includes(`href="${getWhatsAppCustomerGroup({ phone: example.userInfo.phone }).url}"`))
+    assert.doesNotMatch(html, /os-join-group|chat.whatsapp.com/)
     assert.match(render({ ...example, orderResponse: { order_no: 'FL-NEWER-ORDER' } }), /FL-NEWER-ORDER/)
   } finally {
     if (previousWindow === undefined) delete globalThis.window
@@ -110,8 +120,10 @@ test('expired or malformed cached state does not pretend an order succeeded', (t
 
 test('completion page never imports or emits Purchase and keeps a normal non-blocking anchor', async () => {
   const source = await readFile(new URL('../src/pages/OrderSuccessPage.jsx', import.meta.url), 'utf8')
+  const communitySource = await readFile(new URL('../src/components/WhatsAppCommunity.jsx', import.meta.url), 'utf8')
   assert.doesNotMatch(source, /trackPurchase|facebookConversions|fbq\(/)
-  assert.match(source, /href=\{whatsappGroup.url\} onClick=\{handleWhatsAppGroup\}/)
+  assert.match(communitySource, /href=\{group.url\} onClick=\{onJoin\}/)
+  assert.ok(source.indexOf('<WhatsAppCommunity') < source.indexOf('<section className="os-delivery"'))
   assert.match(source, /saveCachedOrderSuccessState\(orderSuccessState\)[\s\S]*trackSuccessPageAction\(WHATSAPP_GROUP_CLICK_EVENT, \{ whatsapp_group_id: whatsappGroup.id \}\)/)
   assert.match(source, /ORDER_SUCCESS_STATE_TTL_MS = 2 \* 60 \* 60 \* 1000/)
 })
