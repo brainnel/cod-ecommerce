@@ -1,26 +1,26 @@
-// Active invites from the 2026-10-28 workbook. Remove full groups from this pool.
+// Active invites refreshed from the 2026-11-03 workbook. Remove full groups from this pool.
 // Temporarily paused on 2026-10-29: VIP 7, 14, 18, 21, 22, 24, 27, 28.
 // Restore only after the owner confirms recovery; original invites remain in Git history.
 export const WHATSAPP_CUSTOMER_GROUPS = [
-  { id: 'vip-6', url: 'https://chat.whatsapp.com/G7CKqkn92AfGbU6kVh2MXD' },
-  { id: 'vip-8', url: 'https://chat.whatsapp.com/FGnkyIcWtxG7lrMDsPRnC4' },
-  { id: 'vip-9', url: 'https://chat.whatsapp.com/GBqC7svSbSy7JrHzFnQ4h0' },
-  { id: 'vip-10', url: 'https://chat.whatsapp.com/G3XB2CBwxK8Is1eb5YhChR' },
-  { id: 'vip-11', url: 'https://chat.whatsapp.com/H7Iab2YCFvACLMNdofjlFs' },
-  { id: 'vip-12', url: 'https://chat.whatsapp.com/KDdA3JctISRLDrKWD9ttDl' },
-  { id: 'vip-13', url: 'https://chat.whatsapp.com/CYfyXzZxCWr0WaKXu2LpA4' },
-  { id: 'vip-15', url: 'https://chat.whatsapp.com/Hys5iZTQKBv9fssdixSAGC' },
-  { id: 'vip-16', url: 'https://chat.whatsapp.com/HZr6qMh6sJF8H6NnFbTv0F' },
-  { id: 'vip-17', url: 'https://chat.whatsapp.com/JFy4BbQmacg09xJP8k4oCB' },
-  { id: 'vip-19', url: 'https://chat.whatsapp.com/CkbMOME6ywF5e2UHmm9uNW' },
-  { id: 'vip-20', url: 'https://chat.whatsapp.com/H7lUYB9A063HI4KwCKlU8s' },
-  { id: 'vip-23', url: 'https://chat.whatsapp.com/ICJd1IZM4AN9ubRwoqHYqW' },
-  { id: 'vip-25', url: 'https://chat.whatsapp.com/ImADRrB9o6a9YqL4on0GbU' },
-  { id: 'vip-26', url: 'https://chat.whatsapp.com/K0Hp90WX0JL9e1Z3zPkwaq' },
-  { id: 'vip-29', url: 'https://chat.whatsapp.com/E2bJ2SyBq9pKNPjozPkWAZ' },
-  { id: 'vip-30', url: 'https://chat.whatsapp.com/EP3ge4cbTwkFArsJasqBhc' },
-  { id: 'vip-31', url: 'https://chat.whatsapp.com/K4jJ3bsWfFk03u8L0jYrgi' },
-  { id: 'vip-32', url: 'https://chat.whatsapp.com/FNa3m4YhOGE5eIDzTgVbOI' },
+  { id: 'vip-6', url: 'https://chat.whatsapp.com/GQ9QZYGU5flEs89cMGgZbR' },
+  { id: 'vip-8', url: 'https://chat.whatsapp.com/KFRHTaa2xXRCfIb6zUJ7DO' },
+  { id: 'vip-9', url: 'https://chat.whatsapp.com/DhVmBef4cHKBjMTASXgJih' },
+  { id: 'vip-10', url: 'https://chat.whatsapp.com/GECixpFrwyhFZPQhpL8fN6' },
+  { id: 'vip-11', url: 'https://chat.whatsapp.com/KdhaTxeQqNc3isDTJv0otu' },
+  { id: 'vip-12', url: 'https://chat.whatsapp.com/KHgeQor7H5sEwcXhdTjw6J' },
+  { id: 'vip-13', url: 'https://chat.whatsapp.com/EVZ4b4KWATKID7lJWdXLIa' },
+  { id: 'vip-15', url: 'https://chat.whatsapp.com/FZ05Ezu0GQbEVlgMTCYQrU' },
+  { id: 'vip-16', url: 'https://chat.whatsapp.com/Lbll8XiUvYP0AOjlowGzpt' },
+  { id: 'vip-17', url: 'https://chat.whatsapp.com/EwO6DR3u1eFCJCOVonhwpG' },
+  { id: 'vip-19', url: 'https://chat.whatsapp.com/Jv4xazim5Sd8F66kajTGGl' },
+  { id: 'vip-20', url: 'https://chat.whatsapp.com/EwMuUvP69r8IMOBGLRoc3f' },
+  { id: 'vip-23', url: 'https://chat.whatsapp.com/HXem9u10sTf8l8LQ9LzW1k' },
+  { id: 'vip-25', url: 'https://chat.whatsapp.com/IvQOCCZEkP4GbNLTd3R1ld' },
+  { id: 'vip-26', url: 'https://chat.whatsapp.com/DjjeJQDAstB6a8UkT3Mdai' },
+  { id: 'vip-29', url: 'https://chat.whatsapp.com/G18xd22mAyo0ylyadLNJCW' },
+  { id: 'vip-30', url: 'https://chat.whatsapp.com/DeQFc844fGwHCVUzHmc8Rb' },
+  { id: 'vip-31', url: 'https://chat.whatsapp.com/DxvIO3CNo2uFEyOcHGMUdY' },
+  { id: 'vip-32', url: 'https://chat.whatsapp.com/G976iLIGILM4Zv9CQxQRm8' },
 ]
 
 export const WHATSAPP_GROUP_CLICK_EVENT = 'order_success_whatsapp_group_click'

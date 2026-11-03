@@ -2,6 +2,24 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { getWhatsAppCustomerGroup, WHATSAPP_CUSTOMER_GROUPS } from '../src/config/customerCommunity.js'
 
+test('active URLs match the 2026-11-03 workbook without changing group assignments', () => {
+  const expectedInvites = [
+    [6, 'GQ9QZYGU5flEs89cMGgZbR'], [8, 'KFRHTaa2xXRCfIb6zUJ7DO'],
+    [9, 'DhVmBef4cHKBjMTASXgJih'], [10, 'GECixpFrwyhFZPQhpL8fN6'],
+    [11, 'KdhaTxeQqNc3isDTJv0otu'], [12, 'KHgeQor7H5sEwcXhdTjw6J'],
+    [13, 'EVZ4b4KWATKID7lJWdXLIa'], [15, 'FZ05Ezu0GQbEVlgMTCYQrU'],
+    [16, 'Lbll8XiUvYP0AOjlowGzpt'], [17, 'EwO6DR3u1eFCJCOVonhwpG'],
+    [19, 'Jv4xazim5Sd8F66kajTGGl'], [20, 'EwMuUvP69r8IMOBGLRoc3f'],
+    [23, 'HXem9u10sTf8l8LQ9LzW1k'], [25, 'IvQOCCZEkP4GbNLTd3R1ld'],
+    [26, 'DjjeJQDAstB6a8UkT3Mdai'], [29, 'G18xd22mAyo0ylyadLNJCW'],
+    [30, 'DeQFc844fGwHCVUzHmc8Rb'], [31, 'DxvIO3CNo2uFEyOcHGMUdY'],
+    [32, 'G976iLIGILM4Zv9CQxQRm8'],
+  ]
+  assert.deepEqual(WHATSAPP_CUSTOMER_GROUPS, expectedInvites.map(([number, invite]) => ({
+    id: `vip-${number}`, url: `https://chat.whatsapp.com/${invite}`
+  })))
+})
+
 test('active pool contains only the 19 approved groups, excluding eight paused groups and the full group', () => {
   const activeNumbers = [6, 8, 9, 10, 11, 12, 13, 15, 16, 17, 19, 20, 23, 25, 26, 29, 30, 31, 32]
   const pausedInvites = [
