@@ -5,30 +5,8 @@ import './ProductList.css'
 import './BundleList.css'
 
 const PAGE_SIZE = 20
-const BUNDLE_FAKE_DISCOUNT_MIN = 52
-const BUNDLE_FAKE_DISCOUNT_RANGE = 17
 
 const formatPrice = (value) => Number(value || 0).toLocaleString('fr-FR')
-
-const hashString = (value) => {
-  const text = String(value || '')
-  let hash = 0
-  for (let i = 0; i < text.length; i += 1) {
-    hash = ((hash << 5) - hash + text.charCodeAt(i)) | 0
-  }
-  return Math.abs(hash)
-}
-
-const getBundleDisplayDiscount = (bundleId) => (
-  BUNDLE_FAKE_DISCOUNT_MIN + (hashString(bundleId) % BUNDLE_FAKE_DISCOUNT_RANGE)
-)
-
-const getBundleDisplayOriginalPrice = (price, discountPercent) => {
-  const bundlePrice = Number(price || 0)
-  const discountRate = Number(discountPercent || 0) / 100
-  if (!bundlePrice || discountRate <= 0 || discountRate >= 1) return null
-  return Math.round(bundlePrice / (1 - discountRate))
-}
 
 const getBundleCover = (bundle) => (
   bundle?.cover_image_url
@@ -153,8 +131,6 @@ const BundleList = () => {
         {bundles.map((bundle, index) => {
           const isLast = index === bundles.length - 1
           const cover = getBundleCover(bundle)
-          const displayDiscount = getBundleDisplayDiscount(bundle.id)
-          const displayOriginalPrice = getBundleDisplayOriginalPrice(bundle.cfa_price, displayDiscount)
 
           return (
             <div
@@ -178,7 +154,6 @@ const BundleList = () => {
                 ) : (
                   <div className="bundle-image-placeholder">Pack</div>
                 )}
-                <div className="discount-badge">-{displayDiscount}%</div>
                 <div className="bundle-pack-badge">Pack</div>
               </div>
 
@@ -189,9 +164,6 @@ const BundleList = () => {
                 )}
                 <div className="price-section">
                   <div className="current-price">{formatPrice(bundle.cfa_price)} FCFA</div>
-                  {displayOriginalPrice && displayOriginalPrice > Number(bundle.cfa_price || 0) && (
-                    <div className="original-price">{formatPrice(displayOriginalPrice)} FCFA</div>
-                  )}
                 </div>
               </div>
             </div>

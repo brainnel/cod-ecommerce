@@ -88,7 +88,7 @@ before(async()=>{
 })
 after(async()=>{await server?.close()})
 
-test('treatment adds verified facts while preserving supplied price, reference and children',()=>{
+test('treatment adds verified facts while preserving actual price and children without comparison prices',()=>{
   const props={name:'Nom réel',price:8500,referencePrice:12000,children:'Modèle existant'}
   const baseline=renderToStaticMarkup(createElement(ClaritySummary,props))
   assert.doesNotMatch(baseline,/data-product-clarity/)
@@ -96,10 +96,11 @@ test('treatment adds verified facts while preserving supplied price, reference a
     const treatment=renderToStaticMarkup(createElement(ClaritySummary,{...props,highlights:copy}))
     assert.match(treatment,/data-product-clarity="v1"/)
     assert.ok(treatment.includes(copy.headline));assert.ok(treatment.includes(copy.detail))
-    for(const text of ['Nom réel','Modèle existant','8 500','12 000','Paiement','Payez']) {
+    for(const text of ['Nom réel','Modèle existant','8 500','Paiement','Payez']) {
       if(baseline.includes(text)) assert.ok(treatment.includes(text))
     }
     assert.doesNotMatch(treatment,/HD|4K|garanti|Avis clients/)
+    assert.doesNotMatch(treatment,/<(?:s|del)\b|12 000|Référence indicative|Achetés séparément/)
   }
 })
 

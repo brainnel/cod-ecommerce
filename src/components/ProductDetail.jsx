@@ -21,7 +21,6 @@ import {
   trackProductReviewTabClick
 } from '../services/checkoutFunnelAnalytics';
 import { useAdTrackingContext } from '../hooks/useAdTrackingHooks.js';
-import Countdown from './Countdown';
 import QuantityModal from './QuantityModal';
 import ServiceInfo from './ServiceInfo';
 import ProductVariants from './ProductVariants';
@@ -574,10 +573,6 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
     return price.toString();
   };
 
-  const formatDiscount = (off) => {
-    return (off * 100).toFixed(0);
-  };
-
   const handleOrderConfirm = (quantity) => {
     // 这里可以处理订单确认逻辑
     alert(`订单确认！\n产品: ${product.name_fr}\n数量: ${quantity}\n总价: ${product.price * quantity} FCFA`);
@@ -720,11 +715,6 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
                     decoding="async"
                   />
                   {index > 0 && <div className="swiper-lazy-preloader" aria-hidden="true" />}
-                  {!clarityLanding && index === 0 && product.off > 0 && (
-                    <div className="discount-badge">
-                      -{formatDiscount(product.off)}%
-                    </div>
-                  )}
                 </div>
               </SwiperSlide>
             ))}
@@ -734,7 +724,7 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
         <div className="product-purchase-panel" ref={clarityExposureRef}>
           {/* 产品信息 */}
           {clarityLanding ? (
-            <ClaritySummary name={product.name_fr} price={product.price} referencePrice={product.original_price} highlights={productHighlights}>
+            <ClaritySummary name={product.name_fr} price={product.price} highlights={productHighlights}>
               {product.skus?.[0]?.name_fr && product.skus[0].name_fr !== product.name_fr && (
                 <div className="clarity-model"><span>Modèle</span><strong>{product.skus[0].name_fr}</strong></div>
               )}
@@ -747,10 +737,6 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
             {/* 价格信息 */}
             <div className="price-section">
               <div className="current-price">{formatPrice(product.price)} FCFA</div>
-              {product.original_price && product.original_price > product.price && (
-                <div className="original-price">{formatPrice(product.original_price)} FCFA</div>
-              )}
-              <Countdown />
             </div>
 
             {isCheckoutOptimizationVariant && (

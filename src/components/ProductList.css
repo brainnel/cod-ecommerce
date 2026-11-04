@@ -50,20 +50,6 @@
   transform: scale(1.05);
 }
 
-/* 折扣标签 */
-.discount-badge {
-  position: absolute;
-  top: 8px;
-  left: 8px;
-  background: #dc3545;
-  color: white;
-  padding: 4px 8px;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 600;
-  z-index: 2;
-}
-
 /* 产品信息 */
 .product-info {
   padding: 10px;
@@ -101,14 +87,7 @@
   margin-bottom: 2px;
 }
 
-.original-price {
-  font-size: 10px;
-  color: #6c757d;
-  text-decoration: line-through;
-}
-
-.product-card .current-price,
-.product-card .original-price {
+.product-card .current-price {
   white-space: nowrap;
 }
 
@@ -285,9 +264,6 @@
     font-size: 13px;
   }
   
-  .original-price {
-    font-size: 9px;
-  }
 }
 
 @media (max-width: 480px) {
@@ -313,16 +289,6 @@
     font-size: 12px;
   }
   
-  .original-price {
-    font-size: 8px;
-  }
-  
-  .discount-badge {
-    top: 6px;
-    left: 6px;
-    padding: 3px 6px;
-    font-size: 11px;
-  }
 }
 
 @media (min-width: 1024px) {
@@ -359,9 +325,6 @@
     font-size: 18px;
   }
 
-  .original-price {
-    font-size: 12px;
-  }
 
   .loading-more,
   .no-more-data,

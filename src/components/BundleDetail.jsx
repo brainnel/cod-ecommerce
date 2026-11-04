@@ -28,8 +28,7 @@ import { saveCheckoutPaymentState } from '../utils/checkoutPaymentStateCache'
 import { preloadPaymentPage, schedulePaymentPagePreload } from '../utils/preloadRoutes'
 import { getProductImageLoadingPolicy } from '../utils/productImageLoadingPolicy'
 import { clampCheckoutQuantity, getCheckoutQuantityLimit } from '../utils/checkoutQuantity'
-import Countdown from './Countdown'
-import { isClarityLanding, getStoredLandingReviews, getBundleSeparatePurchasePrice, getBundleItemUnitPrice } from '../utils/landingPresentation'
+import { isClarityLanding, getStoredLandingReviews, getBundleItemUnitPrice } from '../utils/landingPresentation'
 import { ClarityHeader, ClaritySummary, ClarityPurchaseBar, ClarityAftercare, ClarityReviews } from './landing/LandingClarity'
 
 import 'swiper/css'
@@ -40,8 +39,6 @@ import './BundleDetail.css'
 const BUNDLE_UNAVAILABLE_FR = "Ce pack n'est plus disponible. Veuillez consulter d'autres produits."
 const GENERIC_BUNDLE_FETCH_ERROR_FR = 'Échec de récupération des informations du pack'
 const MAX_PROMOTED_DETAIL_IMAGES = 4
-const BUNDLE_FAKE_DISCOUNT_MIN = 52
-const BUNDLE_FAKE_DISCOUNT_RANGE = 17
 
 const getBundleFetchErrorMessage = (err) => {
   if (err?.response?.status === 404) {
@@ -53,26 +50,6 @@ const getBundleFetchErrorMessage = (err) => {
 const formatFcfa = (value) => {
   const num = Number(value || 0)
   return num.toLocaleString('fr-FR')
-}
-
-const hashString = (value) => {
-  const text = String(value || '')
-  let hash = 0
-  for (let i = 0; i < text.length; i += 1) {
-    hash = ((hash << 5) - hash + text.charCodeAt(i)) | 0
-  }
-  return Math.abs(hash)
-}
-
-const getBundleDisplayDiscount = (bundleId) => (
-  BUNDLE_FAKE_DISCOUNT_MIN + (hashString(bundleId) % BUNDLE_FAKE_DISCOUNT_RANGE)
-)
-
-const getBundleDisplayOriginalPrice = (price, discountPercent) => {
-  const bundlePrice = Number(price || 0)
-  const discountRate = Number(discountPercent || 0) / 100
-  if (!bundlePrice || discountRate <= 0 || discountRate >= 1) return null
-  return Math.round(bundlePrice / (1 - discountRate))
 }
 
 const getBundleItemDisplayName = (item) => (
@@ -375,8 +352,6 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
     ...coverImages.map((src) => ({ src, type: 'main' })),
     ...promotedDetailImages.map((src) => ({ src, type: 'detail-preview' }))
   ]
-  const displayDiscount = getBundleDisplayDiscount(bundle.id)
-  const displayOriginalPrice = getBundleDisplayOriginalPrice(bundle.cfa_price, displayDiscount)
   const bundleGalleryAutoplay = galleryImages.length > 1 && imageLoadingPolicy.autoplayEnabled
     ? {
         delay: 3500,
@@ -411,7 +386,7 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
             {clarityLanding ? <div className="bundle-item-copy">
               <div className="bundle-item-name">{itemDisplayName}</div>
               {unitPrice !== null && <div className="bundle-item-unit-price" id={priceDescriptionId}>
-                Achat séparé : <strong>{formatFcfa(unitPrice)} FCFA</strong>
+                Prix unitaire : <strong>{formatFcfa(unitPrice)} FCFA</strong>
               </div>}
             </div> : <div className="bundle-item-name">{itemDisplayName}</div>}
             <div className="bundle-item-qty">×{item.quantity || 1}</div>
@@ -489,11 +464,6 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
                       decoding="async"
                     />
                     {index > 0 && <div className="swiper-lazy-preloader" aria-hidden="true" />}
-                    {!clarityLanding && index === 0 && displayDiscount > 0 && (
-                      <div className="discount-badge">
-                        -{displayDiscount}%
-                      </div>
-                    )}
                   </div>
                 </SwiperSlide>
               ))}
@@ -507,7 +477,7 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
 
         <div className="product-purchase-panel">
           {clarityLanding ? (
-            <ClaritySummary name={bundle.title_fr} price={bundle.cfa_price} referencePrice={getBundleSeparatePurchasePrice(bundle)} isBundle>
+            <ClaritySummary name={bundle.title_fr} price={bundle.cfa_price} isBundle>
               {quantitySelector}
             </ClaritySummary>
           ) : <div className="product-info">
@@ -515,10 +485,6 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
 
             <div className="price-section">
               <div className="current-price">{formatFcfa(bundle.cfa_price)} FCFA</div>
-              {displayOriginalPrice && displayOriginalPrice > Number(bundle.cfa_price || 0) && (
-                <div className="original-price">{formatFcfa(displayOriginalPrice)} FCFA</div>
-              )}
-              <Countdown />
             </div>
 
             {isCheckoutOptimizationVariant && (

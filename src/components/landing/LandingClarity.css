@@ -89,9 +89,6 @@
 .landing-clarity .clarity-price { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; margin-top: 12px; font-variant-numeric: tabular-nums; }
 .landing-clarity .clarity-price strong { font-size: 32px; font-weight: 800; letter-spacing: -1.2px; line-height: 1.1; }
 .landing-clarity .clarity-price > span { font-size: 13px; font-weight: 650; color: var(--clarity-muted); }
-.landing-clarity .clarity-reference-price { display: flex; flex-direction: column; align-self: center; gap: 2px; margin-left: 8px; color: var(--clarity-muted); font-weight: 400; letter-spacing: 0; line-height: 1.3; }
-.landing-clarity .clarity-reference-price > span { font-size: 10px; }
-.landing-clarity .clarity-reference-price s { font-size: 15px; text-decoration-thickness: 1px; white-space: nowrap; }
 .landing-clarity .clarity-promises { margin-top: 14px; display: grid; gap: 7px; }
 .landing-clarity .clarity-promises p { display: flex; align-items: flex-start; gap: 8px; margin: 0; font-size: 12px; font-weight: 600; line-height: 1.5; color: var(--clarity-green); }
 .landing-clarity .clarity-promises svg { width: 17px; height: 17px; margin-top: 1px; flex-shrink: 0; }

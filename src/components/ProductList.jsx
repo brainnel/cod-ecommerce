@@ -17,11 +17,6 @@ const ProductList = ({ categoryId }) => {
     return price.toString()
   }
 
-  // 格式化折扣
-  const formatDiscount = (off) => {
-    return (off * 100).toFixed(0)
-  }
-
   // 加载产品数据 - 使用useCallback包装
   const loadProducts = useCallback(async (pageNum = 1, isNewCategory = false) => {
     try {
@@ -168,11 +163,6 @@ const ProductList = ({ categoryId }) => {
                   loading="lazy"
                   decoding="async"
                 />
-                {product.off > 0 && (
-                  <div className="discount-badge">
-                    -{formatDiscount(product.off)}%
-                  </div>
-                )}
               </div>
               
               <div className="product-info">
@@ -180,9 +170,6 @@ const ProductList = ({ categoryId }) => {
                 
                 <div className="price-section">
                   <div className="current-price">{formatPrice(product.price)} FCFA</div>
-                  {product.original_price && product.original_price > product.price && (
-                    <div className="original-price">{formatPrice(product.original_price)} FCFA</div>
-                  )}
                 </div>
 
               </div>

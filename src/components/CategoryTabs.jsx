@@ -99,7 +99,7 @@ const CategoryTabs = ({ onCategoryChange, onSpecialViewChange, selectedCategoryI
                 data-category-id="packs"
                 data-category-key="packs"
               >
-                Packs promo
+                Packs
               </button>
             )}
           </Fragment>

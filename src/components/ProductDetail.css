@@ -209,21 +209,6 @@
   object-position: center;
 }
 
-/* 折扣标签 */
-.discount-badge {
-  position: absolute;
-  top: 12px;
-  left: 12px;
-  background: linear-gradient(135deg, #ff6b35, #f7931e);
-  color: white;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: bold;
-  z-index: 10;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-}
-
 /* Swiper 分页器样式 */
 .main-swiper .swiper-pagination {
   bottom: 12px;
@@ -281,12 +266,6 @@
   font-size: 24px;
   font-weight: bold;
   color: #ff6b35;
-}
-
-.original-price {
-  font-size: 16px;
-  color: #999;
-  text-decoration: line-through;
 }
 
 .delivery-benefit-pill {
@@ -816,10 +795,6 @@
 
   .product-detail .current-price {
     font-size: 32px;
-  }
-
-  .product-detail .original-price {
-    font-size: 17px;
   }
 
   .product-detail .service-info {

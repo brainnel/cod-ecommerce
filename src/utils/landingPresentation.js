@@ -8,34 +8,11 @@ const positiveAmount = (value) => {
   return Number.isFinite(amount) && amount > 0 ? amount : null
 }
 
-// The single-product catalog value is indicative, not verified price history.
-// Do not invent a fallback or show two prices that format to the same FCFA value.
-export const getLandingReferencePrice = (price, referencePrice) => {
-  const current = positiveAmount(price)
-  const reference = positiveAmount(referencePrice)
-  return current !== null && reference !== null && Math.round(current) > 0
-    && Math.round(reference) > Math.round(current) ? reference : null
-}
-
 export const getBundleItemUnitPrice = (item) => {
   const price = positiveAmount(item?.unit_price)
   if (price === null) return null
   const rounded = Math.ceil(price / 500) * 500
   return Number.isFinite(rounded) ? rounded : null
-}
-
-export const getBundleSeparatePurchasePrice = (bundle) => {
-  if (!Array.isArray(bundle?.items) || !bundle.items.length) return null
-  let total = 0
-  for (const item of bundle.items) {
-    const unitPrice = getBundleItemUnitPrice(item)
-    const quantity = positiveAmount(item?.quantity)
-    if (unitPrice === null || !Number.isSafeInteger(quantity)) return null
-    // Match the single-product API's per-SKU upward rounding, before quantity.
-    // Missing component prices cannot silently contribute zero to the total.
-    total += unitPrice * quantity
-  }
-  return getLandingReferencePrice(bundle.cfa_price, total)
 }
 
 // Production uses the approved design on every domain. Only loopback previews
