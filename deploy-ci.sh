@@ -3,7 +3,7 @@
 # CI/CD 部署脚本 - 适用于 GitHub Actions
 # 用于自动化部署 Brainnel.com
 
-set -e
+set -euo pipefail
 
 echo "🚀 开始 CI/CD 自动部署..."
 
@@ -15,13 +15,24 @@ fi
 
 cd /home/admin/projects/cod-ecommerce
 
+for REQUIRED_COMMAND in git npm rsync curl flock; do
+    command -v "$REQUIRED_COMMAND" >/dev/null || { echo "❌ 缺少命令: $REQUIRED_COMMAND"; exit 1; }
+done
+# Serialize manual/script deployments as well as the workflow concurrency guard.
+exec 9>.git/brainnel-deploy.lock
+flock -n 9 || { echo "❌ 已有前端部署正在运行，请稍后重试"; exit 1; }
+
 echo "📥 拉取最新代码..."
-# 强制更新本地代码以处理强制推送的情况
 git fetch origin main
-git reset --hard origin/main
+if [ -n "$(git status --porcelain)" ]; then
+    echo "❌ 工作区有本地修改，停止部署并保留全部修改；请先人工核对。"
+    git status --short
+    exit 1
+fi
+git merge --ff-only origin/main
 
 echo "📦 安装/更新依赖..."
-npm install --production=false
+npm ci --include=dev
 
 echo "🏗️ 构建生产版本..."
 npm run build:prod
@@ -33,30 +44,47 @@ if [ ! -d "dist" ] || [ ! -f "dist/index.html" ]; then
 fi
 
 # 双站点发布: 同一份 dist 发布到两个域名的 webroot
-SITES="/var/www/brainnel.com /var/www/brainnel-vite.com"
-BACKUP_TS=$(date +%Y%m%d_%H%M%S)
+SITES=(/var/www/brainnel.com /var/www/brainnel-vite.com)
+BACKUP_TS="$(date +%Y%m%d_%H%M%S)_$$"
+INDEX_TMP=""
+cleanup_index_tmp() {
+    # Only remove the exact temporary index created by mktemp, never a webroot.
+    case "$INDEX_TMP" in
+        /var/www/brainnel.com/.index.html.deploy.*|/var/www/brainnel-vite.com/.index.html.deploy.*)
+            sudo rm -f -- "$INDEX_TMP" ;;
+    esac
+}
+trap cleanup_index_tmp EXIT
 
-for SITE in $SITES; do
+# Check both destinations and nginx before publishing anything.
+for SITE in "${SITES[@]}"; do
     if [ ! -d "$SITE" ]; then
-        echo "⚠️  $SITE 不存在，跳过（如为新站点请先在服务器创建目录和 nginx 配置）"
-        continue
+        echo "❌ $SITE 不存在，停止双站点发布；请先创建目录和 nginx 配置。"
+        exit 1
     fi
+done
+sudo nginx -t
+
+for SITE in "${SITES[@]}"; do
     echo "📁 备份 $SITE ..."
-    sudo cp -r "$SITE" "$SITE.backup.$BACKUP_TS"
+    sudo cp -a -- "$SITE" "$SITE.backup.$BACKUP_TS"
 
-    echo "🚚 部署新版本到 $SITE ..."
-    sudo rm -rf "$SITE"/*
-    sudo cp -r ./dist/* "$SITE"/
+    echo "🚚 先发布资源到 $SITE（保留旧 hash 资源和无关文件）..."
+    # No --delete / --inplace: old tabs retain their lazy chunks, and rsync
+    # finishes files with a rename instead of exposing partially copied files.
+    sudo rsync -a --delay-updates --exclude='/index.html' \
+        --chown=www-data:www-data --chmod=D755,F644 ./dist/ "$SITE/"
 
-    echo "🔐 设置权限 $SITE ..."
-    sudo chown -R www-data:www-data "$SITE"
-    sudo chmod -R 755 "$SITE"
+    echo "🔀 最后原子替换 $SITE/index.html ..."
+    # mktemp lives in the destination directory: mv is a same-filesystem rename.
+    # Until the rename succeeds, readers continue seeing the previous entrypoint.
+    INDEX_TMP=$(sudo mktemp "$SITE/.index.html.deploy.XXXXXXXX")
+    sudo install -o www-data -g www-data -m 644 ./dist/index.html "$INDEX_TMP"
+    sudo mv -fT -- "$INDEX_TMP" "$SITE/index.html"
+    INDEX_TMP=""
 
-    # 每个站点只保留最近 5 份备份
-    ls -1dt "$SITE".backup.* 2>/dev/null | tail -n +6 | while read -r OLD; do
-        sudo rm -rf "$OLD"
-        echo "🧹 清理旧备份: $OLD"
-    done
+    # Backups and old hashed assets are deliberately retained. Do not prune
+    # webroot contents here; any retention cleanup needs a separate reviewed plan.
 done
 
 echo "🔄 验证并重新加载 Nginx..."

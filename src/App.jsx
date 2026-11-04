@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react'
 import { Routes, Route } from 'react-router-dom'
 import HomePage from './pages/HomePage'
 import ProductPage from './pages/ProductPage'
+import RouteRecoveryBoundary from './components/RouteRecoveryBoundary'
 import './components/ProductDetail.css'
 import './App.css'
 
@@ -23,7 +24,7 @@ const routeFallback = (
 function App() {
   return (
     <div className="App">
-      <Suspense fallback={routeFallback}>
+      <RouteRecoveryBoundary><Suspense fallback={routeFallback}>
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/product/:productId" element={<ProductPage />} />
@@ -36,7 +37,7 @@ function App() {
           <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
           <Route path="/terms-of-use" element={<TermsOfUsePage />} />
         </Routes>
-      </Suspense>
+      </Suspense></RouteRecoveryBoundary>
     </div>
   )
 }

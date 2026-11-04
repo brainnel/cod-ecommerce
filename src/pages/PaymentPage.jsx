@@ -1,13 +1,18 @@
 import { lazy, Suspense, useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { FiCreditCard, FiMapPin, FiSearch, FiX } from 'react-icons/fi'
-import { districtAPI, orderAPI, bundleAPI } from '../services/api'
+import { orderAPI, bundleAPI } from '../services/api'
+import { buildApiUrl } from '../config/api.config'
+import { flattenDistrictCities, loadCheckoutDistricts } from '../services/checkoutDistricts'
+import { getCheckoutGuidance, getDistrictAddressExample } from '../utils/checkoutGuidance'
+import { getCheckoutOptimizationAssignment } from '../utils/checkoutOptimizationExperiment'
 import { useAdId } from '../hooks/useAdTrackingHooks.js'
 import { buildMetaPurchaseContext, getClientInfo, trackPurchaseEvent } from '../services/facebookConversions'
 import { trackGoogleAdsPurchaseConversion } from '../services/googleAdsConversions'
 import {
   buildCheckoutProductProperties,
   getCheckoutQuantityExperiment,
+  getCheckoutDeviceId,
   getCheckoutSessionId,
   isAddressFirstCheckoutVariant,
   isCodTrustCheckoutVariant,
@@ -217,6 +222,10 @@ const PaymentPage = () => {
     [routeCheckoutQuantityExperiment]
   )
   const adId = useAdId()
+  const optimization = useMemo(() => getCheckoutOptimizationAssignment({
+    deviceId: getCheckoutDeviceId(), productId: product?.product_id
+  }), [product?.product_id])
+  const guidanceExposedRef = useRef(false)
   const checkoutSessionIdRef = useRef(routeCheckoutSessionId || null)
   const inlineQuantityConfirmedRef = useRef(Boolean(routeQuantityConfirmed))
   const infoStepTrackedRef = useRef(false)
@@ -245,7 +254,11 @@ const PaymentPage = () => {
 
   // 三步流程：1=选大区, 2=地图标记, 3=填写信息
   const [currentStep, setCurrentStep] = useState(() => getCheckoutStepFromSearch(location.search))
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [districtLoadState, setDistrictLoadState] = useState({ source: 'none', error: false })
+  const [districtReload, setDistrictReload] = useState(0)
+  const [districtSubmitNotice, setDistrictSubmitNotice] = useState(false)
+  const districtTrackerRef = useRef(null)
   const [rawQuantity, setQuantity] = useState(() => clampCheckoutQuantity(routeQuantity || 1, product))
   // Normalize synchronously so restored routes, totals and order payloads agree.
   const quantity = clampCheckoutQuantity(rawQuantity, product)
@@ -305,6 +318,9 @@ const PaymentPage = () => {
     && !selectedDistrict
     && Boolean(initialLastDistrictRef.current)
   )
+  const districtListReady = Boolean(selectedDistrict && districts.some(row => (
+    String(row.id) === String(selectedDistrict.id) && String(row.city_id) === String(selectedDistrict.city_id)
+  )))
   const singlePageInfoVisible = (
     isSinglePageVariant
     && (selectedDistrict || singlePageCachedDistrictPending)
@@ -533,6 +549,7 @@ const PaymentPage = () => {
     })
   }
   deliveryAreaTrackerRef.current = trackPaymentEvent
+  districtTrackerRef.current = trackPaymentEvent
 
   const updateDeliveryAreaWarning = useCallback((address, trigger) => {
     const validation = validateCheckoutDeliveryArea(address)
@@ -871,38 +888,42 @@ const PaymentPage = () => {
     }
   }, [location.search, product, quantity, selectedDistrict, customMarker, currentStep, singlePageCachedDistrictPending])
 
-  // 加载大区列表（扁平化）
+  // A bounded background read; a structurally validated recent cache can keep checkout usable.
   useEffect(() => {
-    const fetchDistricts = async () => {
-      try {
-        setLoading(true)
-        const citiesData = await districtAPI.getAllDistricts()
-        
-        // 扁平化：将所有districts展开，保留城市信息
-        const allDistricts = []
-        citiesData.forEach(city => {
-          if (city.districts && city.districts.length > 0) {
-            city.districts.forEach(district => {
-              allDistricts.push({
-                ...district,
-                city_id: city.id,
-                city_name: city.name,
-                all_city_districts: city.districts  // 保存同城市所有districts用于计算中心点
-              })
-            })
-          }
-        })
-        
-        setDistricts(allDistricts)
-      } catch (err) {
-        console.error('获取大区列表失败:', err)
-        alert('Impossible de charger la liste des districts')
-      } finally {
-        setLoading(false)
-      }
+    const controller = new AbortController()
+    let storage
+    try { storage = window.localStorage } catch { /* storage may be unavailable */ }
+    void loadCheckoutDistricts({
+      url: buildApiUrl('/api/flash-local/cities-and-districts/'), storage, signal: controller.signal,
+      onState: state => {
+        setDistricts(flattenDistrictCities(state.cities))
+        setLoading(state.loading)
+        setDistrictLoadState({ source: state.source, error: state.error })
+        if (state.cities.length) setDistrictSubmitNotice(false)
+      },
+      onEvent: (name, properties) => districtTrackerRef.current?.(name, properties)
+    })
+    return () => controller.abort()
+  }, [districtReload])
+
+  useEffect(() => {
+    if (districtLoadState.source === 'none' || !selectedDistrict) return
+    const current = districts.find(row => String(row.id) === String(selectedDistrict.id) && String(row.city_id) === String(selectedDistrict.city_id))
+    if (!current) {
+      setSelectedDistrict(null)
+      setCustomMarker(null)
+      setShowSinglePageDistrictPicker(true)
+      setDistrictSubmitNotice(true)
+      districtTrackerRef.current?.('district_cached_selection_invalid', {})
     }
-    fetchDistricts()
-  }, [])
+  }, [districts, districtLoadState.source, selectedDistrict])
+
+  const retryDistricts = () => {
+    if (loading) return
+    setLoading(true)
+    trackPaymentEvent('district_list_retry_click', {})
+    setDistrictReload(value => value + 1)
+  }
 
   useEffect(() => {
     if (
@@ -1811,6 +1832,13 @@ const PaymentPage = () => {
   }, [showInfoSection, isSinglePageVariant, selectedDistrict])
 
   useEffect(() => {
+    if (!showInfoSection || !selectedDistrict || guidanceExposedRef.current) return
+    if (!['form_guidance_treatment', 'form_guidance_control'].includes(optimization.group)) return
+    guidanceExposedRef.current = true
+    districtTrackerRef.current?.('checkout_guidance_exposed', optimization.analyticsProps)
+  }, [showInfoSection, selectedDistrict, optimization])
+
+  useEffect(() => {
     if (!showInfoSection) return undefined
 
     const handlePageHide = () => {
@@ -1835,6 +1863,28 @@ const PaymentPage = () => {
   // 提交订单
   const handlePlaceOrder = async () => {
     if (orderSubmitLockRef.current) return
+
+    if (!districtListReady || singlePageCachedDistrictPending || !customMarker) {
+      setDistrictSubmitNotice(true)
+      trackPaymentEvent('checkout_district_not_ready', { district_loading: loading, district_source: districtLoadState.source })
+      if (!loading && !districts.length) retryDistricts()
+      if (districtListReady && !customMarker) setShowSinglePageDistrictPicker(true)
+      document.getElementById('checkout-district-feedback')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      return
+    }
+
+    if (optimization.formGuidanceEnabled && guidance.field) {
+      trackPaymentEvent('checkout_guidance_next_click', { next_field: guidance.field })
+      if (guidance.field === 'phone' && userInfo.phone) {
+        setErrors(prev => ({ ...prev, phone: validateCheckoutPhone(userInfo.phone).error }))
+      } else if (guidance.field === 'addressDescription' && userInfo.addressDescription) {
+        setErrors(prev => ({ ...prev, addressDescription: validateCheckoutAddress(userInfo.addressDescription, {
+          fullName: userInfo.fullName, phone: userInfo.phone, districtName: getDistrictDisplayName(selectedDistrict)
+        }).error }))
+      }
+      scrollToFirstMissingField([guidance.field])
+      return
+    }
 
     orderSubmitLockRef.current = true
     setIsPlacingOrder(true)
@@ -1889,11 +1939,6 @@ const PaymentPage = () => {
         whatsapp_same_as_phone: whatsappSameAsPhone
       })
       scrollToFirstMissingField(missingFields)
-      releaseOrderSubmitLock()
-      return
-    }
-
-    if (singlePageCachedDistrictPending || !selectedDistrict || !customMarker) {
       releaseOrderSubmitLock()
       return
     }
@@ -2072,6 +2117,7 @@ const PaymentPage = () => {
   })
   const displayedAddressError = errors.addressDescription || deliveryAreaWarning?.error
   const addressReady = addressValidationState.isValid && !displayedAddressError
+  const guidance = getCheckoutGuidance({ fullNameReady, phoneReady, addressReady })
   const addressMinimumHint = ['required', 'too_short'].includes(addressValidationState.reason)
     ? 'Minimum 5 caractères'
     : ''
@@ -2169,6 +2215,18 @@ const PaymentPage = () => {
                 </div>
               </div>
             )}
+            <div id="checkout-district-feedback" aria-live="polite">
+              {(districtLoadState.error || districtSubmitNotice) && (
+                <div className="district-recovery-note" role="status">
+                  <span>{districts.length
+                    ? (districtSubmitNotice ? 'Choisissez votre zone de livraison pour continuer.' : 'Connexion lente : vos zones récentes restent disponibles.')
+                    : (loading ? 'Vérification de votre zone de livraison…' : 'Les zones n’ont pas pu se charger. Réessayez sans quitter cette page.')}</span>
+                  <button type="button" onClick={retryDistricts} disabled={loading}>
+                    {loading ? 'Chargement…' : 'Réessayer'}
+                  </button>
+                </div>
+              )}
+            </div>
             {isSinglePageVariant && selectedDistrict && !showSinglePageDistrictPicker ? (
               <div className="selected-district-summary">
                 <div className="selected-district-icon"><FiMapPin aria-hidden="true" /></div>
@@ -2193,7 +2251,7 @@ const PaymentPage = () => {
                 <div className="selected-district-copy">
                   <span className="selected-district-label">Zone de livraison</span>
                   <strong>{initialCachedDistrictLabel || 'Votre dernière zone'}</strong>
-                  <span className="selected-district-note">Choisi la dernière fois</span>
+                  <span className="selected-district-note">{loading ? 'Vérification en cours…' : 'Zone à vérifier — réessayez ci-dessus'}</span>
                 </div>
                 <button
                   type="button"
@@ -2203,7 +2261,7 @@ const PaymentPage = () => {
                   Changer
                 </button>
               </div>
-            ) : loading ? (
+            ) : loading && !districts.length ? (
               <div className="loading-container">
                 <div className="loading-spinner"></div>
                 <p>Chargement...</p>
@@ -2385,6 +2443,9 @@ const PaymentPage = () => {
         {showInfoSection && (
           <div className={`section info-section ${isSinglePageVariant ? 'single-page-info-section' : ''}`}>
             <h2 className="section-title">Informations de livraison</h2>
+            {optimization.formGuidanceEnabled && (
+              <p className="checkout-guidance-note">Votre nom, votre téléphone et un repère pour la livraison.</p>
+            )}
 
             <div className="form-group">
               <label htmlFor="fullName" className="form-label required-field-label">
@@ -2451,7 +2512,9 @@ const PaymentPage = () => {
                 onBlur={() => updateDeliveryAreaWarning(userInfo.addressDescription, 'blur')}
                 aria-invalid={Boolean(displayedAddressError)}
                 aria-describedby="checkout-address-feedback"
-                placeholder={isCodTrustVariant
+                placeholder={optimization.formGuidanceEnabled
+                  ? getDistrictAddressExample(getDistrictDisplayName(selectedDistrict))
+                  : isCodTrustVariant
                   ? 'Ex: Cocody Riviera 3, près de la Pharmacie Sainte Marie, portail bleu'
                   : isInlineQuantityVariant
                   ? 'Ex: Cocody Riviera 3, près de la Pharmacie Sainte Marie, portail bleu'
@@ -2569,7 +2632,9 @@ const PaymentPage = () => {
                     <span>Commande en cours...</span>
                   </>
                 ) : (
-                  'Passer la commande'
+                  !districtListReady
+                    ? (loading ? 'Vérification de la zone…' : 'Réessayer la zone de livraison')
+                    : optimization.formGuidanceEnabled ? guidance.label : 'Passer la commande'
                 )}
               </button>
             </div>

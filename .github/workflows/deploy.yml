@@ -5,6 +5,10 @@ on:
     branches: [ main, master ]
   workflow_dispatch:  # 允许手动触发
 
+concurrency:
+  group: brainnel-production-deploy
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -36,17 +40,20 @@ jobs:
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         port: ${{ secrets.PORT }}
         script: |
+          set -eu
           cd /home/admin/projects/cod-ecommerce
-          
-          # 强制更新本地代码以处理强制推送的情况
+
+          # Preserve local changes; a dirty or diverged checkout requires review.
           git fetch origin main
-          git reset --hard origin/main
-          
-          # 确保脚本有执行权限
-          chmod +x deploy-ci.sh
-          
-          # 执行部署脚本
-          ./deploy-ci.sh
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "Deployment stopped: server checkout has local changes; nothing was discarded."
+            git status --short
+            exit 1
+          fi
+          git merge --ff-only origin/main
+
+          # Do not chmod the tracked file and make the checkout dirty.
+          bash deploy-ci.sh
           
     - name: Notify deployment status
       run: |

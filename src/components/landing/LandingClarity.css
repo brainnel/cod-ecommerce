@@ -83,6 +83,9 @@
 .landing-clarity .clarity-summary { padding: 19px 18px 18px; }
 .landing-clarity .clarity-eyebrow { margin: 0 0 9px; color: var(--clarity-green); font-size: 11px; font-weight: 750; letter-spacing: 1.2px; text-transform: uppercase; }
 .product-detail.landing-clarity .clarity-title { margin: 0; color: var(--clarity-ink); font-size: 22px; font-weight: 750; line-height: 1.22; letter-spacing: -.55px; overflow-wrap: anywhere; }
+.landing-clarity .clarity-product-highlights { margin-top: 9px; padding-left: 10px; border-left: 2px solid var(--clarity-green); }
+.landing-clarity .clarity-product-highlights p { margin: 0; font-size: 12px; line-height: 1.45; color: var(--clarity-muted); }
+.landing-clarity .clarity-product-highlights p:first-child { margin-bottom: 3px; color: var(--clarity-ink); font-weight: 600; }
 .landing-clarity .clarity-price { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; margin-top: 12px; font-variant-numeric: tabular-nums; }
 .landing-clarity .clarity-price strong { font-size: 32px; font-weight: 800; letter-spacing: -1.2px; line-height: 1.1; }
 .landing-clarity .clarity-price > span { font-size: 13px; font-weight: 650; color: var(--clarity-muted); }

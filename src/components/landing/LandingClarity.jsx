@@ -1,4 +1,5 @@
 import logoImage from '../../assets/logo.png'
+import ClarityProductHighlights from './ClarityProductHighlights'
 import { CLARITY_DELIVERY_PROMISE, getLandingReferencePrice } from '../../utils/landingPresentation'
 import './LandingClarity.css'
 
@@ -32,12 +33,13 @@ export const ClarityHeader = ({ onHome }) => (
   </header>
 )
 
-export const ClaritySummary = ({ name, price, referencePrice, isBundle = false, children }) => {
+export const ClaritySummary = ({ name, price, referencePrice, isBundle = false, highlights, children }) => {
   const comparisonPrice = getLandingReferencePrice(price, referencePrice)
   return (
     <section className="clarity-summary">
       {isBundle && <p className="clarity-eyebrow">Le pack complet</p>}
       <h1 className="product-title clarity-title">{name}</h1>
+      <ClarityProductHighlights copy={highlights} />
       <div className="clarity-price">
         <strong>{formatFcfa(price)}</strong><span>FCFA</span>
         {comparisonPrice !== null && <div className="clarity-reference-price">

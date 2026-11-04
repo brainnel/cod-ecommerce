@@ -9,6 +9,7 @@ import {
   beginCheckoutFunnel,
   buildCheckoutProductProperties,
   getCheckoutQuantityExperiment,
+  getCheckoutDeviceId,
   isAddressFirstCheckoutVariant,
   isCodTrustLandingVariant,
   isInlineCheckoutVariant,
@@ -16,6 +17,7 @@ import {
   trackCheckoutEvent,
   trackProductLandingEngagement,
   trackProductLandingView,
+  trackProductClarityExposure,
   trackProductReviewTabClick
 } from '../services/checkoutFunnelAnalytics';
 import { useAdTrackingContext } from '../hooks/useAdTrackingHooks.js';
@@ -32,6 +34,7 @@ import { saveCheckoutPaymentState } from '../utils/checkoutPaymentStateCache';
 import { preloadPaymentPage, schedulePaymentPagePreload } from '../utils/preloadRoutes';
 import { getProductImageLoadingPolicy } from '../utils/productImageLoadingPolicy';
 import { isClarityLanding, getStoredLandingReviews } from '../utils/landingPresentation';
+import { getCheckoutOptimizationAssignment, getProductClarityCopy } from '../utils/checkoutOptimizationExperiment';
 import { ClarityHeader, ClaritySummary, ClarityPurchaseBar, ClarityAftercare, ClarityReviews } from './landing/LandingClarity';
 
 const PRODUCT_UNAVAILABLE_BACKEND_MESSAGE = '此商品已下架，请查看其它商品';
@@ -264,6 +267,12 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
   const landingEngagementRef = useRef(null);
   const checkoutQuantityExperiment = useMemo(() => getCheckoutQuantityExperiment(), []);
   const imageLoadingPolicy = useMemo(() => getProductImageLoadingPolicy(), []);
+  const checkoutOptimization = useMemo(() => getCheckoutOptimizationAssignment({
+    deviceId: getCheckoutDeviceId(), productId: product?.product_id
+  }), [product?.product_id]);
+  const productHighlights = checkoutOptimization.productClarityEnabled
+    ? getProductClarityCopy(product?.product_id) : null;
+  const clarityExposureRef = useRef(null);
   const clarityLanding = isClarityLanding();
   const isCheckoutOptimizationVariant = isInlineCheckoutVariant(checkoutQuantityExperiment);
   const isCodTrustLanding = isCodTrustLandingVariant(checkoutQuantityExperiment);
@@ -391,6 +400,7 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
     viewTrackedProductRef.current = trackingKey;
 
     let cleanupLandingEngagement = null;
+    let cleanupClarityExposure = null;
     try {
       const landingSessionId = trackProductLandingView(product, {
         ad_id: adId,
@@ -405,6 +415,36 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
         passiveSent: false,
         checkoutClickSent: false
       };
+
+      if (clarityLanding && checkoutOptimization.productEligible
+        && ['product_clarity_treatment', 'product_clarity_control'].includes(checkoutOptimization.group)) {
+        let exposed = false;
+        const maybeExpose = () => {
+          if (exposed || document.visibilityState === 'hidden') return;
+          const rect = clarityExposureRef.current?.getBoundingClientRect();
+          if (!rect || rect.height <= 0 || rect.bottom <= 0 || rect.top >= window.innerHeight) return;
+          const visible = Math.min(rect.bottom, window.innerHeight) - Math.max(rect.top, 0);
+          if (visible < Math.min(rect.height * 0.5, 80)) return;
+          exposed = true;
+          trackProductClarityExposure(product, {
+            ad_id: adId, landing_session_id: landingSessionId,
+            product_clarity_rendered: checkoutOptimization.productClarityEnabled
+          });
+        };
+        const observer = typeof IntersectionObserver === 'function'
+          ? new IntersectionObserver(maybeExpose, { threshold: [0, 0.5, 1] }) : null;
+        if (clarityExposureRef.current) observer?.observe(clarityExposureRef.current);
+        window.addEventListener('scroll', maybeExpose, { passive: true });
+        window.addEventListener('resize', maybeExpose);
+        document.addEventListener('visibilitychange', maybeExpose);
+        maybeExpose();
+        cleanupClarityExposure = () => {
+          observer?.disconnect();
+          window.removeEventListener('scroll', maybeExpose);
+          window.removeEventListener('resize', maybeExpose);
+          document.removeEventListener('visibilitychange', maybeExpose);
+        };
+      }
 
       const updateMaxScrollPercent = () => {
         if (typeof window === 'undefined' || typeof document === 'undefined') return;
@@ -481,8 +521,12 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
       console.warn('Facebook ViewContent 事件错误:', fbError);
     }
 
-    return cleanupLandingEngagement || undefined;
-  }, [adId, adTrackingLoading, product, product?.product_id, product?.price]);
+    return () => {
+      cleanupLandingEngagement?.();
+      cleanupClarityExposure?.();
+    };
+  }, [adId, adTrackingLoading, product, product?.product_id, product?.price, clarityLanding,
+    checkoutOptimization.group, checkoutOptimization.productEligible, checkoutOptimization.productClarityEnabled]);
 
   if (loading) {
     return (
@@ -687,10 +731,10 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
           </Swiper>
         </div>
 
-        <div className="product-purchase-panel">
+        <div className="product-purchase-panel" ref={clarityExposureRef}>
           {/* 产品信息 */}
           {clarityLanding ? (
-            <ClaritySummary name={product.name_fr} price={product.price} referencePrice={product.original_price}>
+            <ClaritySummary name={product.name_fr} price={product.price} referencePrice={product.original_price} highlights={productHighlights}>
               {product.skus?.[0]?.name_fr && product.skus[0].name_fr !== product.name_fr && (
                 <div className="clarity-model"><span>Modèle</span><strong>{product.skus[0].name_fr}</strong></div>
               )}

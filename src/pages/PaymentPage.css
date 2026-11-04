@@ -2339,3 +2339,31 @@
     min-width: 230px;
   }
 }
+.district-recovery-note {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  margin: 10px 0;
+  background: #fff7e7;
+  border: 1px solid #e6c997;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #694b1b;
+}
+.district-recovery-note span { flex: 1; min-width: 0; }
+.district-recovery-note button {
+  flex-shrink: 0;
+  padding: 10px;
+  border: 1px solid #b78c43;
+  border-radius: 6px;
+  background: #fff;
+  color: #694b1b;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.district-recovery-note button:disabled { opacity: .65; cursor: wait; }
+.district-recovery-note button:focus-visible { outline: 3px solid #166534; outline-offset: 2px; }
+.checkout-guidance-note { margin: -4px 0 18px; font-size: 14px; line-height: 1.5; color: #59655e; }

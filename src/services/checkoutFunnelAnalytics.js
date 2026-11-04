@@ -1,4 +1,5 @@
 import { buildApiUrl } from '../config/api.config.js'
+import { getCheckoutOptimizationAssignment } from '../utils/checkoutOptimizationExperiment.js'
 
 const ANALYTICS_ENDPOINT = '/api/vite/analytics/events'
 const DEVICE_ID_STORAGE_KEY = 'cod_checkout_device_id'
@@ -19,6 +20,7 @@ const QUANTITY_FLOW_ADDRESS_FIRST_PERCENT = 0
 const QUANTITY_FLOW_SINGLE_PAGE_PERCENT = 100
 const QUANTITY_FLOW_SINGLE_PAGE_REVIEW_PERCENT = 0
 const PENDING_CHECKOUT_REUSE_MS = 10 * 60 * 1000
+let storageUnavailableDeviceId = null
 
 const QUANTITY_MODAL_VARIANT = 'quantity_modal'
 const INLINE_QUANTITY_VARIANT = 'inline_quantity'
@@ -144,11 +146,16 @@ const createId = (prefix) => {
 export const getCheckoutDeviceId = () => {
   if (typeof window === 'undefined') return createId('device')
 
-  const cached = safeGetStorage(window.localStorage, DEVICE_ID_STORAGE_KEY)
+  let storage
+  try { storage = window.localStorage } catch { /* Restricted storage is optional. */ }
+  const cached = safeGetStorage(storage, DEVICE_ID_STORAGE_KEY)
   if (cached) return cached
 
-  const deviceId = createId('device')
-  safeSetStorage(window.localStorage, DEVICE_ID_STORAGE_KEY, deviceId)
+  // Storage-restricted browsers still keep one identity during this page's
+  // lifetime, so rendering and tracking cannot receive different experiment arms.
+  const deviceId = storageUnavailableDeviceId || createId('device')
+  storageUnavailableDeviceId = deviceId
+  safeSetStorage(storage, DEVICE_ID_STORAGE_KEY, deviceId)
   return deviceId
 }
 
@@ -374,6 +381,9 @@ export const buildCheckoutProductProperties = (product, extra = {}) => {
     checkout_flow: CHECKOUT_FLOW,
     ...quantityExperiment,
     ...buildAdTrackingProperties(),
+    ...getCheckoutOptimizationAssignment({
+      deviceId: getCheckoutDeviceId(), productId: product?.product_id || extra.product_id
+    }).analyticsProps,
     product_id: product?.product_id ? String(product.product_id) : extra.product_id || null,
     product_name: product?.name_fr || extra.product_name || null,
     internal_no: product?.internal_no || extra.internal_no || null,
@@ -478,6 +488,9 @@ export const trackCheckoutEvent = (eventName, properties = {}, options = {}) => 
   const eventProperties = {
     ...context,
     ...properties,
+    ...getCheckoutOptimizationAssignment({
+      deviceId: getCheckoutDeviceId(), productId: properties.product_id || context.product_id
+    }).analyticsProps,
     checkout_flow: CHECKOUT_FLOW,
     event_id: createId('event'),
     ...getPageProperties()
@@ -569,6 +582,18 @@ export const trackProductLandingEngagement = (product, extra = {}) => {
   })
 
   return landingSessionId
+}
+
+// Separate actual treatment/control exposure from mere assignment. This uses
+// the same landing session, and never creates a checkout session or Meta event.
+export const trackProductClarityExposure = (product, extra = {}) => {
+  const landingSessionId = extra.landing_session_id || getLandingSessionId()
+  if (!landingSessionId) return null
+  return trackCheckoutEvent('product_clarity_exposed', {
+    ...buildCheckoutProductProperties(product, { ...extra, landing_session_id: landingSessionId }),
+    product_clarity_rendered: Boolean(extra.product_clarity_rendered),
+    product_clarity_copy_version: '20261104_v1'
+  }, { sessionId: landingSessionId })
 }
 
 export const trackProductReviewTabClick = (product, extra = {}) => {

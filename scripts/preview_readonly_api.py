@@ -4,6 +4,7 @@ Run this alongside npm run preview:local. Live product reads are cached in memor
 Only event names and non-personal funnel IDs are retained for local QA.
 """
 import json
+import os
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -13,6 +14,7 @@ import requests
 
 CACHE = {}
 EVENTS = []
+QA_DISTRICTS_FAIL = False
 LOCK = threading.Lock()
 READ_PATHS = ('/api/flash-local/', '/api/vite/app/download-links')
 
@@ -35,6 +37,8 @@ class PreviewHandler(BaseHTTPRequestHandler):
         if path == '/__qa/events':
             with LOCK:
                 return self.respond(200, {'events': list(EVENTS), 'upstream_writes': 0})
+        if path == '/api/flash-local/cities-and-districts/' and QA_DISTRICTS_FAIL:
+            return self.respond(503, {'detail': 'Local QA simulated district outage.'})
         if not path.startswith(READ_PATHS) or any(x in path for x in ['/orders', '/order/', '/user', '/cart']):
             return self.respond(403, {'detail': 'This endpoint is not part of the read-only preview.'})
         try:
@@ -43,7 +47,7 @@ class PreviewHandler(BaseHTTPRequestHandler):
             if cached and time.monotonic() - cached[0] < 300:
                 return self.respond(cached[1], cached[2])
             response = requests.get('https://api.brainnel.com/backend' + self.path,
-                                    proxies={'https': 'http://127.0.0.1:7890'}, timeout=30,
+                                    proxies={'https': os.environ.get('PREVIEW_HTTPS_PROXY', 'http://127.0.0.1:7897')}, timeout=30,
                                     allow_redirects=False)
             data = response.json()
             with LOCK:
@@ -53,12 +57,16 @@ class PreviewHandler(BaseHTTPRequestHandler):
             self.respond(502, {'detail': 'Preview could not read live product data. Retry shortly.'})
 
     def do_POST(self):
+        global QA_DISTRICTS_FAIL
         size = min(int(self.headers.get('Content-Length', '0')), 100_000)
         try:
             data = json.loads(self.rfile.read(size) or b'{}')
         except (ValueError, TypeError):
             data = {}
         path = urlsplit(self.path).path
+        if path == '/__qa/district-failure':
+            QA_DISTRICTS_FAIL = bool(data.get('enabled'))
+            return self.respond(200, {'enabled': QA_DISTRICTS_FAIL, 'upstream_writes': 0})
         if '/analytics/' in path or '/facebook-conversions' in path:
             items = data.get('events', data.get('data', [data])) if isinstance(data, dict) else []
             if not isinstance(items, list):
@@ -71,7 +79,8 @@ class PreviewHandler(BaseHTTPRequestHandler):
                     EVENTS.append({'event_name': item.get('event_name'), 'session_id': item.get('session_id'),
                                    'product_id': props.get('product_id'), 'ad_id': props.get('ad_id'),
                                    'landing_session_id': props.get('landing_session_id'),
-                                   'quantity': props.get('quantity'), 'path': path})
+                                   'quantity': props.get('quantity'), 'path': path,
+                                   **{key: value for key, value in props.items() if key.startswith('checkout_optimization_') or key == 'product_clarity_rendered'}})
                 del EVENTS[:-300]
             return self.respond(200, {'success': True, 'preview_only': True})
         self.respond(409, {'detail': 'Aperçu local : aucune commande réelle ne sera créée.'})
