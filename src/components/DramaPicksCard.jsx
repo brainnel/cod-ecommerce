@@ -1,6 +1,7 @@
 import { Component, useEffect, useMemo, useRef, useState } from 'react'
 import { fetchDramaPicks, orderForDisplay, sendDramaEvents, buildEventsBody } from '../services/dramaPicks'
 import DramaPlayer, { Cover } from './DramaPlayer'
+import { probeMedia } from '../services/dramaDiagnostics'
 import './DramaPicksCard.css'
 
 // Impressions are sent once per page view per pid+order, even when React
@@ -124,6 +125,23 @@ const DramaPicksCard = ({ pid, impressionKey = '', preview = null, onTrack, onLe
     handleOpenSite(series, slot, { source: 'thumbnail', secondsWatched: 0, positionS: 0 })
   }
 
+  // Play errors carry the browser's own MediaError and, for `video` errors, a
+  // 2-byte CORS probe of the same URL (status or failure), to tell a refused
+  // network/CORS load from a media-stack refusal. One event, sent within ~4 s.
+  const reportPlayError = (series, slot, reason, details) => {
+    const { url, ...fields } = details || {}
+    const base = {
+      reason,
+      ...fields,
+      user_agent: typeof navigator === 'undefined' ? null : String(navigator.userAgent || '').slice(0, 200),
+    }
+    if (reason !== 'video' || !url || preview || typeof fetch !== 'function') {
+      track('order_success_drama_play_error', series, slot, base)
+      return
+    }
+    probeMedia(url).then((probe) => track('order_success_drama_play_error', series, slot, { ...base, ...probe }))
+  }
+
   const handlePlayStart = (series, slot, { sound, trigger }) => {
     const key = `${pid}|${impressionKey}|${series.slug}`
     if (playedKeys.has(key)) return
@@ -162,7 +180,7 @@ const DramaPicksCard = ({ pid, impressionKey = '', preview = null, onTrack, onLe
         onInteract={(series, slot, action) => markClick(series, slot, action)}
         onPlayStart={handlePlayStart}
         onComplete={(series, slot, { durationS }) => track('order_success_drama_complete', series, slot, { duration_s: durationS })}
-        onFail={(series, slot, reason) => track('order_success_drama_play_error', series, slot, { reason })}
+        onFail={(series, slot, reason, details) => reportPlayError(series, slot, reason, details)}
         onOpenSite={handleOpenSite}
       />
 

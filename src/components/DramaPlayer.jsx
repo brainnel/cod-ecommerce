@@ -6,6 +6,7 @@ import {
   freeEpisodesLine,
   playedSeconds,
 } from '../services/dramaEpisode'
+import { mediaErrorDetails } from '../services/dramaDiagnostics'
 import './DramaPlayer.css'
 
 // Inline BabiDrama player of the order-success card: one persistent <video>
@@ -139,7 +140,7 @@ const DramaPlayer = ({
 
   const isCurrent = (event) => Boolean(srcRef.current) && event.currentTarget.getAttribute('src') === srcRef.current
 
-  const fail = (reason) => {
+  const fail = (reason, details = null) => {
     const video = videoRef.current
     if (video && srcRef.current) {
       lastPositionRef.current = video.currentTime || lastPositionRef.current
@@ -158,7 +159,7 @@ const DramaPlayer = ({
     setBuffering(false)
     setNeedsTap(false)
     setSoundBlocked(false)
-    notify('onFail', reason)
+    notify('onFail', reason, details)
   }
   const failRef = useRef(fail)
   failRef.current = fail
@@ -432,7 +433,7 @@ const DramaPlayer = ({
           }}
           onTimeUpdate={onTimeUpdate}
           onEnded={onEnded}
-          onError={(event) => { if (isCurrent(event)) fail('video') }}
+          onError={(event) => { if (isCurrent(event)) fail('video', mediaErrorDetails(event.currentTarget, srcRef.current)) }}
         />
         <button type="button" className="os-drama-surface" aria-label={surfaceLabel} onClick={onSurfaceTap} />
 
