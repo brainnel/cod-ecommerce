@@ -181,6 +181,10 @@ const DramaPicksCard = ({ pid, impressionKey = '', preview = null, onTrack, onLe
         onPlayStart={handlePlayStart}
         onComplete={(series, slot, { durationS }) => track('order_success_drama_complete', series, slot, { duration_s: durationS })}
         onFail={(series, slot, reason, details) => reportPlayError(series, slot, reason, details)}
+        onDiagnostic={(series, slot, name, fields) => track(`order_success_drama_${name}`, series, slot, {
+          ...fields,
+          user_agent: typeof navigator === 'undefined' ? null : String(navigator.userAgent || '').slice(0, 200),
+        })}
         onOpenSite={handleOpenSite}
       />
 

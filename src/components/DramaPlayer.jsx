@@ -39,6 +39,8 @@ const safely = (fn) => {
   try { return fn() } catch (error) { console.warn('drama player action failed:', error); return undefined }
 }
 
+const nowMs = () => (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now())
+
 // play() as 'played' | 'blocked' | 'aborted' | 'failed'; never rejects.
 const attemptPlay = (video) => {
   try {
@@ -108,6 +110,7 @@ const DramaPlayer = ({
   onComplete,
   onFail,
   onOpenSite,
+  onDiagnostic,
 }) => {
   const { series, slot } = current
   const stageRef = useRef(null)
@@ -137,9 +140,30 @@ const DramaPlayer = ({
   const [hasFrame, setHasFrame] = useState(false)
   const statusRef = useRef(status)
   statusRef.current = status
+  // Views that end with neither a play nor an error (2026-11-08: 2 of 12 iPhones, 4 of 63
+  // Android): was autoplay refused outright (« Touchez pour lancer », no timeout then), or did
+  // the viewer leave first? One `tap_needed` and one `leave` per episode load, analytics only.
+  const diagRef = useRef(null)
+  const diagnose = (name, extra = {}) => {
+    const video = videoRef.current
+    const diag = diagRef.current
+    const ms = (from) => (from == null ? null : Math.round(nowMs() - from))
+    notify('onDiagnostic', name, {
+      status: statusRef.current,
+      ms_since_load: ms(diag?.loadedAt),
+      ms_since_src: ms(diag?.srcAt),
+      ready_state: video?.readyState ?? null,
+      network_state: video?.networkState ?? null,
+      in_view: inViewRef.current,
+      page_visible: typeof document === 'undefined' ? null : document.visibilityState === 'visible',
+      ...extra,
+    })
+  }
+  const diagnoseRef = useRef(diagnose)
+  diagnoseRef.current = diagnose
 
   const callbacks = useRef({})
-  callbacks.current = { onInteract, onPlayStart, onComplete, onFail, onOpenSite, fetchImpl, allowLoopbackHttp }
+  callbacks.current = { onInteract, onPlayStart, onComplete, onFail, onOpenSite, onDiagnostic, fetchImpl, allowLoopbackHttp }
   const notify = (name, ...args) => safely(() => callbacks.current[name]?.(series, slot, ...args))
 
   const isCurrent = (event) => Boolean(srcRef.current) && event.currentTarget.getAttribute('src') === srcRef.current
@@ -183,7 +207,13 @@ const DramaPlayer = ({
     outcome = await attemptPlay(video)
     if (loadIdRef.current !== loadId) return
     if (outcome === 'played') setSoundBlocked(true)
-    else if (outcome === 'blocked') setNeedsTap(true)
+    else if (outcome === 'blocked') {
+      setNeedsTap(true)
+      if (diagRef.current && !diagRef.current.tapNeeded) {
+        diagRef.current.tapNeeded = true
+        safely(() => diagnose('tap_needed'))
+      }
+    }
   }
 
   // The other series' thumbnails open BabiDrama in a new tab: pause here so the
@@ -209,6 +239,7 @@ const DramaPlayer = ({
     if (progressRef.current) progressRef.current.style.transform = 'scaleX(0)'
     setStatus('loading')
     setHasFrame(false)
+    diagRef.current = { loadedAt: nowMs(), srcAt: null, tapNeeded: false, left: false }
     setEpisode(null)
     setPaused(true)
     setBuffering(false)
@@ -227,6 +258,7 @@ const DramaPlayer = ({
       setEpisode(next)
       setHref(next.watchUrl)
       srcRef.current = next.videoUrl
+      if (diagRef.current) diagRef.current.srcAt = nowMs()
       safely(() => { video.src = next.videoUrl })
       setStatus('starting')
       playWithSoundFallback(loadId)
@@ -262,10 +294,21 @@ const DramaPlayer = ({
   useEffect(() => {
     const stage = stageRef.current
     const video = videoRef.current
+    // Leaving before the episode started (and without an error): report where it stood.
+    const onLeave = (trigger) => {
+      const diag = diagRef.current
+      if (!diag || diag.left || startedRef.current) return
+      if (statusRef.current === 'failed' || statusRef.current === 'ended') return
+      diag.left = true
+      safely(() => diagnoseRef.current('leave', { trigger, tap_needed: diag.tapNeeded }))
+    }
     const onVisibility = () => {
       if (document.hidden && video && !video.paused) safely(() => video.pause())
+      if (document.hidden) onLeave('hidden')
     }
+    const onPageHide = () => onLeave('pagehide')
     document.addEventListener('visibilitychange', onVisibility)
+    window.addEventListener('pagehide', onPageHide)
     let observer
     if (stage && typeof IntersectionObserver === 'function') {
       observer = new IntersectionObserver(([entry]) => {
@@ -284,6 +327,7 @@ const DramaPlayer = ({
     }
     return () => {
       document.removeEventListener('visibilitychange', onVisibility)
+      window.removeEventListener('pagehide', onPageHide)
       observer?.disconnect()
       srcRef.current = null
       safely(() => {
