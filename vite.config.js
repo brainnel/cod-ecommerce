@@ -24,6 +24,8 @@ export default defineConfig(({ mode }) => {
         'import.meta.env.VITE_API_ENV': JSON.stringify('production'),
         'import.meta.env.VITE_API_BASE_URL': JSON.stringify('/__preview/api'),
         'import.meta.env.VITE_FACEBOOK_API_URL': JSON.stringify('/__preview/api'),
+        // BabiDrama picks through the read-only preview server (reads only; events stay local).
+        'import.meta.env.VITE_BABIDRAMA_BASE_URL': JSON.stringify('/__preview/api/babidrama'),
       },
       server: {
         host: '127.0.0.1',
