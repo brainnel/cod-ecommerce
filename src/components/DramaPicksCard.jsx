@@ -5,7 +5,7 @@ import './DramaPicksCard.css'
 
 // Impressions are sent once per page view per pid+order, even when React
 // StrictMode or a remount runs the effect again. Clicks likewise once per
-// series (an interaction with the playing card, a thumbnail tap or a link).
+// series (an interaction with the playing card, a thumbnail or a link).
 const impressedKeys = new Set()
 const clickedKeys = new Set()
 const playedKeys = new Set()
@@ -55,15 +55,15 @@ const DramaPicksCard = ({ pid, impressionKey = '', preview = null, onTrack, onLe
     if (!pid) return null
     return preview ? orderForDisplay(preview) : undefined
   })
-  // Series in the player: the big card (slot 0) until a thumbnail is tapped.
-  const [chosen, setChosen] = useState(null)
+  // The player always shows the big card (slot 0); the other series' thumbnails
+  // open BabiDrama directly (owner request 2026-11-08).
   const playerRef = useRef(null)
   const previewFetch = useMemo(() => (preview ? previewEpisodeFetch(preview.episodes) : null), [preview])
   const featured = useMemo(
     () => (picks?.series?.length ? { series: picks.series[0], slot: 0, trigger: 'autoplay' } : null),
     [picks]
   )
-  const current = chosen || featured
+  const current = featured
 
   useEffect(() => {
     if (!pid || preview) return undefined
@@ -119,11 +119,9 @@ const DramaPicksCard = ({ pid, impressionKey = '', preview = null, onTrack, onLe
     track('order_success_drama_click', series, slot, { action })
   }
 
-  const handleSwitch = (series, slot) => {
-    // Inside the tap, before any await: lets iOS start the next series with sound.
-    safely(() => playerRef.current?.unlock())
-    markClick(series, slot, 'thumbnail')
-    setChosen({ series, slot, trigger: 'thumbnail' })
+  const handleThumbnail = (series, slot) => {
+    safely(() => playerRef.current?.pause())
+    handleOpenSite(series, slot, { source: 'thumbnail', secondsWatched: 0, positionS: 0 })
   }
 
   const handlePlayStart = (series, slot, { sound, trigger }) => {
@@ -174,15 +172,17 @@ const DramaPicksCard = ({ pid, impressionKey = '', preview = null, onTrack, onLe
           <ul>
             {others.map(({ series, slot }) => (
               <li key={series.slug}>
-                <button
-                  type="button"
+                <a
                   className="os-drama-thumb"
-                  aria-label={`Regarder ${series.title}`}
-                  onClick={() => handleSwitch(series, slot)}
+                  href={series.watchUrl}
+                  target="_blank"
+                  rel="noopener"
+                  aria-label={`Regarder ${series.title} sur BabiDrama`}
+                  onClick={() => handleThumbnail(series, slot)}
                 >
                   <Cover url={series.coverUrl} className="os-drama-thumb-cover" />
                   <span className="os-drama-thumb-title" aria-hidden="true">{series.title}</span>
-                </button>
+                </a>
               </li>
             ))}
           </ul>

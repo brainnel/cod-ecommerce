@@ -62,7 +62,7 @@
 .order-success-page .os-drama-more-label { margin: 0 0 9px; color: var(--bd-muted); font-size: 12px; line-height: 1.5; font-weight: 600; }
 .order-success-page .os-drama-more ul { display: flex; gap: 12px; margin: 0; padding: 0; list-style: none; }
 .order-success-page .os-drama-more li { flex: 0 0 66px; min-width: 0; }
-.order-success-page .os-drama-thumb { display: block; width: 100%; padding: 0; border: 0; background: none; color: rgba(255, 255, 255, .85); font: inherit; text-align: left; cursor: pointer; touch-action: manipulation; }
+.order-success-page .os-drama-thumb { display: block; width: 100%; padding: 0; border: 0; background: none; color: rgba(255, 255, 255, .85); font: inherit; text-align: left; text-decoration: none; cursor: pointer; touch-action: manipulation; }
 .order-success-page .os-drama-thumb-cover { width: 100%; border-radius: 8px; }
 .order-success-page .os-drama-thumb-cover::after { z-index: 2; color: #fff; font-size: 12px; text-shadow: 0 1px 4px rgba(0, 0, 0, .6); }
 .order-success-page .os-drama-thumb-title { display: -webkit-box; margin-top: 5px; overflow: hidden; font-size: 11px; line-height: 1.35; overflow-wrap: anywhere; hyphens: auto; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }

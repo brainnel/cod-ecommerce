@@ -53,28 +53,6 @@ const attemptPlay = (video) => {
   }
 }
 
-// 0.1 s of silence (8 kHz mono WAV). Played inside a tap, it lets iOS start
-// the next episode with sound once its URL arrives.
-let silentClip
-const silentClipUrl = () => {
-  if (silentClip !== undefined) return silentClip
-  try {
-    const samples = 800
-    const buffer = new ArrayBuffer(44 + samples)
-    const view = new DataView(buffer)
-    const ascii = (offset, text) => { for (let i = 0; i < text.length; i += 1) view.setUint8(offset + i, text.charCodeAt(i)) }
-    ascii(0, 'RIFF'); view.setUint32(4, 36 + samples, true); ascii(8, 'WAVE'); ascii(12, 'fmt ')
-    view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true)
-    view.setUint32(24, 8000, true); view.setUint32(28, 8000, true); view.setUint16(32, 1, true); view.setUint16(34, 8, true)
-    ascii(36, 'data'); view.setUint32(40, samples, true)
-    for (let i = 0; i < samples; i += 1) view.setUint8(44 + i, 128)
-    silentClip = URL.createObjectURL(new Blob([buffer], { type: 'audio/wav' }))
-  } catch {
-    silentClip = null
-  }
-  return silentClip
-}
-
 const Icon = ({ children, size = 24, filled = false }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} stroke={filled ? 'none' : 'currentColor'}
     strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
@@ -203,18 +181,12 @@ const DramaPlayer = ({
     else if (outcome === 'blocked') setNeedsTap(true)
   }
 
-  // A thumbnail tap: play a silent clip unmuted inside the gesture so the next
-  // series may start with sound once its episode arrives (iOS).
+  // The other series' thumbnails open BabiDrama in a new tab: pause here so the
+  // order page goes quiet behind it.
   useImperativeHandle(ref, () => ({
-    unlock: () => {
+    pause: () => {
       const video = videoRef.current
-      if (!video) return
-      srcRef.current = null
-      loadIdRef.current += 1
-      video.muted = false
-      const silent = silentClipUrl()
-      if (silent) video.src = silent
-      attemptPlay(video)
+      if (video && !video.paused) video.pause()
     },
   }), [])
 

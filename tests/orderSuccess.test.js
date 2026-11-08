@@ -89,7 +89,9 @@ test('drama card renders the inline player of the featured series, its continue 
   assert.match(html, /Autres séries/)
   assert.equal((html.match(/class="os-drama-thumb"/g) || []).length, 2)
   assert.ok(html.indexOf('Regarder La Reine') < html.indexOf('Regarder Le Boss'), 'ranked keeps API order')
-  assert.match(html, /<button type="button" class="os-drama-thumb" aria-label="Regarder La Reine">/)
+  // Other series open BabiDrama directly (no in-page switch).
+  assert.match(html, /<a class="os-drama-thumb" href="https:\/\/babidrama.com\/w\/la-reine\/1\?c=brainnel" target="_blank" rel="noopener" aria-label="Regarder La Reine sur BabiDrama">/)
+  assert.doesNotMatch(html, /<button type="button" class="os-drama-thumb"/)
   assert.ok(html.indexOf('<video') < html.indexOf('os-drama-cta'), 'player above the link')
   assert.ok(html.indexOf('os-drama-cta') < html.indexOf('Autres séries'), 'thumbnails below the link')
 })
