@@ -1,0 +1,44 @@
+/* Inline BabiDrama player (inside .os-drama, see DramaPicksCard.css for the tokens).
+   9:16 episode shown whole (contain) so the burned-in subtitles are never cropped. */
+.order-success-page .os-drama-stage { position: relative; height: 62vh; max-height: 560px; min-height: 280px; overflow: hidden; background: #0b060d; }
+.order-success-page .os-drama-stage[hidden] { display: none; }
+.order-success-page .os-drama-video { position: absolute; inset: 0; display: block; width: 100%; height: 100%; max-width: none; object-fit: contain; background: transparent; }
+
+/* Whole picture: pause / play, or sound on after a muted autoplay. */
+.order-success-page .os-drama-surface { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; padding: 0; border: 0; background: transparent; cursor: pointer; touch-action: manipulation; }
+.order-success-page .os-drama-surface:focus-visible { outline-offset: -4px; }
+
+.order-success-page .os-drama-center { position: absolute; inset: 0; z-index: 2; display: flex; align-items: center; justify-content: center; padding: 0 16px; pointer-events: none; }
+.order-success-page .os-drama-spinner { color: rgba(255, 255, 255, .8); }
+.order-success-page .os-drama-spinner svg { animation: os-drama-spin .9s linear infinite; }
+.order-success-page .os-drama-paused { display: flex; align-items: center; justify-content: center; width: 72px; height: 72px; padding-left: 4px; border-radius: 50%; background: rgba(0, 0, 0, .45); }
+.order-success-page .os-drama-prompt { display: inline-flex; align-items: center; gap: 8px; padding: 12px 16px; border-radius: 999px; background: rgba(0, 0, 0, .6); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); font-size: 14px; line-height: 1.3; font-weight: 600; text-align: center; animation: os-drama-fade-in 180ms ease-out; }
+.order-success-page .os-drama-prompt svg { flex-shrink: 0; }
+
+/* Title over the bottom of the picture; fades out after 4 s of playback with sound
+   (the French subtitles sit near the bottom), back on pause. */
+.order-success-page .os-drama-info { position: absolute; inset: auto 0 0; z-index: 2; padding: 56px 64px 15px 14px; background-image: linear-gradient(to top, rgba(20, 12, 23, .88), rgba(20, 12, 23, 0)); pointer-events: none; transition: opacity 300ms; }
+.order-success-page .os-drama-info.is-immersive { opacity: 0; }
+.order-success-page .os-drama-info h3 { display: -webkit-box; margin: 0; overflow: hidden; font-family: var(--bd-display); font-size: 24px; line-height: 1.02; font-weight: 400; letter-spacing: .01em; text-transform: uppercase; text-shadow: 0 2px 8px rgba(0, 0, 0, .5); overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
+.order-success-page .os-drama-info p { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 8px 0 0; font-size: 12px; line-height: 1.3; }
+.order-success-page .os-drama-badge { padding: 4px 10px; border-radius: 999px; background-image: linear-gradient(135deg, var(--bd-from), var(--bd-to)); font-weight: 600; white-space: nowrap; }
+.order-success-page .os-drama-genres { color: rgba(255, 255, 255, .85); text-shadow: 0 1px 3px rgba(0, 0, 0, .6); }
+
+.order-success-page .os-drama-mute { position: absolute; top: 10px; right: 10px; z-index: 3; display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 50%; background: rgba(0, 0, 0, .35); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); color: #fff; cursor: pointer; touch-action: manipulation; }
+
+.order-success-page .os-drama-progress { position: absolute; inset: auto 0 0; z-index: 3; height: 3px; background: rgba(255, 255, 255, .2); pointer-events: none; }
+.order-success-page .os-drama-progress span { display: block; width: 100%; height: 100%; background-image: linear-gradient(90deg, var(--bd-from), var(--bd-to)); transform: scaleX(0); transform-origin: left; }
+
+/* End of episode 1. */
+.order-success-page .os-drama-end { position: absolute; inset: 0; z-index: 4; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 24px; background: rgba(20, 12, 23, .8); text-align: center; animation: os-drama-fade-in 180ms ease-out; }
+.order-success-page .os-drama-end p { margin: 0 0 4px; color: var(--bd-muted); font-size: 13px; line-height: 1.4; }
+.order-success-page .os-drama-next { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 10px 22px; border-radius: 999px; background-color: #ff5a4c; background-image: linear-gradient(135deg, var(--bd-from), var(--bd-to)); box-shadow: 0 6px 20px rgba(255, 61, 127, .25); color: #fff; font-size: 15px; line-height: 1.3; font-weight: 600; text-decoration: none; }
+.order-success-page .os-drama-next:hover { color: #fff; text-decoration: none; }
+.order-success-page .os-drama-replay { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 8px 18px; border: 0; border-radius: 999px; background: rgba(255, 255, 255, .12); color: #fff; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+
+@keyframes os-drama-spin { to { transform: rotate(360deg); } }
+@keyframes os-drama-fade-in { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .order-success-page .os-drama-info { transition: none; }
+  .order-success-page :is(.os-drama-prompt, .os-drama-end) { animation: none; }
+}

@@ -1,10 +1,14 @@
-import { Component, useEffect, useState } from 'react'
+import { Component, useEffect, useMemo, useRef, useState } from 'react'
 import { fetchDramaPicks, orderForDisplay, sendDramaEvents, buildEventsBody } from '../services/dramaPicks'
+import DramaPlayer, { Cover } from './DramaPlayer'
 import './DramaPicksCard.css'
 
 // Impressions are sent once per page view per pid+order, even when React
-// StrictMode or a remount runs the effect again.
+// StrictMode or a remount runs the effect again. Clicks likewise once per
+// series (an interaction with the playing card, a thumbnail tap or a link).
 const impressedKeys = new Set()
+const clickedKeys = new Set()
+const playedKeys = new Set()
 
 // The order already exists when this renders: any failure here must leave the
 // rest of the success page untouched, so the card simply disappears.
@@ -17,26 +21,6 @@ export class DramaPicksBoundary extends Component {
   }
   render() { return this.state.failed ? null : this.props.children }
 }
-
-// Non-breaking space keeps "73 épisodes" on one line.
-const plural = (count, singular, pluralForm) => `${count}\u00A0${count === 1 ? singular : pluralForm}`
-
-const seriesMeta = (series) => [
-  ...series.genres,
-  series.episodeCount ? plural(series.episodeCount, 'épisode', 'épisodes') : null,
-].filter(Boolean).join(' · ')
-
-const freeLine = (series) => (series.freeEpisodes
-  ? `${plural(series.freeEpisodes, 'épisode gratuit', 'épisodes gratuits')} · en français`
-  : 'En français')
-
-const hideBrokenImage = (event) => { event.currentTarget.style.visibility = 'hidden' }
-
-const Cover = ({ url, className }) => (
-  <span className={className}>
-    {url && <img src={url} alt="" loading="lazy" decoding="async" onError={hideBrokenImage} />}
-  </span>
-)
 
 const safely = (fn) => {
   try { fn() } catch (error) { console.warn('drama picks action failed:', error) }
@@ -51,6 +35,19 @@ const emitEvents = (pid, events, preview) => {
   sendDramaEvents(pid, events)
 }
 
+// Dev fixture only: answers the episode route from `preview.episodes`
+// (a missing slug is a 404), after a short delay like the network.
+const previewEpisodeFetch = (episodes = {}) => (url) => new Promise((resolve) => {
+  const slug = new URL(url, 'http://preview.invalid').searchParams.get('slug')
+  const payload = episodes[slug]
+  setTimeout(() => resolve(payload
+    ? { ok: true, status: 200, json: async () => payload }
+    : { ok: false, status: 404, json: async () => ({}) }), 350)
+})
+
+// Dev only: the local preview proxies the videos over http://127.0.0.1.
+const DEV_MEDIA = Boolean(import.meta.env?.DEV)
+
 const DramaPicksCard = ({ pid, impressionKey = '', preview = null, onTrack, onLeave }) => {
   // undefined = loading, null = nothing to show, object = { mode, series }.
   // Explore mode is shuffled once here, so re-renders keep the same order.
@@ -58,6 +55,15 @@ const DramaPicksCard = ({ pid, impressionKey = '', preview = null, onTrack, onLe
     if (!pid) return null
     return preview ? orderForDisplay(preview) : undefined
   })
+  // Series in the player: the big card (slot 0) until a thumbnail is tapped.
+  const [chosen, setChosen] = useState(null)
+  const playerRef = useRef(null)
+  const previewFetch = useMemo(() => (preview ? previewEpisodeFetch(preview.episodes) : null), [preview])
+  const featured = useMemo(
+    () => (picks?.series?.length ? { series: picks.series[0], slot: 0, trigger: 'autoplay' } : null),
+    [picks]
+  )
+  const current = chosen || featured
 
   useEffect(() => {
     if (!pid || preview) return undefined
@@ -86,77 +92,97 @@ const DramaPicksCard = ({ pid, impressionKey = '', preview = null, onTrack, onLe
   if (picks === undefined) {
     return (
       <div className="os-drama os-drama-skeleton" aria-hidden="true">
-        <span className="os-drama-skel os-drama-skel-kicker" />
-        <div className="os-drama-main">
-          <span className="os-drama-skel os-drama-skel-cover" />
-          <div className="os-drama-info">
-            <span className="os-drama-skel os-drama-skel-line" />
-            <span className="os-drama-skel os-drama-skel-line os-drama-skel-short" />
-            <span className="os-drama-skel os-drama-skel-line" />
-            <span className="os-drama-skel os-drama-skel-line" />
-          </div>
+        <div className="os-drama-head">
+          <span className="os-drama-skel os-drama-skel-logo" />
+          <span className="os-drama-skel os-drama-skel-kicker" />
         </div>
-        <span className="os-drama-skel os-drama-skel-cta" />
+        <span className="os-drama-skel os-drama-skel-stage" />
+        <div className="os-drama-body">
+          <span className="os-drama-skel os-drama-skel-cta" />
+        </div>
       </div>
     )
   }
-  if (!picks?.series?.length) return null
+  if (!picks?.series?.length || !current) return null
 
-  const [featured, ...others] = picks.series
+  const track = (event, series, slot, extra = {}) => safely(() => onTrack?.(event, {
+    pid, series: series.slug, slot, mode: picks.mode, ...extra,
+  }))
 
-  const handleOpen = (series, slot) => {
+  // BabiDrama `click`: the customer engaged with that series (thumbnail tap,
+  // a tap on the playing card or one of its links), once per page view.
+  const markClick = (series, slot, action) => {
+    const key = `${pid}|${impressionKey}|${series.slug}`
+    if (clickedKeys.has(key)) return
+    clickedKeys.add(key)
+    safely(() => emitEvents(pid, [{ type: 'click', slug: series.slug, slot }], preview))
+    track('order_success_drama_click', series, slot, { action })
+  }
+
+  const handleSwitch = (series, slot) => {
+    // Inside the tap, before any await: lets iOS start the next series with sound.
+    safely(() => playerRef.current?.unlock())
+    markClick(series, slot, 'thumbnail')
+    setChosen({ series, slot, trigger: 'thumbnail' })
+  }
+
+  const handlePlayStart = (series, slot, { sound, trigger }) => {
+    const key = `${pid}|${impressionKey}|${series.slug}`
+    if (playedKeys.has(key)) return
+    playedKeys.add(key)
+    track('order_success_drama_play', series, slot, { sound, trigger })
+  }
+
+  const handleOpenSite = (series, slot, { source, secondsWatched, positionS }) => {
     // Preserve the confirmation page when the customer comes back.
     safely(() => onLeave?.())
-    safely(() => emitEvents(pid, [{ type: 'click', slug: series.slug, slot }], preview))
-    safely(() => onTrack?.('order_success_drama_click', { pid, series: series.slug, slot, mode: picks.mode }))
+    markClick(series, slot, source)
+    safely(() => emitEvents(pid, [{ type: 'open', slug: series.slug, slot }], preview))
+    track('order_success_drama_open', series, slot, { source, seconds_watched: secondsWatched, position_s: positionS })
     // The anchor itself navigates; nothing here may block it.
   }
 
-  const meta = seriesMeta(featured)
+  const others = picks.series
+    .map((series, slot) => ({ series, slot }))
+    .filter(({ series }) => series.slug !== current.series.slug)
 
   return (
     <section className="os-drama" aria-labelledby="os-drama-kicker">
       <div className="os-drama-head">
-        <h2 id="os-drama-kicker">En attendant votre livraison</h2>
-        <span className="os-drama-brand">BabiDrama</span>
-      </div>
-
-      <div className="os-drama-main">
-        <Cover url={featured.coverUrl} className="os-drama-cover" />
-        <div className="os-drama-info">
-          <h3>{featured.title}</h3>
-          {meta && <p className="os-drama-meta">{meta}</p>}
-          {featured.hook && <p className="os-drama-hook">{featured.hook}</p>}
+        <img className="os-drama-logo" src="/babidrama/babidrama-logo-64.png" width="28" height="28" alt="" />
+        <div>
+          <span className="os-drama-brand">BabiDrama</span>
+          <h2 id="os-drama-kicker">En attendant votre livraison</h2>
         </div>
       </div>
 
-      <a
-        className="os-drama-cta"
-        href={featured.watchUrl}
-        target="_blank"
-        rel="noopener"
-        onClick={() => handleOpen(featured, 0)}
-      >
-        <span aria-hidden="true">{'▶︎'}</span> Regarder l’épisode 1
-      </a>
-      <p className="os-drama-free">{freeLine(featured)}</p>
+      <DramaPlayer
+        ref={playerRef}
+        current={current}
+        fetchImpl={previewFetch}
+        allowLoopbackHttp={DEV_MEDIA}
+        onInteract={(series, slot, action) => markClick(series, slot, action)}
+        onPlayStart={handlePlayStart}
+        onComplete={(series, slot, { durationS }) => track('order_success_drama_complete', series, slot, { duration_s: durationS })}
+        onFail={(series, slot, reason) => track('order_success_drama_play_error', series, slot, { reason })}
+        onOpenSite={handleOpenSite}
+      />
 
       {others.length > 0 && (
         <div className="os-drama-more">
           <p className="os-drama-more-label">Autres séries</p>
           <ul>
-            {others.map((series, index) => (
+            {others.map(({ series, slot }) => (
               <li key={series.slug}>
-                <a
+                <button
+                  type="button"
                   className="os-drama-thumb"
-                  href={series.watchUrl}
-                  target="_blank"
-                  rel="noopener"
-                  onClick={() => handleOpen(series, index + 1)}
+                  aria-label={`Regarder ${series.title}`}
+                  onClick={() => handleSwitch(series, slot)}
                 >
                   <Cover url={series.coverUrl} className="os-drama-thumb-cover" />
-                  <span className="os-drama-thumb-title">{series.title}</span>
-                </a>
+                  <span className="os-drama-thumb-title" aria-hidden="true">{series.title}</span>
+                </button>
               </li>
             ))}
           </ul>

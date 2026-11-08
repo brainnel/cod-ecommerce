@@ -1,46 +1,87 @@
-/* BabiDrama picks on the order-success page; scoped like OrderSuccessPage.css. */
-.order-success-page .os-drama { margin: 0 0 24px; padding: 14px 14px 15px; border: 1px solid #e9ede9; border-radius: 8px; background: #fff; color: #27332d; }
-.order-success-page .os-drama-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
-.order-success-page .os-drama-head h2 { margin: 0; color: #6c766e; font-size: 12px; line-height: 1.5; font-weight: 550; letter-spacing: 0; }
-.order-success-page .os-drama-brand { flex-shrink: 0; color: #d6336c; font-size: 10px; line-height: 1.5; font-weight: 650; letter-spacing: .2px; }
-.order-success-page .os-drama-main { display: flex; align-items: flex-start; gap: 13px; }
-.order-success-page :is(.os-drama-cover, .os-drama-thumb-cover) { position: relative; display: block; overflow: hidden; aspect-ratio: 3 / 4; background: linear-gradient(160deg, #fff0e6, #ffe3ec); }
-.order-success-page :is(.os-drama-cover, .os-drama-thumb-cover)::after { content: '\25B6\FE0E'; position: absolute; inset: 0; display: grid; place-items: center; color: #f08aa8; font-size: 18px; }
-.order-success-page :is(.os-drama-cover, .os-drama-thumb-cover) img { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; max-width: none; object-fit: cover; }
-.order-success-page .os-drama-cover { flex: 0 0 104px; width: 104px; border-radius: 6px; }
-.order-success-page .os-drama-info { flex: 1; min-width: 0; }
-.order-success-page .os-drama-info h3 { margin: 1px 0 0; font-size: 15px; line-height: 1.4; font-weight: 600; letter-spacing: -.2px; overflow-wrap: anywhere; hyphens: auto; }
-.order-success-page .os-drama-meta { margin: 4px 0 0; color: #748077; font-size: 11.5px; line-height: 1.5; overflow-wrap: anywhere; }
-.order-success-page .os-drama-hook { display: -webkit-box; margin: 8px 0 0; overflow: hidden; color: #4b584f; font-size: 12.5px; line-height: 1.55; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; }
-.order-success-page .os-drama-cta { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 46px; margin-top: 14px; padding: 11px 12px; border-radius: 6px; background-color: #ff5a4c; background-image: linear-gradient(90deg, #ff7a1a, #ff3d7f); color: #fff; font-size: 14px; line-height: 1.5; font-weight: 650; text-decoration: none; transition: filter 120ms; }
-.order-success-page .os-drama-cta span { font-size: 12px; }
-.order-success-page .os-drama-cta:hover { color: #fff; filter: brightness(.95); text-decoration: none; }
-.order-success-page .os-drama-cta:active { filter: brightness(.9); }
-.order-success-page .os-drama-free { margin: 7px 0 0; color: #748077; font-size: 11px; line-height: 1.5; text-align: center; }
-.order-success-page .os-drama-more { margin-top: 13px; padding-top: 12px; border-top: 1px solid #edf0ed; }
-.order-success-page .os-drama-more-label { margin: 0 0 9px; color: #6c766e; font-size: 11.5px; line-height: 1.5; font-weight: 550; }
-.order-success-page .os-drama-more ul { display: flex; gap: 12px; margin: 0; padding: 0; list-style: none; }
-.order-success-page .os-drama-more li { flex: 0 0 64px; min-width: 0; }
-.order-success-page .os-drama-thumb { display: block; color: #39483e; text-decoration: none; }
-.order-success-page .os-drama-thumb-cover { width: 100%; border-radius: 5px; }
-.order-success-page .os-drama-thumb-cover::after { font-size: 13px; }
-.order-success-page .os-drama-thumb-title { display: -webkit-box; margin-top: 5px; overflow: hidden; font-size: 11px; line-height: 1.35; overflow-wrap: anywhere; hyphens: auto; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
-.order-success-page .os-drama-thumb:hover .os-drama-thumb-title { color: #d6336c; }
+/* BabiDrama card on the order-success page, in BabiDrama's "Nuit Drama" style
+   (dark sheet, orange → pink gradient, Anton titles). Scoped like OrderSuccessPage.css. */
 
-/* Loading placeholder: reserves roughly the card's height for at most 2.5 s. */
-.order-success-page .os-drama-skel { display: block; border-radius: 4px; background: #f1f4f1; animation: os-drama-pulse 1.2s ease-in-out infinite; }
-.order-success-page .os-drama-skel-kicker { width: 46%; height: 10px; margin: 4px 0 15px; }
-.order-success-page .os-drama-skel-cover { flex: 0 0 104px; width: 104px; aspect-ratio: 3 / 4; border-radius: 6px; }
-.order-success-page .os-drama-skel-line { height: 11px; margin: 4px 0 11px; }
-.order-success-page .os-drama-skel-short { width: 60%; }
-.order-success-page .os-drama-skel-cta { height: 46px; margin-top: 14px; border-radius: 6px; }
+/* Anton, Latin subset (SIL Open Font License, see /babidrama/OFL.txt), as on babidrama.com. */
+@font-face {
+  font-family: 'BabiDrama Anton';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/babidrama/anton-latin-v27.woff2') format('woff2');
+  unicode-range: U+0020-007E, U+00A0-00FF, U+0152-0153, U+0178, U+2013-2014, U+2018-2019, U+201C-201D, U+2026, U+202F, U+20AC;
+}
+
+.order-success-page .os-drama {
+  --bd-bg: #140c17;
+  --bd-sheet: #1f1424;
+  --bd-from: #ff7a1a;
+  --bd-to: #ff3d7f;
+  --bd-text: #fff;
+  --bd-muted: rgba(255, 255, 255, .62);
+  --bd-chip: rgba(255, 255, 255, .08);
+  --bd-display: 'BabiDrama Anton', Impact, 'Arial Narrow', sans-serif;
+  position: relative;
+  margin: 0 0 24px;
+  padding: 0 0 15px;
+  overflow: hidden;
+  border-radius: 16px;
+  background: var(--bd-bg);
+  color: var(--bd-text);
+  box-shadow: 0 10px 28px rgba(20, 12, 23, .16);
+  -webkit-font-smoothing: antialiased;
+}
+.order-success-page .os-drama :is(button, a):focus-visible { outline: 2px solid var(--bd-to); outline-offset: 2px; }
+
+.order-success-page .os-drama-head { display: flex; align-items: center; gap: 10px; padding: 12px 14px; }
+.order-success-page .os-drama-logo { flex-shrink: 0; width: 28px; height: 28px; border-radius: 8px; }
+.order-success-page .os-drama-head > div { min-width: 0; }
+.order-success-page .os-drama-brand { display: block; font-family: var(--bd-display); font-size: 16px; line-height: 1.05; letter-spacing: .02em; text-transform: uppercase; }
+.order-success-page .os-drama-head h2 { margin: 2px 0 0; color: var(--bd-muted); font-size: 11.5px; line-height: 1.35; font-weight: 500; letter-spacing: 0; }
+
+.order-success-page .os-drama-body { padding: 14px 14px 0; }
+
+/* Primary CTA: BabiDrama's gradient pill. */
+.order-success-page .os-drama-cta { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 48px; padding: 10px 18px; border-radius: 999px; background-color: #ff5a4c; background-image: linear-gradient(135deg, var(--bd-from), var(--bd-to)); box-shadow: 0 6px 20px rgba(255, 61, 127, .25); color: #fff; font-size: 15px; line-height: 1.3; font-weight: 600; text-decoration: none; transition: opacity 120ms; }
+.order-success-page .os-drama-cta:hover { color: #fff; text-decoration: none; opacity: .94; }
+.order-success-page .os-drama-cta:active { opacity: .86; }
+.order-success-page .os-drama-cta svg { flex-shrink: 0; }
+.order-success-page .os-drama-free { margin: 8px 0 0; color: var(--bd-muted); font-size: 12px; line-height: 1.5; text-align: center; }
+
+/* Without a player (episode or video failed): the cover and its link. */
+.order-success-page .os-drama-main { display: flex; align-items: flex-start; gap: 13px; margin-bottom: 14px; }
+.order-success-page :is(.os-drama-cover, .os-drama-thumb-cover) { position: relative; display: block; overflow: hidden; aspect-ratio: 3 / 4; background: var(--bd-sheet); }
+.order-success-page :is(.os-drama-cover, .os-drama-thumb-cover)::after { content: '\25B6\FE0E'; position: absolute; inset: 0; display: grid; place-items: center; color: rgba(255, 255, 255, .35); font-size: 18px; }
+.order-success-page :is(.os-drama-cover, .os-drama-thumb-cover) img { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; max-width: none; object-fit: cover; }
+.order-success-page .os-drama-cover { flex: 0 0 104px; width: 104px; border-radius: 10px; }
+.order-success-page .os-drama-static { flex: 1; min-width: 0; }
+.order-success-page .os-drama-static h3 { margin: 1px 0 0; font-family: var(--bd-display); font-size: 21px; line-height: 1.04; font-weight: 400; letter-spacing: .01em; text-transform: uppercase; overflow-wrap: anywhere; }
+.order-success-page .os-drama-meta { margin: 6px 0 0; color: var(--bd-muted); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.order-success-page .os-drama-hook { display: -webkit-box; margin: 8px 0 0; overflow: hidden; color: rgba(255, 255, 255, .85); font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; }
+
+.order-success-page .os-drama-more { margin: 15px 14px 0; padding-top: 13px; border-top: 1px solid rgba(255, 255, 255, .08); }
+.order-success-page .os-drama-more-label { margin: 0 0 9px; color: var(--bd-muted); font-size: 12px; line-height: 1.5; font-weight: 600; }
+.order-success-page .os-drama-more ul { display: flex; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.order-success-page .os-drama-more li { flex: 0 0 66px; min-width: 0; }
+.order-success-page .os-drama-thumb { display: block; width: 100%; padding: 0; border: 0; background: none; color: rgba(255, 255, 255, .85); font: inherit; text-align: left; cursor: pointer; touch-action: manipulation; }
+.order-success-page .os-drama-thumb-cover { width: 100%; border-radius: 8px; }
+.order-success-page .os-drama-thumb-cover::after { z-index: 2; color: #fff; font-size: 12px; text-shadow: 0 1px 4px rgba(0, 0, 0, .6); }
+.order-success-page .os-drama-thumb-title { display: -webkit-box; margin-top: 5px; overflow: hidden; font-size: 11px; line-height: 1.35; overflow-wrap: anywhere; hyphens: auto; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
+.order-success-page .os-drama-thumb:active .os-drama-thumb-cover { opacity: .8; }
+
+/* Loading placeholder: reserves the card's height for at most 2.5 s. */
+.order-success-page .os-drama-skel { display: block; border-radius: 6px; background: rgba(255, 255, 255, .07); animation: os-drama-pulse 1.2s ease-in-out infinite; }
+.order-success-page .os-drama-skel-logo { flex: 0 0 28px; height: 28px; border-radius: 8px; }
+.order-success-page .os-drama-skel-kicker { width: 46%; height: 12px; }
+.order-success-page .os-drama-skel-stage { height: 62vh; max-height: 560px; min-height: 280px; border-radius: 0; }
+.order-success-page .os-drama-skel-cta { height: 48px; border-radius: 999px; }
 @keyframes os-drama-pulse { 50% { opacity: .5; } }
 
 @media (max-width: 360px) {
-  .order-success-page .os-drama { padding-left: 12px; padding-right: 12px; }
-  .order-success-page :is(.os-drama-cover, .os-drama-skel-cover) { flex-basis: 96px; width: 96px; }
+  .order-success-page .os-drama-body { padding-left: 12px; padding-right: 12px; }
+  .order-success-page .os-drama-more { margin-left: 12px; margin-right: 12px; }
+  .order-success-page .os-drama-cover { flex-basis: 92px; width: 92px; }
   .order-success-page .os-drama-more ul { gap: 9px; }
-  .order-success-page .os-drama-more li { flex-basis: 56px; }
+  .order-success-page .os-drama-more li { flex-basis: 58px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .order-success-page .os-drama-skel { animation: none; }

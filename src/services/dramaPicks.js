@@ -5,7 +5,8 @@
 export const DRAMA_PICKS_TIMEOUT_MS = 2500
 export const DRAMA_MAX_SERIES = 5
 export const DRAMA_MAX_EVENTS = 6
-export const DRAMA_EVENT_TYPES = ['impression', 'click']
+// open = « Continuer sur BabiDrama » / « Épisode 2 » from the inline player.
+export const DRAMA_EVENT_TYPES = ['impression', 'click', 'open']
 
 const DEFAULT_DRAMA_BASE_URL = 'https://babidrama.com'
 const PICKS_PATH = '/api/partner/brainnel/picks'
@@ -13,7 +14,7 @@ const EVENTS_PATH = '/api/partner/brainnel/events'
 
 export const getDramaBaseUrl = () => import.meta.env?.VITE_BABIDRAMA_BASE_URL || DEFAULT_DRAMA_BASE_URL
 
-const trimBase = (base) => String(base || DEFAULT_DRAMA_BASE_URL).replace(/\/+$/, '')
+export const trimDramaBase = (base) => String(base || DEFAULT_DRAMA_BASE_URL).replace(/\/+$/, '')
 
 // Single product: its numeric id. Bundle (synthetic product built by the
 // checkout as "bundle:<id>"): "bundle-<id>". Anything else gets no card.
@@ -26,9 +27,9 @@ export const pidForProduct = (product) => {
   return bundle ? `bundle-${bundle[1]}` : null
 }
 
-export const picksUrl = (base, pid) => `${trimBase(base)}${PICKS_PATH}?pid=${encodeURIComponent(pid)}`
+export const picksUrl = (base, pid) => `${trimDramaBase(base)}${PICKS_PATH}?pid=${encodeURIComponent(pid)}`
 
-export const eventsUrl = (base) => `${trimBase(base)}${EVENTS_PATH}`
+export const eventsUrl = (base) => `${trimDramaBase(base)}${EVENTS_PATH}`
 
 // Fisher–Yates on a copy; the input list is never mutated.
 export const shuffle = (list, random = Math.random) => {

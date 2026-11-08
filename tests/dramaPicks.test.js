@@ -90,6 +90,9 @@ test('events body keeps only valid events and caps them at six', () => {
     { type: 'click', slug: 'a', slot: 5 }, { type: 'click', slug: 'a', slot: -1 }, { type: 'click', slug: 'a', slot: '1' }, { type: 'click', slug: 'ok', slot: 4 }]))
   assert.deepEqual(filtered.events, [{ type: 'click', slug: 'ok', slot: 4 }])
   assert.equal(buildEventsBody('p', []), null)
+  // « Continuer sur BabiDrama » / « Épisode 2 » from the inline player.
+  assert.deepEqual(JSON.parse(buildEventsBody('p', [{ type: 'open', slug: 'a', slot: 2, extra: 'drop' }])),
+    { pid: 'p', events: [{ type: 'open', slug: 'a', slot: 2 }] })
   assert.equal(buildEventsBody('', [{ type: 'click', slug: 'a', slot: 0 }]), null)
   assert.equal(buildEventsBody('p', null), null)
 })

@@ -117,10 +117,20 @@ const getDevOrderSuccessPreviewState = (search) => {
 }
 
 // Dev-only: babidrama.com refuses requests from outside Côte d'Ivoire, so
-// `&preview_drama=1` feeds the card a static picks response instead.
+// `&preview_drama=1` feeds the card a static picks response instead. Its
+// episodes play a 10 s test video served by scripts/preview_readonly_api.py
+// (npm run preview:local); the third series answers 404 (cover + link).
 const previewDramaCover = (from, to, label) => `data:image/svg+xml,${encodeURIComponent(
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 400"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${from}"/><stop offset="1" stop-color="${to}"/></linearGradient></defs><rect width="300" height="400" fill="url(#g)"/><text x="150" y="360" fill="#fff" font-family="sans-serif" font-size="34" font-weight="700" text-anchor="middle">${label}</text></svg>`
 )}`
+
+const previewDramaEpisode = (slug, title, hasNext) => {
+  const media = `${typeof window === 'undefined' ? 'http://127.0.0.1:4173' : window.location.origin}/__preview/api/bdtest`
+  return {
+    slug, title, episodeIndex: 1, durationS: 10, posterUrl: `${media}/poster.jpg`, urls: { '480p': `${media}/episode-480p.mp4` },
+    watchUrl: `https://babidrama.com/w/${slug}/1?c=brainnel`, nextUrl: hasNext ? `https://babidrama.com/w/${slug}/2?c=brainnel` : null
+  }
+}
 
 const getDevDramaPreview = (search) => {
   if (!import.meta.env.DEV) return null
@@ -128,6 +138,10 @@ const getDevDramaPreview = (search) => {
   if (params.get('preview_order_success') !== '1' || params.get('preview_drama') !== '1') return null
 
   return {
+    episodes: {
+      'le-mari-infidele': previewDramaEpisode('le-mari-infidele', 'Le Mari infidèle', true),
+      'la-reine-de-cocody': previewDramaEpisode('la-reine-de-cocody', 'La Reine de Cocody', false)
+    },
     pid: '946101641067',
     mode: 'explore',
     series: [
