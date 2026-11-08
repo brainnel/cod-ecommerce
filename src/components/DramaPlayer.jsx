@@ -6,7 +6,7 @@ import {
   freeEpisodesLine,
   playedSeconds,
 } from '../services/dramaEpisode'
-import { mediaErrorDetails } from '../services/dramaDiagnostics'
+import { bufferedSeconds, mediaErrorDetails, networkDetails } from '../services/dramaDiagnostics'
 import './DramaPlayer.css'
 
 // Inline BabiDrama player of the order-success card: one persistent <video>
@@ -144,23 +144,29 @@ const DramaPlayer = ({
   // Android): was autoplay refused outright (« Touchez pour lancer », no timeout then), or did
   // the viewer leave first? One `tap_needed` and one `leave` per episode load, analytics only.
   const diagRef = useRef(null)
-  const diagnose = (name, extra = {}) => {
+  // Where the episode stood: also sent with an 8 s timeout (1.6 % of views, Android only on
+  // 2026-11-08), to tell a slow episode answer (`loading`) from a slow video (`starting`).
+  const diagDetails = () => {
     const video = videoRef.current
     const diag = diagRef.current
     const ms = (from) => (from == null ? null : Math.round(nowMs() - from))
-    notify('onDiagnostic', name, {
+    return {
       status: statusRef.current,
       ms_since_load: ms(diag?.loadedAt),
       ms_since_src: ms(diag?.srcAt),
       ready_state: video?.readyState ?? null,
       network_state: video?.networkState ?? null,
+      buffered_s: bufferedSeconds(video),
       in_view: inViewRef.current,
       page_visible: typeof document === 'undefined' ? null : document.visibilityState === 'visible',
-      ...extra,
-    })
+      ...networkDetails(),
+    }
   }
+  const diagnose = (name, extra = {}) => notify('onDiagnostic', name, { ...diagDetails(), ...extra })
   const diagnoseRef = useRef(diagnose)
   diagnoseRef.current = diagnose
+  const diagDetailsRef = useRef(diagDetails)
+  diagDetailsRef.current = diagDetails
 
   const callbacks = useRef({})
   callbacks.current = { onInteract, onPlayStart, onComplete, onFail, onOpenSite, onDiagnostic, fetchImpl, allowLoopbackHttp }
@@ -169,6 +175,10 @@ const DramaPlayer = ({
   const isCurrent = (event) => Boolean(srcRef.current) && event.currentTarget.getAttribute('src') === srcRef.current
 
   const fail = (reason, details = null) => {
+    // Once per episode load: the episode request and the stage each time out at 8 s, and both
+    // used to report (two `timeout` errors for one view).
+    if (diagRef.current?.failed) return
+    if (diagRef.current) diagRef.current.failed = true
     const video = videoRef.current
     if (video && srcRef.current) {
       lastPositionRef.current = video.currentTime || lastPositionRef.current
@@ -239,7 +249,7 @@ const DramaPlayer = ({
     if (progressRef.current) progressRef.current.style.transform = 'scaleX(0)'
     setStatus('loading')
     setHasFrame(false)
-    diagRef.current = { loadedAt: nowMs(), srcAt: null, tapNeeded: false, left: false }
+    diagRef.current = { loadedAt: nowMs(), srcAt: null, tapNeeded: false, left: false, failed: false }
     setEpisode(null)
     setPaused(true)
     setBuffering(false)
@@ -251,7 +261,9 @@ const DramaPlayer = ({
     requestEpisode(series.slug, { fetchImpl, allowLoopbackHttp: allowHttp }).then((result) => {
       if (loadIdRef.current !== loadId || result.status === 'aborted') return
       if (result.status !== 'ok') {
-        failRef.current(result.status === 'not_found' ? 'not_found' : result.reason || 'error')
+        let details = null
+        try { details = diagDetailsRef.current() } catch { details = null }
+        failRef.current(result.status === 'not_found' ? 'not_found' : result.reason || 'error', details)
         return
       }
       const next = result.episode
@@ -276,7 +288,11 @@ const DramaPlayer = ({
   // No `canplay` within 8 s (or no episode response): show the cover instead.
   useEffect(() => {
     if (needsTap || (status !== 'loading' && status !== 'starting')) return undefined
-    const timer = setTimeout(() => failRef.current('timeout'), DRAMA_START_TIMEOUT_MS)
+    const timer = setTimeout(() => {
+      let details = null
+      try { details = diagDetailsRef.current() } catch { details = null }
+      failRef.current('timeout', details)
+    }, DRAMA_START_TIMEOUT_MS)
     return () => clearTimeout(timer)
   }, [status, needsTap, current])
 

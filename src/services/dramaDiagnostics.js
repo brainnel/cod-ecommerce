@@ -41,3 +41,26 @@ export const probeMedia = async (url, { fetchImpl = globalThis.fetch, timeoutMs 
     clearTimeout(timer)
   }
 }
+
+// Seconds of the episode buffered from its start (0 when nothing arrived yet).
+export const bufferedSeconds = (video) => {
+  try {
+    const ranges = video?.buffered
+    if (!ranges || ranges.length === 0) return 0
+    return Math.round(ranges.end(0) * 10) / 10
+  } catch {
+    return null
+  }
+}
+
+// What the browser reports about the connection (Android Chrome and WebViews; absent on iOS).
+export const networkDetails = (nav = typeof navigator === 'undefined' ? null : navigator) => {
+  const connection = nav?.connection || nav?.mozConnection || nav?.webkitConnection
+  if (!connection) return {}
+  return {
+    net_type: connection.effectiveType ?? null,
+    net_downlink_mbps: typeof connection.downlink === 'number' ? connection.downlink : null,
+    net_rtt_ms: typeof connection.rtt === 'number' ? connection.rtt : null,
+    net_save_data: typeof connection.saveData === 'boolean' ? connection.saveData : null,
+  }
+}
