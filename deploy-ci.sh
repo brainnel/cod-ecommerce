@@ -2,8 +2,25 @@
 
 # CI/CD 部署脚本 - 适用于 GitHub Actions
 # 用于自动化部署 Brainnel.com
+#
+#   bash deploy-ci.sh --dist <archive.tgz> --sha256 <hex>
+#       GitHub Actions 已构建好的版本：校验后直接发布，本机不安装依赖、不构建（默认路径）。
+#   bash deploy-ci.sh
+#       本机构建再发布（手动备用路径）。
 
 set -euo pipefail
+
+# Archives uploaded by GitHub Actions; kept as rollback material like the webroot backups.
+ARTIFACT_DIR=/home/admin/cod-deploy-artifacts
+DIST_ARCHIVE=""
+DIST_SHA256=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --dist) DIST_ARCHIVE="${2:-}"; shift 2 ;;
+        --sha256) DIST_SHA256="${2:-}"; shift 2 ;;
+        *) echo "❌ 未知参数: $1"; exit 1 ;;
+    esac
+done
 
 echo "🚀 开始 CI/CD 自动部署..."
 
@@ -15,7 +32,7 @@ fi
 
 cd /home/admin/projects/cod-ecommerce
 
-for REQUIRED_COMMAND in git npm rsync curl flock; do
+for REQUIRED_COMMAND in git npm rsync curl flock tar sha256sum; do
     command -v "$REQUIRED_COMMAND" >/dev/null || { echo "❌ 缺少命令: $REQUIRED_COMMAND"; exit 1; }
 done
 # Serialize manual/script deployments as well as the workflow concurrency guard.
@@ -31,15 +48,30 @@ if [ -n "$(git status --porcelain)" ]; then
 fi
 git merge --ff-only origin/main
 
-echo "📦 安装/更新依赖..."
-npm ci --include=dev
+if [ -n "$DIST_ARCHIVE" ]; then
+    echo "📦 使用 GitHub Actions 构建好的版本（本机不构建）..."
+    case "$DIST_ARCHIVE" in
+        "$ARTIFACT_DIR"/brainnel-dist-*.tgz) ;;
+        *) echo "❌ 构建包必须位于 $ARTIFACT_DIR"; exit 1 ;;
+    esac
+    [ -f "$DIST_ARCHIVE" ] || { echo "❌ 构建包不存在: $DIST_ARCHIVE"; exit 1; }
+    [[ "$DIST_SHA256" =~ ^[0-9a-f]{64}$ ]] || { echo "❌ 缺少或无效的 --sha256"; exit 1; }
+    # Verify before extracting anything: a truncated or foreign upload never reaches the webroot.
+    echo "$DIST_SHA256  $DIST_ARCHIVE" | sha256sum -c --quiet - || { echo "❌ 构建包校验失败"; exit 1; }
+    DIST_DIR=$(mktemp -d "${DIST_ARCHIVE%.tgz}.XXXXXXXX")
+    tar -xzf "$DIST_ARCHIVE" -C "$DIST_DIR" --no-same-owner
+else
+    echo "📦 安装/更新依赖..."
+    npm ci --include=dev
 
-echo "🏗️ 构建生产版本..."
-npm run build:prod
+    echo "🏗️ 构建生产版本..."
+    npm run build:prod
+    DIST_DIR=./dist
+fi
 
-# 检查构建是否成功
-if [ ! -d "dist" ] || [ ! -f "dist/index.html" ]; then
-    echo "❌ 构建失败 - dist 目录或 index.html 不存在"
+# 检查构建产物
+if [ ! -d "$DIST_DIR" ] || [ ! -f "$DIST_DIR/index.html" ]; then
+    echo "❌ 构建产物不完整 - $DIST_DIR/index.html 不存在"
     exit 1
 fi
 
@@ -73,13 +105,13 @@ for SITE in "${SITES[@]}"; do
     # No --delete / --inplace: old tabs retain their lazy chunks, and rsync
     # finishes files with a rename instead of exposing partially copied files.
     sudo rsync -a --delay-updates --exclude='/index.html' \
-        --chown=www-data:www-data --chmod=D755,F644 ./dist/ "$SITE/"
+        --chown=www-data:www-data --chmod=D755,F644 "$DIST_DIR/" "$SITE/"
 
     echo "🔀 最后原子替换 $SITE/index.html ..."
     # mktemp lives in the destination directory: mv is a same-filesystem rename.
     # Until the rename succeeds, readers continue seeing the previous entrypoint.
     INDEX_TMP=$(sudo mktemp "$SITE/.index.html.deploy.XXXXXXXX")
-    sudo install -o www-data -g www-data -m 644 ./dist/index.html "$INDEX_TMP"
+    sudo install -o www-data -g www-data -m 644 "$DIST_DIR/index.html" "$INDEX_TMP"
     sudo mv -fT -- "$INDEX_TMP" "$SITE/index.html"
     INDEX_TMP=""
 

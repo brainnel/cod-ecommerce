@@ -6,10 +6,12 @@
 
 ### 部署流程
 1. 推送代码到 `main` 分支
-2. GitHub Actions 自动触发
-3. 在GitHub的runner上构建项目
-4. SSH连接到服务器执行部署脚本
-5. 自动部署到生产环境
+2. GitHub Actions 自动触发，在 GitHub 的 runner 上测试并构建（`npm test && npm run build:prod`），只构建这一次
+3. 把 `dist` 打包成 `brainnel-dist-<commit>.tgz`，计算 SHA-256，上传到服务器 `/home/admin/cod-deploy-artifacts/`
+4. SSH 到服务器，快进更新代码后执行 `deploy-ci.sh --dist <包> --sha256 <值>`：先校验，再解压，服务器上不安装依赖、不构建
+5. 先同步新资源（保留旧的 hash 文件），最后原子替换 `index.html`，两个站点（brainnel.com、brainnel-vite.com）同时更新；正在浏览的访客不受影响
+
+上传的包和解压目录都保留在 `/home/admin/cod-deploy-artifacts/`，和 webroot 备份一样可以作为回滚材料（约 1 MB/次）。
 
 ### 必需的GitHub Secrets
 - `HOST`: 服务器IP地址 (13.245.80.24)
@@ -23,8 +25,8 @@
 # 使用原始部署脚本
 ./deploy.sh
 
-# 或使用CI脚本
-./deploy-ci.sh
+# 或在服务器上用 CI 脚本本机构建再发布（备用路径，会占用服务器 CPU 约 1 分钟）
+bash deploy-ci.sh
 ```
 
 ### 网站地址

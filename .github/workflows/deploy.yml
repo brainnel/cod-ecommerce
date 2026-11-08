@@ -31,7 +31,38 @@ jobs:
       
     - name: Build project
       run: npm test && npm run build:prod
-      
+
+    # The site is built once, here. The web server (2 vCPU, 3.8 GiB) only publishes the archive,
+    # so a deploy never competes with visitors for its CPU.
+    - name: Package build
+      id: package
+      run: |
+        set -euo pipefail
+        test -f dist/index.html
+        ARCHIVE="brainnel-dist-${GITHUB_SHA}.tgz"
+        tar -C dist -czf "$ARCHIVE" .
+        echo "archive=$ARCHIVE" >> "$GITHUB_OUTPUT"
+        echo "sha256=$(sha256sum "$ARCHIVE" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+
+    - name: Prepare upload directory
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.HOST }}
+        username: ${{ secrets.USERNAME }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        port: ${{ secrets.PORT }}
+        script: mkdir -p /home/admin/cod-deploy-artifacts
+
+    - name: Upload build
+      uses: appleboy/scp-action@v0.1.7
+      with:
+        host: ${{ secrets.HOST }}
+        username: ${{ secrets.USERNAME }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        port: ${{ secrets.PORT }}
+        source: ${{ steps.package.outputs.archive }}
+        target: /home/admin/cod-deploy-artifacts
+
     - name: Deploy to server
       uses: appleboy/ssh-action@v1.0.3
       with:
@@ -52,8 +83,9 @@ jobs:
           fi
           git merge --ff-only origin/main
 
+          # Publish the archive built above (checksum verified; nothing is built on this host).
           # Do not chmod the tracked file and make the checkout dirty.
-          bash deploy-ci.sh
+          bash deploy-ci.sh --dist /home/admin/cod-deploy-artifacts/${{ steps.package.outputs.archive }} --sha256 ${{ steps.package.outputs.sha256 }}
           
     - name: Notify deployment status
       run: |

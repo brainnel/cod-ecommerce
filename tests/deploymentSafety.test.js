@@ -44,3 +44,30 @@ test('publication preflights both sites and cleans only its exact temporary inde
   assert.match(deploy, /case "\$INDEX_TMP" in/)
   assert.match(deploy, /trap cleanup_index_tmp EXIT/)
 })
+
+test('GitHub Actions builds once; the server only publishes the verified archive', () => {
+  const runnableWorkflow = commands(workflow)
+  assert.match(workflow, /npm test && npm run build:prod/)
+  assert.match(workflow, /tar -C dist -czf "\$ARCHIVE" \./)
+  assert.match(workflow, /appleboy\/scp-action@v\d+\.\d+\.\d+/)
+  assert.ok(workflow.indexOf('name: Upload build') < workflow.indexOf('name: Deploy to server'))
+  assert.match(
+    runnableWorkflow,
+    /bash deploy-ci\.sh --dist \/home\/admin\/cod-deploy-artifacts\/\$\{\{ steps\.package\.outputs\.archive \}\} --sha256 \$\{\{ steps\.package\.outputs\.sha256 \}\}/
+  )
+
+  // The --dist branch verifies the checksum before extracting and never installs or builds.
+  const start = deploy.indexOf('if [ -n "$DIST_ARCHIVE" ]; then')
+  const end = deploy.indexOf('\nelse\n', start)
+  assert.ok(start > 0 && end > start)
+  const distBranch = deploy.slice(start, end)
+  assert.match(distBranch, /sha256sum -c/)
+  assert.ok(distBranch.indexOf('sha256sum -c') < distBranch.indexOf('tar -xzf'))
+  assert.match(distBranch, /"\$ARTIFACT_DIR"\/brainnel-dist-\*\.tgz\)/)
+  assert.doesNotMatch(distBranch, /\bnpm\b/)
+
+  // Both paths publish the same directory variable; the manual fallback still builds here.
+  assert.match(deploy, /--chmod=D755,F644 "\$DIST_DIR\/" "\$SITE\/"/)
+  assert.match(deploy, /install -o www-data -g www-data -m 644 "\$DIST_DIR\/index\.html"/)
+  assert.doesNotMatch(commands(deploy), /\.\/dist\//)
+})
