@@ -1,5 +1,5 @@
 import { useLocation, useNavigate } from 'react-router-dom'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo } from 'react'
 import {
   FiCheck,
   FiChevronDown,
@@ -8,10 +8,8 @@ import {
 } from 'react-icons/fi'
 import { appDownloadAPI } from '../services/api'
 import { trackCheckoutEvent } from '../services/checkoutFunnelAnalytics'
-import { getWhatsAppCustomerGroup, WHATSAPP_GROUP_CLICK_EVENT } from '../config/customerCommunity'
-import { buildApiUrl } from '../config/api.config'
-import { startCustomerCommunitySync } from '../services/customerCommunity'
-import WhatsAppCommunity from '../components/WhatsAppCommunity'
+import { pidForProduct } from '../services/dramaPicks'
+import DramaPicksCard, { DramaPicksBoundary } from '../components/DramaPicksCard'
 import './OrderSuccessPage.css'
 
 const FALLBACK_DOWNLOAD_LINKS = {
@@ -118,6 +116,40 @@ const getDevOrderSuccessPreviewState = (search) => {
   }
 }
 
+// Dev-only: babidrama.com refuses requests from outside Côte d'Ivoire, so
+// `&preview_drama=1` feeds the card a static picks response instead.
+const previewDramaCover = (from, to, label) => `data:image/svg+xml,${encodeURIComponent(
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 400"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${from}"/><stop offset="1" stop-color="${to}"/></linearGradient></defs><rect width="300" height="400" fill="url(#g)"/><text x="150" y="360" fill="#fff" font-family="sans-serif" font-size="34" font-weight="700" text-anchor="middle">${label}</text></svg>`
+)}`
+
+const getDevDramaPreview = (search) => {
+  if (!import.meta.env.DEV) return null
+  const params = new URLSearchParams(search)
+  if (params.get('preview_order_success') !== '1' || params.get('preview_drama') !== '1') return null
+
+  return {
+    pid: '946101641067',
+    mode: 'explore',
+    series: [
+      {
+        slug: 'le-mari-infidele', title: 'Le Mari infidèle', genres: ['Romance', 'Vengeance'], episodeCount: 73, freeEpisodes: 5,
+        hook: '💔 Elle surprend son mari avec sa meilleure amie le jour de leur anniversaire. Trois ans plus tard, elle revient en héritière d’un empire… et elle n’a rien oublié.',
+        coverUrl: previewDramaCover('#3b1d4a', '#ff3d7f', 'Le Mari'), watchUrl: 'https://babidrama.com/w/le-mari-infidele/1?c=brainnel'
+      },
+      {
+        slug: 'la-reine-de-cocody', title: 'La Reine de Cocody', genres: ['Drame', 'Famille'], episodeCount: 60, freeEpisodes: 6,
+        hook: '👑 Servante le jour, PDG la nuit : personne ne connaît son vrai nom.',
+        coverUrl: previewDramaCover('#1d2f4a', '#ff7a1a', 'La Reine'), watchUrl: 'https://babidrama.com/w/la-reine-de-cocody/1?c=brainnel'
+      },
+      {
+        slug: 'le-milliardaire-cache', title: 'Le Milliardaire caché parmi nous', genres: ['Romance'], episodeCount: 81, freeEpisodes: 5,
+        hook: '💸 Humilié à son mariage, il dévoile enfin qui il est vraiment.',
+        coverUrl: null, watchUrl: 'https://babidrama.com/w/le-milliardaire-cache/1?c=brainnel'
+      }
+    ]
+  }
+}
+
 const OrderSuccessPage = () => {
   const location = useLocation()
   const navigate = useNavigate()
@@ -131,21 +163,11 @@ const OrderSuccessPage = () => {
     [location.state, previewState, cachedInitialSuccessState]
   )
   const { product, quantity, userInfo, selectedLocation, totalPrice, orderResponse } = orderSuccessState
-  const [whatsappGroups, setWhatsAppGroups] = useState([])
-  const whatsappGroup = getWhatsAppCustomerGroup({
-    phone: userInfo?.phone,
-    orderId: orderResponse?.order_no || orderResponse?.order_id,
-    groups: whatsappGroups,
-  })
-
-  useEffect(() => {
-    if (!product || !quantity || !userInfo || !selectedLocation) return
-    const sync = startCustomerCommunitySync({
-      url: buildApiUrl('/api/customer-community'),
-      onGroups: setWhatsAppGroups,
-    })
-    return () => sync.stop()
-  }, [product, quantity, userInfo, selectedLocation])
+  const dramaPreview = useMemo(
+    () => (previewState ? getDevDramaPreview(location.search) : null),
+    [previewState, location.search]
+  )
+  const dramaPid = pidForProduct(product)
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
@@ -210,12 +232,9 @@ const OrderSuccessPage = () => {
     window.location.assign(whatsappUrl)
   }
 
-  const handleWhatsAppGroup = () => {
-    if (!whatsappGroup) return
-    // Preserve the confirmation page when the customer returns from WhatsApp.
+  // Preserve the confirmation page when the customer returns from BabiDrama.
+  const handleDramaLeave = () => {
     if (!previewState) saveCachedOrderSuccessState(orderSuccessState)
-    trackSuccessPageAction(WHATSAPP_GROUP_CLICK_EVENT, { whatsapp_group_id: whatsappGroup.id })
-    // The anchor navigates normally; a click is not a confirmed group membership.
   }
 
   if (!product || !quantity || !userInfo || !selectedLocation) {
@@ -248,7 +267,16 @@ const OrderSuccessPage = () => {
             <p>Merci pour votre confiance.</p>
           </section>
 
-          <WhatsAppCommunity group={whatsappGroup} onJoin={handleWhatsAppGroup} />
+          <DramaPicksBoundary onError={() => trackSuccessPageAction('order_success_drama_render_failed')}>
+            <DramaPicksCard
+              key={dramaPid || 'none'}
+              pid={dramaPid}
+              impressionKey={String(orderResponse?.order_no || orderResponse?.order_id || '')}
+              preview={dramaPreview}
+              onTrack={trackSuccessPageAction}
+              onLeave={handleDramaLeave}
+            />
+          </DramaPicksBoundary>
 
           <section className="os-delivery" aria-label="Livraison et paiement">
             <div><FiTruck aria-hidden="true" /><p><strong>Livraison gratuite sous 48 h</strong><span>À domicile, à Abidjan. Le livreur vous appellera.</span></p></div>

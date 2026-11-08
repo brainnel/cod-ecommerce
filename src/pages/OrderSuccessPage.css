@@ -9,13 +9,6 @@
 .order-success-page .os-check svg { width: 21px; height: 21px; stroke-width: 2; }
 .order-success-page .os-confirmation h1 { font-size: 22px; line-height: 1.3; font-weight: 600; letter-spacing: -.6px; margin: 0; }
 .order-success-page .os-confirmation p { font-size: 13px; line-height: 1.5; margin: 7px 0 0; color: #6c766e; }
-.order-success-page .os-community { text-align: center; padding: 0 0 25px; }
-.order-success-page .os-community h2 { font-size: 16px; line-height: 1.45; font-weight: 600; margin: 0; letter-spacing: -.25px; }
-.order-success-page .os-community p { max-width: 260px; font-size: 13px; line-height: 1.65; margin: 8px auto 18px; color: #667469; }
-.order-success-page .os-join-group { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; min-height: 49px; padding: 13px 12px; background: #28754c; border: 1px solid #28754c; border-radius: 6px; color: #fff; font-size: 14px; font-weight: 600; line-height: 1.5; text-decoration: none; transition: background 120ms; }
-.order-success-page .os-join-group svg { width: 21px; height: 21px; flex-shrink: 0; }
-.order-success-page .os-join-group:hover { background: #1d5c3a; border-color: #1d5c3a; text-decoration: none; }
-.order-success-page .os-join-group:active { background: #194f32; }
 .order-success-page .os-delivery { padding: 22px 0 5px; border-top: 1px solid #e9ede9; }
 .order-success-page .os-delivery > div { display: flex; gap: 11px; margin-bottom: 19px; }
 .order-success-page .os-delivery > div > svg { width: 17px; height: 17px; flex-shrink: 0; margin-top: 2px; color: #7b877f; }
