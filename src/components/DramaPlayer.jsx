@@ -131,6 +131,10 @@ const DramaPlayer = ({
   const [needsTap, setNeedsTap] = useState(false)
   const [href, setHref] = useState(series.watchUrl)
   const [immersive, setImmersive] = useState(false)
+  // The cover stays up until the first frame plays. It is an <img>, not the video's `poster`:
+  // with crossOrigin="anonymous" WebKit loads the poster in CORS mode, img.babidrama.com sends
+  // no CORS headers, and the failed poster fires `error` on the <video> (every iPhone).
+  const [hasFrame, setHasFrame] = useState(false)
   const statusRef = useRef(status)
   statusRef.current = status
 
@@ -204,6 +208,7 @@ const DramaPlayer = ({
     lastWatchedRef.current = 0
     if (progressRef.current) progressRef.current.style.transform = 'scaleX(0)'
     setStatus('loading')
+    setHasFrame(false)
     setEpisode(null)
     setPaused(true)
     setBuffering(false)
@@ -296,6 +301,7 @@ const DramaPlayer = ({
     setBuffering(false)
     setPaused(false)
     setNeedsTap(false)
+    setHasFrame(true)
     setStatus((value) => (value === 'starting' ? 'ready' : value))
     if (!startedRef.current) {
       startedRef.current = true
@@ -413,13 +419,13 @@ const DramaPlayer = ({
   return (
     <>
       <div ref={stageRef} className="os-drama-stage" hidden={failed} data-status={status}>
+        {poster && !hasFrame && <img className="os-drama-poster" src={poster} alt="" aria-hidden="true" decoding="async" />}
         <video
           ref={videoRef}
           className="os-drama-video"
           playsInline
           crossOrigin="anonymous"
           preload="metadata"
-          poster={poster}
           aria-hidden="true"
           {...VIDEO_EXTRA_ATTRIBUTES}
           onPlay={(event) => { if (isCurrent(event)) setPaused(false) }}
@@ -433,7 +439,11 @@ const DramaPlayer = ({
           }}
           onTimeUpdate={onTimeUpdate}
           onEnded={onEnded}
-          onError={(event) => { if (isCurrent(event)) fail('video', mediaErrorDetails(event.currentTarget, srcRef.current)) }}
+          onError={(event) => {
+            // Only a MediaError fails the episode; WebKit also fires `error` here for other loads
+            // (a refused poster) while the video keeps loading. Stalls are left to the timeout.
+            if (isCurrent(event) && event.currentTarget.error) fail('video', mediaErrorDetails(event.currentTarget, srcRef.current))
+          }}
         />
         <button type="button" className="os-drama-surface" aria-label={surfaceLabel} onClick={onSurfaceTap} />
 

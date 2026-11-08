@@ -75,7 +75,11 @@ test('drama card renders the inline player of the featured series, its continue 
   assert.match(video, /playsinline=""/)
   assert.match(video, /crossorigin="anonymous"/)
   assert.match(video, /preload="metadata"/)
-  assert.match(video, /poster="https:\/\/img.babidrama.com\/i\/a\/cover-x.webp"/)
+  // The cover is a plain <img> under the video, never its CORS-mode `poster` (img.babidrama.com
+  // sends no CORS headers; WebKit then fires `error` on the video).
+  assert.doesNotMatch(video, /poster=/)
+  assert.match(html, /<img class="os-drama-poster" src="https:\/\/img.babidrama.com\/i\/a\/cover-x.webp" alt="" aria-hidden="true"/)
+  assert.doesNotMatch(html.match(/<img class="os-drama-poster"[^>]*>/)[0], /crossorigin/)
   assert.doesNotMatch(video, /\ssrc=|autoplay|controls/)
   assert.match(html, /<h3>Le Mari &lt;infidèle&gt;<\/h3>/)
   assert.match(html, /Épisode 1 · gratuit/)

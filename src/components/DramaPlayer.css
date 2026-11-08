@@ -2,6 +2,7 @@
    9:16 episode shown whole (contain) so the burned-in subtitles are never cropped. */
 .order-success-page .os-drama-stage { position: relative; height: 62vh; max-height: 560px; min-height: 280px; overflow: hidden; background: #0b060d; }
 .order-success-page .os-drama-stage[hidden] { display: none; }
+.order-success-page .os-drama-poster { position: absolute; inset: 0; display: block; width: 100%; height: 100%; max-width: none; object-fit: contain; pointer-events: none; }
 .order-success-page .os-drama-video { position: absolute; inset: 0; display: block; width: 100%; height: 100%; max-width: none; object-fit: contain; background: transparent; }
 
 /* Whole picture: pause / play, or sound on after a muted autoplay. */
