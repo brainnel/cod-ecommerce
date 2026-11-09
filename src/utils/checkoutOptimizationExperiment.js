@@ -1,6 +1,9 @@
 // Keep this experiment independent of the historical quantity-flow assignment.
 // One bucket per device prevents form and product treatments from overlapping.
 export const CHECKOUT_OPTIMIZATION_EXPERIMENT = 'cod_opt_20261104_v1'
+// Keep the original hash salt and buckets. Only former baseline buckets 40–59
+// join form treatment in this stage; all existing experiment arms stay put.
+export const CHECKOUT_OPTIMIZATION_STAGE = 'form30_20261109'
 export const CHECKOUT_OPTIMIZATION_ENABLED = import.meta.env?.VITE_CHECKOUT_OPTIMIZATION_ENABLED !== 'false'
 const PREVIEW_KEY = `${CHECKOUT_OPTIMIZATION_EXPERIMENT}:preview`
 const GROUPS = ['form_guidance_treatment', 'form_guidance_control', 'product_clarity_treatment', 'product_clarity_control', 'baseline']
@@ -64,15 +67,18 @@ export const getCheckoutOptimizationAssignment = ({
     : bucket < 10 ? 'form_guidance_treatment'
     : bucket < 20 ? 'form_guidance_control'
     : bucket < 30 ? 'product_clarity_treatment'
-    : bucket < 40 ? 'product_clarity_control' : 'baseline')
+    : bucket < 40 ? 'product_clarity_control'
+    : bucket < 60 ? 'form_guidance_treatment' : 'baseline')
   const productEligible = Object.hasOwn(PRODUCT_CLARITY_COPY, String(productId ?? ''))
   const formGuidanceEnabled = enabled && group === 'form_guidance_treatment'
   const productClarityEnabled = enabled && productEligible && group === 'product_clarity_treatment'
   return {
     experiment: CHECKOUT_OPTIMIZATION_EXPERIMENT,
+    stage: CHECKOUT_OPTIMIZATION_STAGE,
     group, bucket, productEligible, formGuidanceEnabled, productClarityEnabled,
     analyticsProps: {
       checkout_optimization_experiment: CHECKOUT_OPTIMIZATION_EXPERIMENT,
+      checkout_optimization_stage: CHECKOUT_OPTIMIZATION_STAGE,
       checkout_optimization_group: group,
       checkout_optimization_bucket: bucket,
       checkout_optimization_enabled: Boolean(enabled),
