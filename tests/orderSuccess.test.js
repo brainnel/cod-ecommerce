@@ -86,7 +86,8 @@ test('drama card renders the inline player of the featured series, its continue 
   assert.match(html, /Romance · Vengeance/)
   assert.match(html, /class="os-drama-center os-drama-spinner"/, 'loading until the episode arrives')
   assert.match(html, /aria-label="Couper le son"/)
-  assert.match(html, /<a class="os-drama-cta" href="https:\/\/babidrama.com\/w\/le-mari\/1\?c=brainnel" target="_blank" rel="noopener">/)
+  // Links to BabiDrama say which product, which link and which test variant sent the customer.
+  assert.match(html, /<a class="os-drama-cta" href="https:\/\/babidrama.com\/w\/le-mari\/1\?c=brainnel&amp;p=830827813382&amp;src=continue&amp;v=a" target="_blank" rel="noopener">/)
   assert.match(html, /Continuer sur BabiDrama/)
   assert.match(html, /Les 5 premiers épisodes sont gratuits/)
   assert.doesNotMatch(html, /Regarder ici|Touchez pour|Lecture impossible/)
@@ -94,10 +95,33 @@ test('drama card renders the inline player of the featured series, its continue 
   assert.equal((html.match(/class="os-drama-thumb"/g) || []).length, 2)
   assert.ok(html.indexOf('Regarder La Reine') < html.indexOf('Regarder Le Boss'), 'ranked keeps API order')
   // Other series open BabiDrama directly (no in-page switch).
-  assert.match(html, /<a class="os-drama-thumb" href="https:\/\/babidrama.com\/w\/la-reine\/1\?c=brainnel" target="_blank" rel="noopener" aria-label="Regarder La Reine sur BabiDrama">/)
+  assert.match(html, /<a class="os-drama-thumb" href="https:\/\/babidrama.com\/w\/la-reine\/1\?c=brainnel&amp;p=830827813382&amp;src=thumbnail&amp;v=a" target="_blank" rel="noopener" aria-label="Regarder La Reine sur BabiDrama">/)
   assert.doesNotMatch(html, /<button type="button" class="os-drama-thumb"/)
   assert.ok(html.indexOf('<video') < html.indexOf('os-drama-cta'), 'player above the link')
   assert.ok(html.indexOf('os-drama-cta') < html.indexOf('Autres séries'), 'thumbnails below the link')
+})
+
+test('variants b and c show no link to BabiDrama while episode 1 loads or plays; the order number picks the variant', () => {
+  for (const variant of ['b', 'c']) {
+    const html = renderToStaticMarkup(createElement(DramaPicksCard, { pid: '830827813382', preview: { ...picks, variant } }))
+    assert.equal((html.match(/<video/g) || []).length, 1, variant)
+    assert.doesNotMatch(html, /os-drama-cta|Continuer sur BabiDrama/, variant)
+    assert.match(html, /Les 5 premiers épisodes sont gratuits/, variant)
+    // The other series still open BabiDrama, tagged with the variant.
+    assert.match(html, new RegExp(`la-reine\\/1\\?c=brainnel&amp;p=830827813382&amp;src=thumbnail&amp;v=${variant}"`), variant)
+    assert.doesNotMatch(html, /os-drama-end|commence dans/, variant)
+  }
+  // Without a preview override the order number decides, and stays the same for that order.
+  const byOrder = (orderNo) => renderToStaticMarkup(createElement(DramaPicksCard, { pid: '830827813382', impressionKey: orderNo, preview: picks }))
+  const seen = new Set()
+  for (let n = 0; n < 60; n += 1) {
+    const html = byOrder(`FL-66${String(n).padStart(4, '0')}-00001`)
+    const variant = html.match(/src=thumbnail&amp;v=([abc])"/)[1]
+    seen.add(variant)
+    assert.equal(/os-drama-cta/.test(html), variant === 'a', variant)
+    assert.equal(byOrder(`FL-66${String(n).padStart(4, '0')}-00001`), html)
+  }
+  assert.deepEqual([...seen].sort(), ['a', 'b', 'c'])
 })
 
 test('a single series has no thumbnail row; empty, invalid or missing pid render nothing', () => {
@@ -189,6 +213,7 @@ test('expired or malformed cached state does not pretend an order succeeded', (t
 test('completion page never emits Purchase, isolates the drama card and saves state before leaving', async () => {
   const source = await readFile(new URL('../src/pages/OrderSuccessPage.jsx', import.meta.url), 'utf8')
   const cardSource = await readFile(new URL('../src/components/DramaPicksCard.jsx', import.meta.url), 'utf8')
+  const playerSource = await readFile(new URL('../src/components/DramaPlayer.jsx', import.meta.url), 'utf8')
   assert.doesNotMatch(source, /trackPurchase|facebookConversions|fbq\(/)
   assert.doesNotMatch(source, /customerCommunity|WhatsAppCommunity|customer-community/)
   assert.ok(source.indexOf('id="os-confirmation-title"') < source.indexOf('<DramaPicksBoundary'))
@@ -197,11 +222,21 @@ test('completion page never emits Purchase, isolates the drama card and saves st
   assert.match(source, /handleDramaLeave = \(\) => \{\s*if \(!previewState\) saveCachedOrderSuccessState\(orderSuccessState\)/)
   assert.match(source, /onTrack=\{trackSuccessPageAction\}/)
   assert.match(source, /https:\/\/wa\.me\//)
-  const playerSource = await readFile(new URL('../src/components/DramaPlayer.jsx', import.meta.url), 'utf8')
   // Leaving for BabiDrama saves the confirmation first, then counts the open.
   assert.match(cardSource, /const handleOpenSite = [\s\S]*?safely\(\(\) => onLeave\?\.\(\)\)[\s\S]*?type: 'open'[\s\S]*?'order_success_drama_open'/)
   assert.match(cardSource, /'order_success_drama_click', series, slot, \{ action \}/)
   assert.match(cardSource, /'order_success_drama_complete'/)
+  // A finished episode 1 is reported to BabiDrama once (it orders the big card by it).
+  assert.match(cardSource, /completedKeys\.add\(key\)[\s\S]*?type: 'complete'/)
+  assert.match(cardSource, /'order_success_drama_progress'/)
+  assert.match(cardSource, /'order_success_drama_exit'/)
+  // Every event carries the test variant.
+  assert.match(cardSource, /pid, series: series\.slug, slot, mode: picks\.mode, variant, \.\.\.extra/)
+  // Only variant c leaves by itself, after the countdown, in a visible page, saving the page first.
+  assert.equal((playerSource.match(/window\.location\.assign/g) || []).length, 1)
+  assert.match(playerSource, /status !== 'ended' \|\| variant !== 'c' \|\| !hasNext/)
+  assert.match(playerSource, /document\.hidden\) \|\| !inViewRef\.current\) return undefined\s+const target = link\(nextHref, 'auto_next'\)\s+onLeave\('auto_next'\)/)
+  assert.doesNotMatch(cardSource, /location\.assign|location\.href\s*=/)
   assert.match(playerSource, /crossOrigin="anonymous"/)
   // Inline only: no history entries, no dialogs, no full-screen takeover.
   for (const code of [source, cardSource, playerSource]) assert.doesNotMatch(code, /pushState|replaceState|history\.|requestFullscreen/)

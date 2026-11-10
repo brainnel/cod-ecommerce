@@ -7,6 +7,7 @@ import {
   playedSeconds,
 } from '../services/dramaEpisode'
 import { bufferedSeconds, mediaErrorDetails, networkDetails } from '../services/dramaDiagnostics'
+import { DRAMA_AUTO_NEXT_SECONDS, dramaLink } from '../services/dramaPicks'
 import './DramaPlayer.css'
 
 // Inline BabiDrama player of the order-success card: one persistent <video>
@@ -14,9 +15,16 @@ import './DramaPlayer.css'
 // allows it, muted with a « Touchez pour activer le son » prompt otherwise).
 // Any failure turns into the cover with its link; nothing here may break the
 // confirmation page around it.
+//
+// `variant` (dramaPicks.js, test of 2026-11-10): 'a' keeps « Continuer sur
+// BabiDrama » under the playing episode; 'b' and 'c' show no link to BabiDrama
+// while episode 1 plays (the end card offers episode 2), and 'c' opens episode
+// 2 by itself after a countdown the customer can cancel.
 
 // Uninterrupted playback fades the title so burned-in subtitles stay readable.
 const IMMERSIVE_AFTER_MS = 4000
+// Shares of the episode reported once each (order-success analytics).
+const PROGRESS_MARKS = [25, 50, 75]
 // Signed playback URLs stay valid 6–7 h: a series played again soon (or a
 // remount while its request is in flight, e.g. StrictMode) reuses the same
 // request instead of issuing new URLs. Failures are never kept.
@@ -103,16 +111,22 @@ const VIDEO_EXTRA_ATTRIBUTES = { 'webkit-playsinline': '', 'x-webkit-airplay': '
 const DramaPlayer = ({
   ref,
   current,
+  variant = 'a',
+  pid = null,
   fetchImpl,
   allowLoopbackHttp = false,
   onInteract,
   onPlayStart,
+  onProgress,
   onComplete,
+  onExit,
   onFail,
   onOpenSite,
   onDiagnostic,
 }) => {
   const { series, slot } = current
+  const lateLink = variant === 'b' || variant === 'c'
+  const link = (url, source) => dramaLink(url, { pid, source, variant })
   const stageRef = useRef(null)
   const videoRef = useRef(null)
   const progressRef = useRef(null)
@@ -125,6 +139,10 @@ const DramaPlayer = ({
   const inViewRef = useRef(true)
   const lastPositionRef = useRef(0)
   const lastWatchedRef = useRef(0)
+  const marksRef = useRef(new Set())
+  const exitReportedRef = useRef(false)
+  // Variant c: seconds left before episode 2 opens by itself (null = no countdown).
+  const [autoIn, setAutoIn] = useState(null)
   const [status, setStatus] = useState('loading') // loading | starting | ready | ended | failed
   const [episode, setEpisode] = useState(null)
   const [paused, setPaused] = useState(true)
@@ -169,8 +187,10 @@ const DramaPlayer = ({
   diagDetailsRef.current = diagDetails
 
   const callbacks = useRef({})
-  callbacks.current = { onInteract, onPlayStart, onComplete, onFail, onOpenSite, onDiagnostic, fetchImpl, allowLoopbackHttp }
+  callbacks.current = { onInteract, onPlayStart, onProgress, onComplete, onExit, onFail, onOpenSite, onDiagnostic, fetchImpl, allowLoopbackHttp }
   const notify = (name, ...args) => safely(() => callbacks.current[name]?.(series, slot, ...args))
+  const notifyRef = useRef(notify)
+  notifyRef.current = notify
 
   const isCurrent = (event) => Boolean(srcRef.current) && event.currentTarget.getAttribute('src') === srcRef.current
 
@@ -246,6 +266,9 @@ const DramaPlayer = ({
     autoPausedRef.current = false
     lastPositionRef.current = 0
     lastWatchedRef.current = 0
+    marksRef.current = new Set()
+    exitReportedRef.current = false
+    setAutoIn(null)
     if (progressRef.current) progressRef.current.style.transform = 'scaleX(0)'
     setStatus('loading')
     setHasFrame(false)
@@ -318,11 +341,27 @@ const DramaPlayer = ({
       diag.left = true
       safely(() => diagnoseRef.current('leave', { trigger, tap_needed: diag.tapNeeded }))
     }
+    // Leaving after it started: how far the customer watched here (once per episode load).
+    const onExit = (trigger) => {
+      if (!startedRef.current || exitReportedRef.current || statusRef.current === 'failed') return
+      exitReportedRef.current = true
+      const playing = Boolean(video && srcRef.current)
+      safely(() => notifyRef.current('onExit', {
+        trigger,
+        ended: statusRef.current === 'ended',
+        secondsWatched: playing ? playedSeconds(video.played) : lastWatchedRef.current,
+        positionS: Math.floor((playing ? video.currentTime : lastPositionRef.current) || 0),
+      }))
+    }
     const onVisibility = () => {
+      if (document.hidden) onExit('hidden')
       if (document.hidden && video && !video.paused) safely(() => video.pause())
       if (document.hidden) onLeave('hidden')
     }
-    const onPageHide = () => onLeave('pagehide')
+    const onPageHide = () => {
+      onExit('pagehide')
+      onLeave('pagehide')
+    }
     document.addEventListener('visibilitychange', onVisibility)
     window.addEventListener('pagehide', onPageHide)
     let observer
@@ -381,6 +420,15 @@ const DramaPlayer = ({
       progressRef.current.style.transform = `scaleX(${Math.min(1, video.currentTime / duration)})`
     }
     lastPositionRef.current = video.currentTime
+    if (duration > 0) {
+      const percent = (video.currentTime / duration) * 100
+      for (const mark of PROGRESS_MARKS) {
+        if (percent >= mark && !marksRef.current.has(mark)) {
+          marksRef.current.add(mark)
+          notify('onProgress', { percent: mark, positionS: Math.floor(video.currentTime) })
+        }
+      }
+    }
     const next = continueUrl(episode?.watchUrl || series.watchUrl, video.currentTime)
     setHref((value) => (value === next ? value : next))
   }
@@ -433,6 +481,7 @@ const DramaPlayer = ({
   const onReplay = () => {
     const video = videoRef.current
     if (!video || !srcRef.current) return
+    setAutoIn(null)
     safely(() => { video.currentTime = 0 })
     if (progressRef.current) progressRef.current.style.transform = 'scaleX(0)'
     if (soundBlocked) {
@@ -464,6 +513,35 @@ const DramaPlayer = ({
   const ended = status === 'ended'
   const watchUrl = episode?.watchUrl || series.watchUrl
   const nextHref = episode?.nextUrl || watchUrl
+  const hasNext = Boolean(episode?.nextUrl)
+
+  // Variant c: the end of episode 1 starts the countdown to episode 2, only while the card is
+  // on screen in a visible page. « Revoir » and « Rester ici » stop it.
+  useEffect(() => {
+    if (status !== 'ended' || variant !== 'c' || !hasNext) {
+      setAutoIn(null)
+      return
+    }
+    if ((typeof document !== 'undefined' && document.hidden) || !inViewRef.current) return
+    setAutoIn(DRAMA_AUTO_NEXT_SECONDS)
+  }, [status, variant, hasNext])
+
+  useEffect(() => {
+    if (autoIn === null) return undefined
+    if (autoIn > 0) {
+      const timer = setTimeout(() => setAutoIn((value) => (value === null ? null : value - 1)), 1000)
+      return () => clearTimeout(timer)
+    }
+    setAutoIn(null)
+    if ((typeof document !== 'undefined' && document.hidden) || !inViewRef.current) return undefined
+    const target = link(nextHref, 'auto_next')
+    onLeave('auto_next')
+    // Same tab (a script may not open a new one): the saved confirmation comes back with Back.
+    safely(() => window.location.assign(target))
+    return undefined
+    // The countdown alone drives this; the link and the leave handler are read when it ends.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoIn])
   const poster = episode?.posterUrl || series.coverUrl || undefined
   const title = episode?.title || series.title
   const genres = series.genres.join(' · ')
@@ -540,10 +618,16 @@ const DramaPlayer = ({
         {ended && (
           <div className="os-drama-end">
             <p>Fin de l’épisode 1</p>
-            <a className="os-drama-next" href={nextHref} target="_blank" rel="noopener" onClick={() => onLeave('next')}>
-              {episode?.nextUrl ? 'Épisode 2 sur BabiDrama' : 'Continuer sur BabiDrama'} <PlayIcon size={16} />
+            {autoIn !== null && (
+              <p className="os-drama-auto" role="status">L’épisode 2 commence dans {Math.max(autoIn, 0)} s…</p>
+            )}
+            <a className="os-drama-next" href={link(nextHref, 'next')} target="_blank" rel="noopener" onClick={() => { setAutoIn(null); onLeave('next') }}>
+              {hasNext ? 'Épisode 2 sur BabiDrama' : 'Continuer sur BabiDrama'} <PlayIcon size={16} />
             </a>
             <button type="button" className="os-drama-replay" onClick={onReplay}><ReplayIcon size={18} />Revoir</button>
+            {autoIn !== null && (
+              <button type="button" className="os-drama-stay" onClick={() => { setAutoIn(null); notify('onInteract', 'stay') }}>Rester ici</button>
+            )}
           </div>
         )}
       </div>
@@ -559,15 +643,17 @@ const DramaPlayer = ({
             </div>
           </div>
         )}
-        <a
-          className="os-drama-cta"
-          href={ended ? nextHref : href}
-          target="_blank"
-          rel="noopener"
-          onClick={() => onLeave(ended ? 'next' : failed ? 'fallback' : 'continue')}
-        >
-          <PlayIcon size={18} /> {ctaLabel}
-        </a>
+        {(!lateLink || ended || failed) && (
+          <a
+            className="os-drama-cta"
+            href={ended ? link(nextHref, 'next') : link(href, failed ? 'fallback' : 'continue')}
+            target="_blank"
+            rel="noopener"
+            onClick={() => { setAutoIn(null); onLeave(ended ? 'next' : failed ? 'fallback' : 'continue') }}
+          >
+            <PlayIcon size={18} /> {ctaLabel}
+          </a>
+        )}
         {free && <p className="os-drama-free">{free}</p>}
       </div>
     </>

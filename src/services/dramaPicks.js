@@ -5,8 +5,23 @@
 export const DRAMA_PICKS_TIMEOUT_MS = 2500
 export const DRAMA_MAX_SERIES = 5
 export const DRAMA_MAX_EVENTS = 6
-// open = « Continuer sur BabiDrama » / « Épisode 2 » from the inline player.
-export const DRAMA_EVENT_TYPES = ['impression', 'click', 'open']
+// open = « Continuer sur BabiDrama » / « Épisode 2 » from the inline player;
+// complete = episode 1 played to its end in the card (BabiDrama orders the
+// big card by it).
+export const DRAMA_EVENT_TYPES = ['impression', 'click', 'open', 'complete']
+
+// Test of when the customer is sent to BabiDrama (2026-11-10). Measured on
+// 2026-11-08…09: customers who finished episode 1 here and opened episode 2
+// kept watching there (72 % watched an episode for 20 s or more), those who
+// tapped « Continuer » a few seconds in mostly left within 20 s (14 %).
+//   a: « Continuer sur BabiDrama » under the playing episode (as before);
+//   b: no link while episode 1 plays, episode 2 offered when it ends;
+//   c: as b, and episode 2 opens by itself after a countdown the customer
+//      can cancel.
+export const DRAMA_VARIANTS = ['a', 'b', 'c']
+export const DRAMA_AUTO_NEXT_SECONDS = 5
+// Which link of the card opened BabiDrama (`src` on its URL).
+export const DRAMA_LINK_SOURCES = ['continue', 'next', 'auto_next', 'thumbnail', 'fallback']
 
 const DEFAULT_DRAMA_BASE_URL = 'https://babidrama.com'
 const PICKS_PATH = '/api/partner/brainnel/picks'
@@ -25,6 +40,37 @@ export const pidForProduct = (product) => {
   if (/^\d+$/.test(id)) return id
   const bundle = id.match(/^bundle:(\d+)$/)
   return bundle ? `bundle-${bundle[1]}` : null
+}
+
+// FNV-1a over the order key: the same order always gets the same variant, and
+// consecutive order numbers spread evenly. No key (nothing to hash): 'a'.
+export const dramaVariant = (orderKey, override = null) => {
+  if (DRAMA_VARIANTS.includes(override)) return override
+  const key = orderKey === null || orderKey === undefined ? '' : String(orderKey).trim()
+  if (!key) return DRAMA_VARIANTS[0]
+  let hash = 0x811c9dc5
+  for (let index = 0; index < key.length; index += 1) {
+    hash ^= key.charCodeAt(index)
+    hash = Math.imul(hash, 0x01000193)
+  }
+  return DRAMA_VARIANTS[(hash >>> 0) % DRAMA_VARIANTS.length]
+}
+
+// A BabiDrama link with what its analytics read: `p` (product), `src` (which
+// link of the card) and `v` (variant). An URL that cannot be parsed is returned
+// unchanged; unknown values are left out.
+export const dramaLink = (url, { pid = null, source = null, variant = null } = {}) => {
+  let parsed
+  try {
+    parsed = new URL(url)
+  } catch {
+    return url
+  }
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return url
+  if (pid && /^(?:\d{1,20}|bundle-\d{1,10})$/.test(String(pid))) parsed.searchParams.set('p', String(pid))
+  if (DRAMA_LINK_SOURCES.includes(source)) parsed.searchParams.set('src', source)
+  if (DRAMA_VARIANTS.includes(variant)) parsed.searchParams.set('v', variant)
+  return parsed.toString()
 }
 
 export const picksUrl = (base, pid) => `${trimDramaBase(base)}${PICKS_PATH}?pid=${encodeURIComponent(pid)}`

@@ -2,7 +2,10 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import {
   DRAMA_MAX_EVENTS,
+  DRAMA_VARIANTS,
   buildEventsBody,
+  dramaLink,
+  dramaVariant,
   eventsUrl,
   fetchDramaPicks,
   orderForDisplay,
@@ -209,4 +212,42 @@ test('a slow body after the timeout cannot resurrect the card', async () => {
   })
   assert.equal(result, null)
   release?.()
+})
+
+test('variant: stable per order, spread over the three versions, a for an order without number', () => {
+  const counts = { a: 0, b: 0, c: 0 }
+  for (let n = 659000; n < 662000; n += 1) {
+    const key = `FL-${n}-00001`
+    const variant = dramaVariant(key)
+    assert.ok(DRAMA_VARIANTS.includes(variant))
+    assert.equal(dramaVariant(key), variant)
+    counts[variant] += 1
+  }
+  for (const variant of DRAMA_VARIANTS) assert.ok(counts[variant] > 900 && counts[variant] < 1100, JSON.stringify(counts))
+  for (const empty of ['', '   ', null, undefined]) assert.equal(dramaVariant(empty), 'a')
+  assert.equal(dramaVariant(2611081513488681), dramaVariant('2611081513488681'))
+  // The dev preview may force a version; anything else is ignored.
+  assert.equal(dramaVariant('FL-1', 'c'), 'c')
+  assert.equal(dramaVariant('', 'b'), 'b')
+  assert.equal(dramaVariant('FL-659000-00001', 'z'), dramaVariant('FL-659000-00001'))
+})
+
+test('links to BabiDrama carry the product, the link used and the variant, and nothing unexpected', () => {
+  const watch = 'https://babidrama.com/w/le-mari/1?c=brainnel'
+  assert.equal(dramaLink(watch, { pid: '830827813382', source: 'continue', variant: 'a' }),
+    'https://babidrama.com/w/le-mari/1?c=brainnel&p=830827813382&src=continue&v=a')
+  assert.equal(dramaLink(`${watch}&t=47`, { pid: 'bundle-12', source: 'auto_next', variant: 'c' }),
+    'https://babidrama.com/w/le-mari/1?c=brainnel&t=47&p=bundle-12&src=auto_next&v=c')
+  // A `p` already set by BabiDrama is kept once.
+  assert.equal(dramaLink(`${watch}&p=830827813382`, { pid: '830827813382', source: 'thumbnail', variant: 'b' }),
+    'https://babidrama.com/w/le-mari/1?c=brainnel&p=830827813382&src=thumbnail&v=b')
+  assert.equal(dramaLink(watch, { pid: '<script>', source: 'evil', variant: 'zz' }), watch)
+  assert.equal(dramaLink(watch), watch)
+  for (const bad of ['javascript:alert(1)', 'not a url', '', null, undefined]) assert.equal(dramaLink(bad, { pid: '1', source: 'next', variant: 'a' }), bad)
+})
+
+test('a finished episode 1 is an accepted event', () => {
+  assert.deepEqual(JSON.parse(buildEventsBody('830827813382', [{ type: 'complete', slug: 'le-mari', slot: 0 }])),
+    { pid: '830827813382', events: [{ type: 'complete', slug: 'le-mari', slot: 0 }] })
+  assert.equal(buildEventsBody('830827813382', [{ type: 'completed', slug: 'le-mari', slot: 0 }]), null)
 })

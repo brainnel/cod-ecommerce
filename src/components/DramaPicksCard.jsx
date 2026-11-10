@@ -1,5 +1,5 @@
 import { Component, useEffect, useMemo, useRef, useState } from 'react'
-import { fetchDramaPicks, orderForDisplay, sendDramaEvents, buildEventsBody } from '../services/dramaPicks'
+import { fetchDramaPicks, orderForDisplay, sendDramaEvents, buildEventsBody, dramaLink, dramaVariant } from '../services/dramaPicks'
 import DramaPlayer, { Cover } from './DramaPlayer'
 import { probeMedia } from '../services/dramaDiagnostics'
 import './DramaPicksCard.css'
@@ -10,6 +10,7 @@ import './DramaPicksCard.css'
 const impressedKeys = new Set()
 const clickedKeys = new Set()
 const playedKeys = new Set()
+const completedKeys = new Set()
 
 // The order already exists when this renders: any failure here must leave the
 // rest of the success page untouched, so the card simply disappears.
@@ -59,6 +60,8 @@ const DramaPicksCard = ({ pid, impressionKey = '', preview = null, onTrack, onLe
   // The player always shows the big card (slot 0); the other series' thumbnails
   // open BabiDrama directly (owner request 2026-11-08).
   const playerRef = useRef(null)
+  // Which version of the card this order gets (test of when to send the customer to BabiDrama).
+  const variant = useMemo(() => dramaVariant(impressionKey, preview?.variant), [impressionKey, preview])
   const previewFetch = useMemo(() => (preview ? previewEpisodeFetch(preview.episodes) : null), [preview])
   const featured = useMemo(
     () => (picks?.series?.length ? { series: picks.series[0], slot: 0, trigger: 'autoplay' } : null),
@@ -86,9 +89,9 @@ const DramaPicksCard = ({ pid, impressionKey = '', preview = null, onTrack, onLe
     const slugs = picks.series.map((series) => series.slug)
     safely(() => emitEvents(pid, slugs.map((slug, slot) => ({ type: 'impression', slug, slot })), preview))
     safely(() => onTrack?.('order_success_drama_impression', {
-      pid, series: slugs.join(','), series_count: slugs.length, mode: picks.mode,
+      pid, series: slugs.join(','), series_count: slugs.length, mode: picks.mode, variant,
     }))
-  }, [picks, pid, impressionKey, preview, onTrack])
+  }, [picks, pid, impressionKey, preview, onTrack, variant])
 
   if (picks === undefined) {
     return (
@@ -107,7 +110,7 @@ const DramaPicksCard = ({ pid, impressionKey = '', preview = null, onTrack, onLe
   if (!picks?.series?.length || !current) return null
 
   const track = (event, series, slot, extra = {}) => safely(() => onTrack?.(event, {
-    pid, series: series.slug, slot, mode: picks.mode, ...extra,
+    pid, series: series.slug, slot, mode: picks.mode, variant, ...extra,
   }))
 
   // BabiDrama `click`: the customer engaged with that series (thumbnail tap,
@@ -149,6 +152,16 @@ const DramaPicksCard = ({ pid, impressionKey = '', preview = null, onTrack, onLe
     track('order_success_drama_play', series, slot, { sound, trigger })
   }
 
+  // Episode 1 watched to its end here: BabiDrama orders the big card by it (once per page view).
+  const handleComplete = (series, slot, { durationS }) => {
+    const key = `${pid}|${impressionKey}|${series.slug}`
+    if (!completedKeys.has(key)) {
+      completedKeys.add(key)
+      safely(() => emitEvents(pid, [{ type: 'complete', slug: series.slug, slot }], preview))
+    }
+    track('order_success_drama_complete', series, slot, { duration_s: durationS })
+  }
+
   const handleOpenSite = (series, slot, { source, secondsWatched, positionS }) => {
     // Preserve the confirmation page when the customer comes back.
     safely(() => onLeave?.())
@@ -175,11 +188,17 @@ const DramaPicksCard = ({ pid, impressionKey = '', preview = null, onTrack, onLe
       <DramaPlayer
         ref={playerRef}
         current={current}
+        variant={variant}
+        pid={pid}
         fetchImpl={previewFetch}
         allowLoopbackHttp={DEV_MEDIA}
         onInteract={(series, slot, action) => markClick(series, slot, action)}
         onPlayStart={handlePlayStart}
-        onComplete={(series, slot, { durationS }) => track('order_success_drama_complete', series, slot, { duration_s: durationS })}
+        onProgress={(series, slot, { percent, positionS }) => track('order_success_drama_progress', series, slot, { percent, position_s: positionS })}
+        onComplete={handleComplete}
+        onExit={(series, slot, { trigger, ended, secondsWatched, positionS }) => track('order_success_drama_exit', series, slot, {
+          trigger, ended, seconds_watched: secondsWatched, position_s: positionS,
+        })}
         onFail={(series, slot, reason, details) => reportPlayError(series, slot, reason, details)}
         onDiagnostic={(series, slot, name, fields) => track(`order_success_drama_${name}`, series, slot, {
           ...fields,
@@ -196,7 +215,7 @@ const DramaPicksCard = ({ pid, impressionKey = '', preview = null, onTrack, onLe
               <li key={series.slug}>
                 <a
                   className="os-drama-thumb"
-                  href={series.watchUrl}
+                  href={dramaLink(series.watchUrl, { pid, source: 'thumbnail', variant })}
                   target="_blank"
                   rel="noopener"
                   aria-label={`Regarder ${series.title} sur BabiDrama`}

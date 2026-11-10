@@ -138,6 +138,8 @@ const getDevDramaPreview = (search) => {
   if (params.get('preview_order_success') !== '1' || params.get('preview_drama') !== '1') return null
 
   return {
+    // `&drama_variant=a|b|c` picks the version of the card under test (dramaPicks.js).
+    variant: params.get('drama_variant'),
     episodes: {
       'le-mari-infidele': previewDramaEpisode('le-mari-infidele', 'Le Mari infidèle', true),
       'la-reine-de-cocody': previewDramaEpisode('la-reine-de-cocody', 'La Reine de Cocody', false)
