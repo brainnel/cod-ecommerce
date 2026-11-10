@@ -2,6 +2,7 @@ import { Component, useEffect, useMemo, useRef, useState } from 'react'
 import { fetchDramaPicks, orderForDisplay, sendDramaEvents, buildEventsBody, dramaLink, dramaVariant } from '../services/dramaPicks'
 import DramaPlayer, { Cover } from './DramaPlayer'
 import { probeMedia } from '../services/dramaDiagnostics'
+import { describePlacement, describeTap, tapTarget } from '../services/dramaPlacement'
 import './DramaPicksCard.css'
 
 // Impressions are sent once per page view per pid+order, even when React
@@ -63,6 +64,41 @@ const DramaPicksCard = ({ pid, impressionKey = '', preview = null, onTrack, onLe
   // The player always shows the big card (slot 0); the other series' thumbnails
   // open BabiDrama directly (owner request 2026-11-08).
   const playerRef = useRef(null)
+  // Where the card sits in the window and the last tap inside it, for our own
+  // analytics (dramaPlacement.js). Measuring must never break the card.
+  const rootRef = useRef(null)
+  const lastTap = useRef(null)
+  const placement = () => {
+    try {
+      const root = rootRef.current
+      if (!root || typeof window === 'undefined') return {}
+      const cta = root.querySelector('.os-drama-cta')
+      return describePlacement({
+        viewportWidth: window.innerWidth,
+        viewportHeight: window.innerHeight,
+        scrollY: window.scrollY,
+        cardRect: root.getBoundingClientRect(),
+        ctaRect: cta ? cta.getBoundingClientRect() : null,
+        sinceLoadMs: performance.now(),
+      })
+    } catch {
+      return {}
+    }
+  }
+  const noteTap = (event) => {
+    try {
+      lastTap.current = { trusted: event.isTrusted, on: tapTarget(event.target), at: performance.now() }
+    } catch {
+      lastTap.current = null
+    }
+  }
+  const tapInfo = () => {
+    try {
+      return describeTap(lastTap.current, performance.now())
+    } catch {
+      return {}
+    }
+  }
   // Which version of the card this order gets (test of when to send the customer to BabiDrama),
   // in the shares BabiDrama sent with the picks.
   const variant = useMemo(
@@ -96,7 +132,7 @@ const DramaPicksCard = ({ pid, impressionKey = '', preview = null, onTrack, onLe
     const slugs = picks.series.map((series) => series.slug)
     safely(() => emitEvents(pid, slugs.map((slug, slot) => ({ type: 'impression', slug, slot })), preview, variant))
     safely(() => onTrack?.('order_success_drama_impression', {
-      pid, series: slugs.join(','), series_count: slugs.length, mode: picks.mode, variant,
+      pid, series: slugs.join(','), series_count: slugs.length, mode: picks.mode, variant, ...placement(),
     }))
   }, [picks, pid, impressionKey, preview, onTrack, variant])
 
@@ -157,7 +193,7 @@ const DramaPicksCard = ({ pid, impressionKey = '', preview = null, onTrack, onLe
     if (playedKeys.has(key)) return
     playedKeys.add(key)
     safely(() => emitEvents(pid, [{ type: 'play', slug: series.slug, slot }], preview, variant))
-    track('order_success_drama_play', series, slot, { sound, trigger })
+    track('order_success_drama_play', series, slot, { sound, trigger, ...placement() })
   }
 
   // An episode watched to its end here, once each per page view: BabiDrama orders the big card by
@@ -176,7 +212,9 @@ const DramaPicksCard = ({ pid, impressionKey = '', preview = null, onTrack, onLe
     safely(() => onLeave?.())
     markClick(series, slot, source)
     safely(() => emitEvents(pid, [{ type: 'open', slug: series.slug, slot, src: source }], preview, variant))
-    track('order_success_drama_open', series, slot, { source, seconds_watched: secondsWatched, position_s: positionS })
+    track('order_success_drama_open', series, slot, {
+      source, seconds_watched: secondsWatched, position_s: positionS, ...placement(), ...tapInfo(),
+    })
     // The anchor itself navigates; nothing here may block it.
   }
 
@@ -185,7 +223,7 @@ const DramaPicksCard = ({ pid, impressionKey = '', preview = null, onTrack, onLe
     .filter(({ series }) => series.slug !== current.series.slug)
 
   return (
-    <section className="os-drama" aria-labelledby="os-drama-kicker">
+    <section ref={rootRef} className="os-drama" aria-labelledby="os-drama-kicker" onClickCapture={noteTap}>
       <div className="os-drama-head">
         <img className="os-drama-logo" src="/babidrama/babidrama-logo-64.png" width="28" height="28" alt="" />
         <div>
