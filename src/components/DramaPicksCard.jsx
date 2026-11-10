@@ -1,5 +1,5 @@
 import { Component, useEffect, useMemo, useRef, useState } from 'react'
-import { fetchDramaPicks, orderForDisplay, sendDramaEvents, buildEventsBody, dramaLink, dramaVariant } from '../services/dramaPicks'
+import { fetchDramaPicks, orderForDisplay, sendDramaEvents, buildEventsBody, dramaLink, dramaVersion } from '../services/dramaPicks'
 import DramaPlayer, { Cover } from './DramaPlayer'
 import { probeMedia } from '../services/dramaDiagnostics'
 import { describePlacement, describeTap, seenInSession, tapTarget } from '../services/dramaPlacement'
@@ -12,6 +12,7 @@ const impressedKeys = new Set()
 const clickedKeys = new Set()
 const playedKeys = new Set()
 const completedKeys = new Set()
+const quarterKeys = new Set()
 
 // The order already exists when this renders: any failure here must leave the
 // rest of the success page untouched, so the card simply disappears.
@@ -105,12 +106,14 @@ const DramaPicksCard = ({ pid, impressionKey = '', preview = null, onTrack, onLe
       return {}
     }
   }
-  // Which version of the card this order gets (test of when to send the customer to BabiDrama),
-  // in the shares BabiDrama sent with the picks.
-  const variant = useMemo(
-    () => dramaVariant(impressionKey, preview?.variant, picks?.variants),
+  // Which version of the card this order gets, in the shares BabiDrama sent with the picks
+  // (dramaPicks.js): `variant` is the id everything is reported under, `version.base` the
+  // handoff the player follows, the rest its switches.
+  const version = useMemo(
+    () => dramaVersion(impressionKey, preview?.variant, { versions: picks?.versions, variants: picks?.variants }),
     [impressionKey, preview, picks]
   )
+  const variant = version.id
   const previewFetch = useMemo(() => (preview ? previewEpisodeFetch(preview.episodes) : null), [preview])
   const featured = useMemo(
     () => (picks?.series?.length ? { series: picks.series[0], slot: 0, trigger: 'autoplay' } : null),
@@ -210,6 +213,21 @@ const DramaPicksCard = ({ pid, impressionKey = '', preview = null, onTrack, onLe
     track('order_success_drama_play', series, slot, { sound, trigger, repeat, ...placement() })
   }
 
+  // Episode 1 reached a quarter of its length here, once per order: the early signal the versions
+  // of the card are compared on (few customers reach the end of an episode).
+  const handleProgress = (series, slot, { episode, percent, positionS }) => {
+    if (episode === 1 && percent === 25) {
+      const key = `${pid}|${impressionKey}`
+      if (!quarterKeys.has(key)) {
+        quarterKeys.add(key)
+        if (!seenInSession(`quarter|${key}`)) {
+          safely(() => emitEvents(pid, [{ type: 'quarter', slug: series.slug, slot }], preview, variant))
+        }
+      }
+    }
+    track('order_success_drama_progress', series, slot, { episode, percent, position_s: positionS })
+  }
+
   // An episode watched to its end here, once each per page view: BabiDrama orders the big card by
   // the finished episodes 1 and counts the later ones (variant d) for the test.
   const handleComplete = (series, slot, { episode = 1, durationS }) => {
@@ -238,27 +256,35 @@ const DramaPicksCard = ({ pid, impressionKey = '', preview = null, onTrack, onLe
     .map((series, slot) => ({ series, slot }))
     .filter(({ series }) => series.slug !== current.series.slug)
 
+  // Version switch `hook`: the head says what is playing (the series' hook line, in place of the
+  // brand and the kicker, so the player stays where it is) and the picture carries a badge with
+  // the free episodes. Without a hook line the card keeps its usual head.
+  const headline = version.hook && current.series.hook ? current.series.hook : ''
+
   return (
     <section ref={rootRef} className="os-drama" aria-labelledby="os-drama-kicker" onClickCapture={noteTap}>
-      <div className="os-drama-head">
-        <img className="os-drama-logo" src="/babidrama/babidrama-logo-64.png" width="28" height="28" alt="" />
+      <div className={`os-drama-head${headline ? ' has-hook' : ''}`}>
+        <img className="os-drama-logo" src="/babidrama/babidrama-logo-64.png" width="28" height="28" alt={headline ? 'BabiDrama' : ''} />
         <div>
-          <span className="os-drama-brand">BabiDrama</span>
-          <h2 id="os-drama-kicker">En attendant votre livraison</h2>
+          {!headline && <span className="os-drama-brand">BabiDrama</span>}
+          <h2 id="os-drama-kicker">{headline || 'En attendant votre livraison'}</h2>
         </div>
       </div>
 
       <DramaPlayer
         ref={playerRef}
         current={current}
-        variant={variant}
+        variant={version.base}
+        versionId={variant}
+        handoffAfter={version.handoffAfter}
+        freeBadge={Boolean(headline)}
         pid={pid}
         fetchImpl={previewFetch}
         allowLoopbackHttp={DEV_MEDIA}
         onInteract={(series, slot, action) => markClick(series, slot, action)}
         onPlayStart={handlePlayStart}
         onEpisodeStart={(series, slot, { episode, sound }) => track('order_success_drama_episode', series, slot, { episode, sound })}
-        onProgress={(series, slot, { episode, percent, positionS }) => track('order_success_drama_progress', series, slot, { episode, percent, position_s: positionS })}
+        onProgress={handleProgress}
         onComplete={handleComplete}
         onExit={(series, slot, { episode, trigger, ended, secondsWatched, positionS }) => track('order_success_drama_exit', series, slot, {
           episode, trigger, ended, seconds_watched: secondsWatched, position_s: positionS,

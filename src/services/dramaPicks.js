@@ -8,8 +8,9 @@ export const DRAMA_MAX_EVENTS = 6
 // open = « Continuer sur BabiDrama » / « Épisode 2 » from the inline player
 // (with `src`, the link used); play = the inline episode 1 started; complete =
 // an episode played to its end in the card (`ep`; BabiDrama orders the big
-// card by the finished episodes 1).
-export const DRAMA_EVENT_TYPES = ['impression', 'click', 'open', 'complete', 'play']
+// card by the finished episodes 1); quarter = episode 1 reached a quarter of
+// its length in the card.
+export const DRAMA_EVENT_TYPES = ['impression', 'click', 'open', 'complete', 'play', 'quarter']
 
 // Test of when the customer is sent to BabiDrama (2026-11-10). Measured on
 // 2026-11-08…09: customers who finished episode 1 here and opened episode 2
@@ -31,6 +32,47 @@ export const DRAMA_EVENT_TYPES = ['impression', 'click', 'open', 'complete', 'pl
 // a release here; equal thirds from the order number when it sends none.
 export const DRAMA_VARIANTS = ['a', 'd', 'c']
 export const DRAMA_KNOWN_VARIANTS = ['a', 'b', 'c', 'd']
+
+// Since 2026-11-10 d is the baseline, and BabiDrama describes the versions of
+// the card itself with the picks (`versions`): the id it counts the page under
+// (`v` on events and links), a weight, the handoff the version is built on
+// (`base`: a, c or d above) and switches on top of it:
+//   hook: the series' hook line is the card's headline, above the player;
+//   handoffAfter: BabiDrama opens after that many episodes played here
+//     (base d), instead of where the free episodes end.
+// A new version made of these needs no release here. `variants` (the three
+// weights) remains the fallback when `versions` is missing or malformed.
+export const DRAMA_VERSION_BASES = ['a', 'c', 'd']
+export const DRAMA_MAX_VERSIONS = 8
+const VERSION_ID = /^[a-z][a-z0-9]{0,7}$/
+export const isDramaVersionId = (value) => typeof value === 'string' && VERSION_ID.test(value)
+
+// [{ id, base, weight, hook, handoffAfter }] in BabiDrama's order, or null:
+// not a list, a malformed entry (the whole list is then distrusted) or no
+// weight above 0. A version built on a base this build does not know is left
+// out: it gets no order page from here.
+export const normalizeVersions = (value) => {
+  if (!Array.isArray(value) || value.length === 0 || value.length > DRAMA_MAX_VERSIONS) return null
+  const versions = []
+  const seen = new Set()
+  for (const item of value) {
+    if (!item || typeof item !== 'object') return null
+    const weight = Number(item.weight)
+    if (!isDramaVersionId(item.id) || seen.has(item.id)) return null
+    if (item.weight === null || item.weight === '' || !Number.isFinite(weight) || weight < 0) return null
+    seen.add(item.id)
+    if (!DRAMA_VERSION_BASES.includes(item.base)) continue
+    const handoffAfter = Number(item.handoffAfter)
+    versions.push({
+      id: item.id,
+      base: item.base,
+      weight: Math.floor(weight),
+      hook: item.hook === true,
+      handoffAfter: Number.isInteger(handoffAfter) && handoffAfter >= 1 && handoffAfter <= 30 ? handoffAfter : null,
+    })
+  }
+  return versions.some((version) => version.weight > 0) ? versions : null
+}
 
 // { a, c, d } as whole weights ≥ 0 with at least one above 0, or null.
 export const normalizeWeights = (value) => {
@@ -68,6 +110,29 @@ export const pidForProduct = (product) => {
   return bundle ? `bundle-${bundle[1]}` : null
 }
 
+const orderKeyText = (orderKey) => (orderKey === null || orderKey === undefined ? '' : String(orderKey).trim())
+
+// FNV-1a of the order key, as an unsigned 32-bit integer.
+const fnv1a = (key) => {
+  let hash = 0x811c9dc5
+  for (let index = 0; index < key.length; index += 1) {
+    hash ^= key.charCodeAt(index)
+    hash = Math.imul(hash, 0x01000193)
+  }
+  return hash >>> 0
+}
+
+// FNV-1a mixes its low bits poorly (order numbers differ in their last
+// digits), so a murmur3 finalizer spreads them before a point is taken.
+const spread = (value) => {
+  let hash = value
+  hash ^= hash >>> 16
+  hash = Math.imul(hash, 0x85ebca6b)
+  hash ^= hash >>> 13
+  hash = Math.imul(hash, 0xc2b2ae35)
+  return (hash ^ (hash >>> 16)) >>> 0
+}
+
 // FNV-1a over the order key: the same order always gets the same variant, and
 // consecutive order numbers spread evenly. No key (nothing to hash): 'a'.
 // With `weights` (BabiDrama's shares) the hash picks a point of the order's own
@@ -75,25 +140,13 @@ export const pidForProduct = (product) => {
 // while the shares stay the same.
 export const dramaVariant = (orderKey, override = null, weights = null) => {
   if (DRAMA_KNOWN_VARIANTS.includes(override)) return override
-  const key = orderKey === null || orderKey === undefined ? '' : String(orderKey).trim()
+  const key = orderKeyText(orderKey)
   const shares = normalizeWeights(weights)
   if (!key) return shares ? DRAMA_VARIANTS.find((variant) => shares[variant] > 0) : DRAMA_VARIANTS[0]
-  let hash = 0x811c9dc5
-  for (let index = 0; index < key.length; index += 1) {
-    hash ^= key.charCodeAt(index)
-    hash = Math.imul(hash, 0x01000193)
-  }
-  hash >>>= 0
+  const hash = fnv1a(key)
   if (!shares) return DRAMA_VARIANTS[hash % DRAMA_VARIANTS.length]
   const total = DRAMA_VARIANTS.reduce((sum, variant) => sum + shares[variant], 0)
-  // FNV-1a mixes its low bits poorly (order numbers differ in their last
-  // digits), so a murmur3 finalizer spreads them before taking the point.
-  hash ^= hash >>> 16
-  hash = Math.imul(hash, 0x85ebca6b)
-  hash ^= hash >>> 13
-  hash = Math.imul(hash, 0xc2b2ae35)
-  hash = (hash ^ (hash >>> 16)) >>> 0
-  let point = hash % total
+  let point = spread(hash) % total
   for (const variant of DRAMA_VARIANTS) {
     if (point < shares[variant]) return variant
     point -= shares[variant]
@@ -101,9 +154,36 @@ export const dramaVariant = (orderKey, override = null, weights = null) => {
   return DRAMA_VARIANTS[0]
 }
 
+const plainVersion = (id) => ({ id, base: id, weight: 0, hook: false, handoffAfter: null })
+
+// The version of the card an order page gets, as { id, base, hook,
+// handoffAfter }: from BabiDrama's `versions` when the picks carry a usable
+// list (the order's point on the line of their weights, as above), else the
+// variant of the three weights with nothing on top. `override` (dev preview)
+// names a version of the list, or one of the plain variants.
+export const dramaVersion = (orderKey, override = null, { versions = null, variants = null } = {}) => {
+  const list = normalizeVersions(versions)
+  if (typeof override === 'string' && override) {
+    const named = list?.find((version) => version.id === override)
+    if (named) return named
+    if (DRAMA_KNOWN_VARIANTS.includes(override)) return plainVersion(override)
+  }
+  if (!list) return plainVersion(dramaVariant(orderKey, null, variants))
+  const live = list.filter((version) => version.weight > 0)
+  const key = orderKeyText(orderKey)
+  if (!key) return live[0]
+  const total = live.reduce((sum, version) => sum + version.weight, 0)
+  let point = spread(fnv1a(key)) % total
+  for (const version of live) {
+    if (point < version.weight) return version
+    point -= version.weight
+  }
+  return live[0]
+}
+
 // A BabiDrama link with what its analytics read: `p` (product), `src` (which
-// link of the card) and `v` (variant). An URL that cannot be parsed is returned
-// unchanged; unknown values are left out.
+// link of the card) and `v` (the version's id). An URL that cannot be parsed
+// is returned unchanged; unknown values are left out.
 export const dramaLink = (url, { pid = null, source = null, variant = null } = {}) => {
   let parsed
   try {
@@ -114,7 +194,7 @@ export const dramaLink = (url, { pid = null, source = null, variant = null } = {
   if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return url
   if (pid && /^(?:\d{1,20}|bundle-\d{1,10})$/.test(String(pid))) parsed.searchParams.set('p', String(pid))
   if (DRAMA_LINK_SOURCES.includes(source)) parsed.searchParams.set('src', source)
-  if (DRAMA_KNOWN_VARIANTS.includes(variant)) parsed.searchParams.set('v', variant)
+  if (isDramaVersionId(variant)) parsed.searchParams.set('v', variant)
   return parsed.toString()
 }
 
@@ -188,14 +268,19 @@ export const orderForDisplay = (response, random = Math.random) => {
   if (!valid.length) return null
   const mode = response.mode === 'explore' ? 'explore' : 'ranked'
   const ordered = mode === 'explore' ? shuffle(valid, random) : valid
-  return { mode, series: ordered.slice(0, DRAMA_MAX_SERIES), variants: normalizeWeights(response.variants) }
+  return {
+    mode,
+    series: ordered.slice(0, DRAMA_MAX_SERIES),
+    variants: normalizeWeights(response.variants),
+    versions: normalizeVersions(response.versions),
+  }
 }
 
 // JSON text for the events endpoint (sent as text/plain), or null when there
 // is no valid event. At most DRAMA_MAX_EVENTS events per request.
-// `variant` (the card version of this page view) goes with every request as
-// `v`; an open carries the link used (`src`), a finished episode its number
-// (`ep`, from episode 2 on).
+// `variant` (the id of the card version of this page view) goes with every
+// request as `v`; an open carries the link used (`src`), a finished episode
+// its number (`ep`, from episode 2 on).
 export const buildEventsBody = (pid, events, variant = null) => {
   if (!pid || !Array.isArray(events)) return null
   const valid = events
@@ -213,7 +298,7 @@ export const buildEventsBody = (pid, events, variant = null) => {
   if (!valid.length) return null
   return JSON.stringify({
     pid: String(pid),
-    ...(DRAMA_KNOWN_VARIANTS.includes(variant) ? { v: variant } : {}),
+    ...(isDramaVersionId(variant) ? { v: variant } : {}),
     events: valid,
   })
 }

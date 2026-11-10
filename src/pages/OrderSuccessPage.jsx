@@ -139,8 +139,15 @@ const getDevDramaPreview = (search) => {
   if (params.get('preview_order_success') !== '1' || params.get('preview_drama') !== '1') return null
 
   return {
-    // `&drama_variant=a|b|c` picks the version of the card under test (dramaPicks.js).
+    // `&drama_variant=a|b|c|d|e|k` picks the version of the card under test (dramaPicks.js).
     variant: params.get('drama_variant'),
+    // As BabiDrama sends them: e is d with the hook headline, k a d that hands over after 2 episodes.
+    versions: [
+      { id: 'a', weight: 0, base: 'a' },
+      { id: 'd', weight: 1, base: 'd' },
+      { id: 'e', weight: 1, base: 'd', hook: true },
+      { id: 'k', weight: 0, base: 'd', handoffAfter: 2 }
+    ],
     episodes: {
       // Three free episodes: variant d plays them one after the other, then hands over.
       'le-mari-infidele': previewDramaEpisode('le-mari-infidele', 'Le Mari infidèle', true, 1, true),

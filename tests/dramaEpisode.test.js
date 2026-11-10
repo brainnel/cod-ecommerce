@@ -5,6 +5,7 @@ import {
   continueUrl,
   episodeUrl,
   fetchDramaEpisode,
+  freeEpisodesBadge,
   freeEpisodesLine,
   isMediaUrl,
   normalizeEpisode,
@@ -169,6 +170,9 @@ test('seconds watched add up the played ranges; free line follows the series', (
   assert.equal(freeEpisodesLine(5), 'Les 5 premiers épisodes sont gratuits')
   assert.equal(freeEpisodesLine(1), 'Le premier épisode est gratuit')
   for (const none of [0, null, undefined, -1, 2.5]) assert.equal(freeEpisodesLine(none), '')
+  assert.equal(freeEpisodesBadge(8), '8\u00A0épisodes gratuits')
+  assert.equal(freeEpisodesBadge(1), '1\u00A0épisode gratuit')
+  for (const none of [0, null, undefined, -1, 2.5]) assert.equal(freeEpisodesBadge(none), '')
 })
 
 test('player events: open joins impression and click with the same body shape', () => {

@@ -3,6 +3,7 @@ import {
   DRAMA_START_TIMEOUT_MS,
   continueUrl,
   fetchDramaEpisode,
+  freeEpisodesBadge,
   freeEpisodesLine,
   playedSeconds,
 } from '../services/dramaEpisode'
@@ -22,6 +23,11 @@ import './DramaPlayer.css'
 // BabiDrama while an episode plays (the end card offers the next one); 'c'
 // and 'd' open it by themselves after a countdown the customer can cancel;
 // 'd' first plays the following free episodes here, one after the other.
+// `versionId` is the id of the card version the links carry as `v` (a version
+// is one of these variants plus switches, dramaPicks.js); `handoffAfter`
+// (variant d) hands over after that many episodes played here instead of where
+// the free episodes end; `freeBadge` puts the free episodes on the picture (a
+// badge at its top) instead of the line under it.
 
 // Uninterrupted playback fades the title so burned-in subtitles stay readable.
 const IMMERSIVE_AFTER_MS = 4000
@@ -117,6 +123,9 @@ const DramaPlayer = ({
   ref,
   current,
   variant = 'a',
+  versionId = variant,
+  handoffAfter = null,
+  freeBadge = false,
   pid = null,
   fetchImpl,
   allowLoopbackHttp = false,
@@ -134,7 +143,7 @@ const DramaPlayer = ({
   const lateLink = variant !== 'a'
   const autoNext = variant === 'c' || variant === 'd'
   const inlineSeries = variant === 'd'
-  const link = (url, source) => dramaLink(url, { pid, source, variant })
+  const link = (url, source) => dramaLink(url, { pid, source, variant: versionId })
   // The episode playing in the card: 1, then the following free ones in variant d.
   const [episodeNo, setEpisodeNo] = useState(1)
   const episodeNoRef = useRef(1)
@@ -481,8 +490,10 @@ const DramaPlayer = ({
       episode: episodeNo,
       durationS: Math.round(event.currentTarget.duration || episode?.durationS || 0),
     })
-    // Variant d: the next free episode follows here, without a stop.
-    if (inlineSeries && episode?.nextInline) {
+    // Variant d: the next free episode follows here, without a stop, up to the version's own
+    // handoff point when it has one.
+    const handsOver = Number.isInteger(handoffAfter) && handoffAfter >= 1 && episodeNo >= handoffAfter
+    if (inlineSeries && episode?.nextInline && !handsOver) {
       setEpisodeNo(episodeNo + 1)
       return
     }
@@ -595,7 +606,8 @@ const DramaPlayer = ({
   const poster = episode?.posterUrl || series.coverUrl || undefined
   const title = episode?.title || series.title
   const genres = series.genres.join(' · ')
-  const free = freeEpisodesLine(series.freeEpisodes)
+  const free = freeBadge ? '' : freeEpisodesLine(series.freeEpisodes)
+  const badge = freeBadge ? freeEpisodesBadge(series.freeEpisodes) : ''
   const showSpinner = !failed && !needsTap && !ended
     && (status === 'loading' || status === 'starting' || (buffering && !paused))
   const showPaused = status === 'ready' && paused && !needsTap && !soundBlocked
@@ -653,6 +665,8 @@ const DramaPlayer = ({
             {genres && <span className="os-drama-genres">{genres}</span>}
           </p>
         </div>
+
+        {badge && <span className="os-drama-free-badge">{badge}</span>}
 
         <button
           type="button"

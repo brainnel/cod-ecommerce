@@ -125,6 +125,56 @@ test('variants b, c and d show no link to BabiDrama while episode 1 loads or pla
   assert.deepEqual([...seen].sort(), ['a', 'c', 'd'])
 })
 
+test('versions sent by BabiDrama: d renders as before under its id, the hook switch moves the hook to the head', () => {
+  const versions = [
+    { id: 'a', weight: 0, base: 'a' },
+    { id: 'd', weight: 1, base: 'd' },
+    { id: 'e', weight: 1, base: 'd', hook: true },
+  ]
+  const render = (props) => renderToStaticMarkup(createElement(DramaPicksCard, { pid: '830827813382', ...props }))
+  // The baseline through the list is the same markup as the plain variant d.
+  const plain = render({ preview: { ...picks, variant: 'd' } })
+  assert.equal(render({ preview: { ...picks, versions, variant: 'd' } }), plain)
+  assert.match(plain, /<span class="os-drama-brand">BabiDrama<\/span><h2 id="os-drama-kicker">En attendant votre livraison<\/h2>/)
+  assert.doesNotMatch(plain, /has-hook|os-drama-free-badge/)
+
+  const hook = render({ preview: { ...picks, versions, variant: 'e' } })
+  assert.match(hook, /<div class="os-drama-head has-hook"><img class="os-drama-logo" src="\/babidrama\/babidrama-logo-64.png" width="28" height="28" alt="BabiDrama"\/><div><h2 id="os-drama-kicker">💔 Elle surprend son mari…<\/h2><\/div><\/div>/)
+  assert.doesNotMatch(hook, /os-drama-brand|En attendant votre livraison/)
+  // The free episodes are a badge on the picture, not the line under it.
+  assert.match(hook, /<span class="os-drama-free-badge">5\u00A0épisodes gratuits<\/span>/)
+  assert.doesNotMatch(hook, /os-drama-free"|Les 5 premiers épisodes sont gratuits/)
+  // Built on d: no link while the episode plays, and everything is reported under the version's id.
+  assert.doesNotMatch(hook, /os-drama-cta|Continuer sur BabiDrama|os-drama-end/)
+  assert.match(hook, /la-reine\/1\?c=brainnel&amp;p=830827813382&amp;src=thumbnail&amp;v=e"/)
+  assert.equal((hook.match(/<video/g) || []).length, 1)
+  // Apart from the head, the badge and the ids, it is the baseline's card.
+  const neutral = (html) => html
+    .replace(/<div class="os-drama-head[^"]*">.*?<\/div><\/div>/, '')
+    .replace(/<span class="os-drama-free-badge">.*?<\/span>/, '')
+    .replace(/<p class="os-drama-free">.*?<\/p>/, '')
+    .replace(/&amp;v=[a-z0-9]+/g, '')
+  assert.equal(neutral(hook), neutral(plain))
+
+  // A series without a hook line keeps the usual head, under the hook version's id.
+  const noHook = render({ preview: { ...picks, series: [picks.series[1], picks.series[0]], versions, variant: 'e' } })
+  assert.match(noHook, /<span class="os-drama-brand">BabiDrama<\/span><h2 id="os-drama-kicker">En attendant votre livraison<\/h2>/)
+  assert.doesNotMatch(noHook, /has-hook|os-drama-free-badge/)
+  assert.match(noHook, /src=thumbnail&amp;v=e"/)
+
+  // The order number picks among the versions that are on, and keeps its version.
+  const seen = new Set()
+  for (let n = 0; n < 60; n += 1) {
+    const orderNo = `FL-66${String(n).padStart(4, '0')}-00001`
+    const html = render({ impressionKey: orderNo, preview: { ...picks, versions } })
+    const id = html.match(/src=thumbnail&amp;v=([a-z0-9]+)"/)[1]
+    seen.add(id)
+    assert.equal(/has-hook/.test(html), id === 'e', id)
+    assert.equal(render({ impressionKey: orderNo, preview: { ...picks, versions } }), html)
+  }
+  assert.deepEqual([...seen].sort(), ['d', 'e'])
+})
+
 test('a single series has no thumbnail row; empty, invalid or missing pid render nothing', () => {
   const single = renderToStaticMarkup(createElement(DramaPicksCard, { pid: 'p', preview: { ...picks, series: [picks.series[1]] } }))
   assert.match(single, /La Reine/)
@@ -239,7 +289,9 @@ test('completion page never emits Purchase, isolates the drama card and saves st
   assert.match(playerSource, /status !== 'ended' \|\| !autoNext \|\| !hasNext/)
   // Variant d alone goes on with the next free episode in the card, and only when BabiDrama says it may.
   assert.match(playerSource, /const inlineSeries = variant === 'd'/)
-  assert.match(playerSource, /if \(inlineSeries && episode\?\.nextInline\) \{\s+setEpisodeNo\(episodeNo \+ 1\)\s+return/)
+  assert.match(playerSource, /if \(inlineSeries && episode\?\.nextInline && !handsOver\) \{\s+setEpisodeNo\(episodeNo \+ 1\)\s+return/)
+  // A version may hand over earlier, after a number of episodes played in the card.
+  assert.match(playerSource, /const handsOver = Number\.isInteger\(handoffAfter\) && handoffAfter >= 1 && episodeNo >= handoffAfter/)
   // Every finished episode goes to BabiDrama once per page view, with its number (it ranks by the
   // episodes 1), the card version, the link used and the inline start.
   assert.match(cardSource, /const key = `\$\{pid\}\|\$\{impressionKey\}\|\$\{series\.slug\}\|\$\{episode\}`\s+if \(!completedKeys\.has\(key\)\)/)
@@ -247,8 +299,14 @@ test('completion page never emits Purchase, isolates the drama card and saves st
   assert.match(cardSource, /type: 'open', slug: series\.slug, slot, src: source \}\], preview, variant\)/)
   assert.match(cardSource, /type: 'play', slug: series\.slug, slot \}\], preview, variant\)/)
   assert.match(cardSource, /sendDramaEvents\(pid, events, \{ variant \}\)/)
-  // The shares of the versions come with the picks.
-  assert.match(cardSource, /dramaVariant\(impressionKey, preview\?\.variant, picks\?\.variants\)/)
+  // The versions and their shares come with the picks; the player follows the version's handoff
+  // and the links carry its id.
+  assert.match(cardSource, /dramaVersion\(impressionKey, preview\?\.variant, \{ versions: picks\?\.versions, variants: picks\?\.variants \}\)/)
+  assert.match(cardSource, /const variant = version\.id/)
+  assert.match(cardSource, /variant=\{version\.base\}\s+versionId=\{variant\}\s+handoffAfter=\{version\.handoffAfter\}/)
+  assert.match(playerSource, /dramaLink\(url, \{ pid, source, variant: versionId \}\)/)
+  // A quarter of episode 1 goes to BabiDrama once per order.
+  assert.match(cardSource, /if \(episode === 1 && percent === 25\) \{[\s\S]*?quarterKeys\.add\(key\)[\s\S]*?seenInSession\(`quarter\|\$\{key\}`\)[\s\S]*?type: 'quarter', slug: series\.slug, slot \}\], preview, variant\)/)
   assert.match(playerSource, /document\.hidden\) \|\| !inViewRef\.current\) return undefined\s+const target = link\(nextHref, 'auto_next'\)\s+onLeave\('auto_next'\)/)
   assert.doesNotMatch(cardSource, /location\.assign|location\.href\s*=/)
   assert.match(playerSource, /crossOrigin="anonymous"/)

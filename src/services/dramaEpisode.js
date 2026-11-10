@@ -162,3 +162,9 @@ export const freeEpisodesLine = (count) => {
   if (!Number.isInteger(count) || count < 1) return ''
   return count === 1 ? 'Le premier épisode est gratuit' : `Les ${count} premiers épisodes sont gratuits`
 }
+
+// The same, short enough for a badge on the picture: « 8 épisodes gratuits ».
+export const freeEpisodesBadge = (count) => {
+  if (!Number.isInteger(count) || count < 1) return ''
+  return count === 1 ? '1\u00A0épisode gratuit' : `${count}\u00A0épisodes gratuits`
+}

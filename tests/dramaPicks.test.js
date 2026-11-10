@@ -6,7 +6,9 @@ import {
   buildEventsBody,
   dramaLink,
   dramaVariant,
+  dramaVersion,
   eventsUrl,
+  normalizeVersions,
   normalizeWeights,
   fetchDramaPicks,
   orderForDisplay,
@@ -246,7 +248,12 @@ test('links to BabiDrama carry the product, the link used and the variant, and n
   // A `p` already set by BabiDrama is kept once.
   assert.equal(dramaLink(`${watch}&p=830827813382`, { pid: '830827813382', source: 'thumbnail', variant: 'b' }),
     'https://babidrama.com/w/le-mari/1?c=brainnel&p=830827813382&src=thumbnail&v=b')
-  assert.equal(dramaLink(watch, { pid: '<script>', source: 'evil', variant: 'zz' }), watch)
+  // The id of a version BabiDrama describes is carried as it is; anything else is left out.
+  assert.equal(dramaLink(watch, { pid: '830827813382', source: 'auto_next', variant: 'e' }),
+    'https://babidrama.com/w/le-mari/1?c=brainnel&p=830827813382&src=auto_next&v=e')
+  for (const variant of ['<x>', 'E', '9a', 'toolongid1', '', 7, null]) {
+    assert.equal(dramaLink(watch, { pid: '<script>', source: 'evil', variant }), watch, String(variant))
+  }
   assert.equal(dramaLink(watch), watch)
   for (const bad of ['javascript:alert(1)', 'not a url', '', null, undefined]) assert.equal(dramaLink(bad, { pid: '1', source: 'next', variant: 'a' }), bad)
 })
@@ -310,8 +317,13 @@ test('events tell BabiDrama the card version, the link used and the episode fini
       { type: 'complete', slug: 'le-mari', slot: 0, ep: 3 },
     ],
   })
-  // An unknown version is left out; episodes outside 2–30 are sent as episode 1 would be.
-  assert.equal('v' in JSON.parse(buildEventsBody('p', [{ type: 'click', slug: 'a', slot: 0 }], 'z')), false)
+  // A malformed version id is left out; episodes outside 2–30 are sent as episode 1 would be.
+  for (const variant of ['Z', 'd!', '9', 'toolongid1', '', 4, null]) {
+    assert.equal('v' in JSON.parse(buildEventsBody('p', [{ type: 'click', slug: 'a', slot: 0 }], variant)), false, String(variant))
+  }
+  // A quarter of episode 1 watched is its own event, with the version's id.
+  assert.deepEqual(JSON.parse(buildEventsBody('830827813382', [{ type: 'quarter', slug: 'le-mari', slot: 0, ep: 1, src: 'next' }], 'e')),
+    { pid: '830827813382', v: 'e', events: [{ type: 'quarter', slug: 'le-mari', slot: 0 }] })
   assert.deepEqual(JSON.parse(buildEventsBody('p', [{ type: 'complete', slug: 'a', slot: 0, ep: 31 }], 'a')).events,
     [{ type: 'complete', slug: 'a', slot: 0 }])
 })
@@ -320,4 +332,98 @@ test('a finished episode 1 is an accepted event', () => {
   assert.deepEqual(JSON.parse(buildEventsBody('830827813382', [{ type: 'complete', slug: 'le-mari', slot: 0 }])),
     { pid: '830827813382', events: [{ type: 'complete', slug: 'le-mari', slot: 0 }] })
   assert.equal(buildEventsBody('830827813382', [{ type: 'completed', slug: 'le-mari', slot: 0 }]), null)
+})
+
+const VERSIONS = [
+  { id: 'a', weight: 10, base: 'a' },
+  { id: 'c', weight: 0, base: 'c' },
+  { id: 'd', weight: 90, base: 'd' },
+  { id: 'e', weight: 90, base: 'd', hook: true },
+]
+
+test('versions: BabiDrama\u2019s list is read strictly, a malformed one is distrusted as a whole', () => {
+  assert.deepEqual(normalizeVersions(VERSIONS), [
+    { id: 'a', base: 'a', weight: 10, hook: false, handoffAfter: null },
+    { id: 'c', base: 'c', weight: 0, hook: false, handoffAfter: null },
+    { id: 'd', base: 'd', weight: 90, hook: false, handoffAfter: null },
+    { id: 'e', base: 'd', weight: 90, hook: true, handoffAfter: null },
+  ])
+  // Switches: only `true` turns the hook on; the handoff point is a whole number of episodes, 1–30.
+  assert.deepEqual(normalizeVersions([
+    { id: 'd', weight: 1.9, base: 'd', hook: 'yes', handoffAfter: 0 },
+    { id: 'k3', weight: '2', base: 'd', hook: true, handoffAfter: 3, extra: 'dropped' },
+    { id: 'k31', weight: 1, base: 'd', handoffAfter: 31 },
+    { id: 'kf', weight: 1, base: 'd', handoffAfter: 2.5 },
+  ]), [
+    { id: 'd', base: 'd', weight: 1, hook: false, handoffAfter: null },
+    { id: 'k3', base: 'd', weight: 2, hook: true, handoffAfter: 3 },
+    { id: 'k31', base: 'd', weight: 1, hook: false, handoffAfter: null },
+    { id: 'kf', base: 'd', weight: 1, hook: false, handoffAfter: null },
+  ])
+  // A version built on a handoff this build cannot render gets no order page; the others keep theirs.
+  assert.deepEqual(normalizeVersions([{ id: 'd', weight: 5, base: 'd' }, { id: 'z', weight: 5, base: 'x' }]).map((version) => version.id), ['d'])
+  assert.equal(normalizeVersions([{ id: 'z', weight: 5, base: 'x' }]), null)
+  // Nothing usable: not a list, empty, too long, a broken entry, a repeated id, no weight above 0.
+  const d = { id: 'd', weight: 1, base: 'd' }
+  for (const bad of [
+    null, undefined, {}, 'd', [], Array.from({ length: 9 }, (_, n) => ({ id: `v${n}`, weight: 1, base: 'd' })),
+    [d, null], [d, 'e'], [d, { id: 'E', weight: 1, base: 'd' }], [d, { id: '', weight: 1, base: 'd' }], [d, { weight: 1, base: 'd' }],
+    [d, { id: 'e', weight: -1, base: 'd' }], [d, { id: 'e', weight: 'x', base: 'd' }], [d, { id: 'e', weight: null, base: 'd' }],
+    [d, { id: 'e', base: 'd' }], [d, { id: 'd', weight: 2, base: 'd' }],
+    [{ id: 'd', weight: 0, base: 'd' }, { id: 'e', weight: 0, base: 'd' }],
+  ]) assert.equal(normalizeVersions(bad), null, JSON.stringify(bad))
+})
+
+test('versions: an order keeps its version, the weights give the shares, the fallback is the three variants', () => {
+  const split = (versions) => {
+    const counts = {}
+    for (let n = 659000; n < 665000; n += 1) {
+      const key = `FL-${n}-00001`
+      const version = dramaVersion(key, null, { versions })
+      assert.deepEqual(dramaVersion(key, null, { versions }), version)
+      counts[version.id] = (counts[version.id] || 0) + 1
+    }
+    return counts
+  }
+  // 10 / 0 / 90 / 90 of 190: about 5 %, none, 47 % and 47 % of 6,000 orders.
+  const counts = split(VERSIONS)
+  assert.equal(counts.c, undefined)
+  assert.ok(counts.a > 230 && counts.a < 400, JSON.stringify(counts))
+  assert.ok(counts.d > 2650 && counts.d < 3030, JSON.stringify(counts))
+  assert.ok(counts.e > 2650 && counts.e < 3030, JSON.stringify(counts))
+  assert.deepEqual(split([{ id: 'd', weight: 100, base: 'd' }, { id: 'e', weight: 0, base: 'd', hook: true }]), { d: 6000 })
+  // What the card needs of a version: the id to report, the handoff to follow and its switches.
+  const hook = dramaVersion('FL-1', 'e', { versions: VERSIONS })
+  assert.deepEqual(hook, { id: 'e', base: 'd', weight: 90, hook: true, handoffAfter: null })
+  // A version of the list can be named even at weight 0 (dev preview); an unknown name is ignored.
+  assert.equal(dramaVersion('FL-1', 'c', { versions: VERSIONS }).base, 'c')
+  assert.deepEqual(dramaVersion('FL-659000-00001', 'zz', { versions: VERSIONS }), dramaVersion('FL-659000-00001', null, { versions: VERSIONS }))
+  // An order without number takes the first version that is on.
+  assert.equal(dramaVersion('', null, { versions: VERSIONS }).id, 'a')
+  assert.equal(dramaVersion(null, null, { versions: VERSIONS.slice(1) }).id, 'd')
+  // Without a usable list: exactly the variant of the three weights (or of the order number), nothing on top.
+  for (const versions of [null, undefined, [], [{ id: 'E', weight: 1, base: 'd' }], 'd']) {
+    for (const variants of [null, { a: 10, c: 0, d: 90 }, { a: 34, c: 33, d: 33 }]) {
+      for (const key of ['FL-659000-00001', 'FL-659001-00001', 2611081513488681, '']) {
+        const variant = dramaVariant(key, null, variants)
+        assert.deepEqual(dramaVersion(key, null, { versions, variants }), { id: variant, base: variant, weight: 0, hook: false, handoffAfter: null })
+      }
+    }
+  }
+  assert.deepEqual(dramaVersion('FL-1'), { id: dramaVariant('FL-1'), base: dramaVariant('FL-1'), weight: 0, hook: false, handoffAfter: null })
+  assert.equal(dramaVersion('FL-1', 'b').id, 'b')
+  assert.equal(dramaVersion('FL-1', 'e').id, dramaVariant('FL-1'))
+})
+
+test('the display list carries BabiDrama\u2019s versions next to the three weights, or none', () => {
+  const plain = orderForDisplay(response('ranked', ['a', 'b']))
+  assert.equal(plain.versions, null)
+  const both = orderForDisplay({ ...response('ranked', ['a', 'b']), variants: { a: 10, c: 0, d: 90 }, versions: VERSIONS })
+  assert.deepEqual(both.variants, { a: 10, d: 90, c: 0 })
+  assert.deepEqual(both.versions.map((version) => `${version.id}:${version.weight}`), ['a:10', 'c:0', 'd:90', 'e:90'])
+  assert.equal(orderForDisplay({ ...response('ranked', ['a']), versions: [{ id: 'd', weight: 0, base: 'd' }] }).versions, null)
+  // A broken list never hides the card: the three weights still decide.
+  const broken = orderForDisplay({ ...response('ranked', ['a']), variants: { a: 0, c: 0, d: 1 }, versions: [{ id: 'D', weight: 1 }] })
+  assert.equal(broken.versions, null)
+  assert.equal(dramaVersion('FL-1', null, broken).id, 'd')
 })
