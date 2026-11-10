@@ -36,6 +36,24 @@ export const describeTap = (tap, nowMs) => {
   }
 }
 
+// True when `key` was already marked in this browser session, and marks it.
+// A customer who opens BabiDrama in the same window and comes Back reloads the
+// order page (9 % of orders showed the card twice or more): what is counted per
+// order must not count that reload again. Without session storage (private
+// mode, blocked) nothing is remembered and every load counts, as before.
+export const seenInSession = (key, storage) => {
+  try {
+    const store = storage === undefined ? globalThis.sessionStorage : storage
+    if (!store) return false
+    const name = `bd-drama:${key}`
+    if (store.getItem(name)) return true
+    store.setItem(name, '1')
+    return false
+  } catch {
+    return false
+  }
+}
+
 // Which part of the card an element belongs to.
 export const tapTarget = (element) => {
   const closest = (selector) => Boolean(element && typeof element.closest === 'function' && element.closest(selector))

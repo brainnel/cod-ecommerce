@@ -2,7 +2,7 @@ import { Component, useEffect, useMemo, useRef, useState } from 'react'
 import { fetchDramaPicks, orderForDisplay, sendDramaEvents, buildEventsBody, dramaLink, dramaVariant } from '../services/dramaPicks'
 import DramaPlayer, { Cover } from './DramaPlayer'
 import { probeMedia } from '../services/dramaDiagnostics'
-import { describePlacement, describeTap, tapTarget } from '../services/dramaPlacement'
+import { describePlacement, describeTap, seenInSession, tapTarget } from '../services/dramaPlacement'
 import './DramaPicksCard.css'
 
 // Impressions are sent once per page view per pid+order, even when React
@@ -130,9 +130,14 @@ const DramaPicksCard = ({ pid, impressionKey = '', preview = null, onTrack, onLe
     if (impressedKeys.has(key)) return
     impressedKeys.add(key)
     const slugs = picks.series.map((series) => series.slug)
-    safely(() => emitEvents(pid, slugs.map((slug, slot) => ({ type: 'impression', slug, slot })), preview, variant))
+    // BabiDrama counts a display per order: a reload of this page (Back from BabiDrama in the
+    // same window) is not another one. Our own event is sent every time, marked `repeat`.
+    const repeat = seenInSession(`display|${key}`)
+    if (!repeat) {
+      safely(() => emitEvents(pid, slugs.map((slug, slot) => ({ type: 'impression', slug, slot })), preview, variant))
+    }
     safely(() => onTrack?.('order_success_drama_impression', {
-      pid, series: slugs.join(','), series_count: slugs.length, mode: picks.mode, variant, ...placement(),
+      pid, series: slugs.join(','), series_count: slugs.length, mode: picks.mode, variant, repeat, ...placement(),
     }))
   }, [picks, pid, impressionKey, preview, onTrack, variant])
 
@@ -192,8 +197,11 @@ const DramaPicksCard = ({ pid, impressionKey = '', preview = null, onTrack, onLe
     const key = `${pid}|${impressionKey}|${series.slug}`
     if (playedKeys.has(key)) return
     playedKeys.add(key)
-    safely(() => emitEvents(pid, [{ type: 'play', slug: series.slug, slot }], preview, variant))
-    track('order_success_drama_play', series, slot, { sound, trigger, ...placement() })
+    // Per order, not per series: after a reload the big card may be another series, and a start
+    // without its display would make starts exceed displays.
+    const repeat = seenInSession(`play|${pid}|${impressionKey}`)
+    if (!repeat) safely(() => emitEvents(pid, [{ type: 'play', slug: series.slug, slot }], preview, variant))
+    track('order_success_drama_play', series, slot, { sound, trigger, repeat, ...placement() })
   }
 
   // An episode watched to its end here, once each per page view: BabiDrama orders the big card by
@@ -202,7 +210,9 @@ const DramaPicksCard = ({ pid, impressionKey = '', preview = null, onTrack, onLe
     const key = `${pid}|${impressionKey}|${series.slug}|${episode}`
     if (!completedKeys.has(key)) {
       completedKeys.add(key)
-      safely(() => emitEvents(pid, [{ type: 'complete', slug: series.slug, slot, ep: episode }], preview, variant))
+      if (!seenInSession(`complete|${key}`)) {
+        safely(() => emitEvents(pid, [{ type: 'complete', slug: series.slug, slot, ep: episode }], preview, variant))
+      }
     }
     track('order_success_drama_complete', series, slot, { episode, duration_s: durationS })
   }
