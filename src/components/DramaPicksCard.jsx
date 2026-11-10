@@ -74,6 +74,7 @@ const DramaPicksCard = ({ pid, impressionKey = '', preview = null, onTrack, onLe
       const root = rootRef.current
       if (!root || typeof window === 'undefined') return {}
       const cta = root.querySelector('.os-drama-cta')
+      const stage = root.querySelector('.os-drama-stage')
       const now = performance.now()
       if (shownAt.current === null) shownAt.current = now
       return describePlacement({
@@ -82,6 +83,7 @@ const DramaPicksCard = ({ pid, impressionKey = '', preview = null, onTrack, onLe
         scrollY: window.scrollY,
         cardRect: root.getBoundingClientRect(),
         ctaRect: cta ? cta.getBoundingClientRect() : null,
+        stageHeight: stage ? stage.getBoundingClientRect().height : null,
         sinceLoadMs: now,
         sinceCardMs: now - shownAt.current,
       })

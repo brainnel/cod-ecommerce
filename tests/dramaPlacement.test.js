@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
-import { describePlacement, describeTap, seenInSession, tapTarget } from '../src/services/dramaPlacement.js'
+import { describePlacement, describeTap, seenInSession, stageHeightFix, tapTarget } from '../src/services/dramaPlacement.js'
 
 test('placement: where the card and its link sit in the window', () => {
   assert.deepEqual(describePlacement({
     viewportWidth: 360, viewportHeight: 667.4, scrollY: 12.6,
-    cardRect: { top: 410.2, bottom: 1100 }, ctaRect: { top: 930, bottom: 978 }, sinceLoadMs: 91834.7, sinceCardMs: 7420.2,
-  }), { vw: 360, vh: 667, scroll_y: 13, card_top: 410, card_visible: true, cta_top: 930, cta_visible: false, since_load_ms: 91835, since_card_ms: 7420 })
+    cardRect: { top: 410.2, bottom: 1100 }, ctaRect: { top: 930, bottom: 978 }, stageHeight: 413.5, sinceLoadMs: 91834.7, sinceCardMs: 7420.2,
+  }), { vw: 360, vh: 667, scroll_y: 13, card_top: 410, card_visible: true, stage_h: 414, cta_top: 930, cta_visible: false, since_load_ms: 91835, since_card_ms: 7420 })
   // The link on screen; the card scrolled past the top is no longer visible.
   assert.equal(describePlacement({ viewportHeight: 700, cardRect: { top: 80, bottom: 640 }, ctaRect: { top: 560, bottom: 608 } }).cta_visible, true)
   assert.equal(describePlacement({ viewportHeight: 700, cardRect: { top: -900, bottom: -20 }, ctaRect: null }).card_visible, false)
@@ -16,7 +16,7 @@ test('placement: where the card and its link sit in the window', () => {
   assert.equal(noLink.cta_top, null)
   assert.equal(noLink.cta_visible, null)
   // Nothing measured: every field is null, never NaN.
-  assert.deepEqual(describePlacement(), { vw: null, vh: null, scroll_y: null, card_top: null, card_visible: null, cta_top: null, cta_visible: null, since_load_ms: null, since_card_ms: null })
+  assert.deepEqual(describePlacement(), { vw: null, vh: null, scroll_y: null, card_top: null, card_visible: null, stage_h: null, cta_top: null, cta_visible: null, since_load_ms: null, since_card_ms: null })
   assert.deepEqual(describePlacement({ viewportWidth: NaN, viewportHeight: undefined, cardRect: { top: NaN, bottom: 5 } }).card_visible, null)
 })
 
@@ -77,4 +77,30 @@ test('the card times its events from when it appeared, not only from the site lo
   // The shop is a single page: performance.now() alone counts the whole visit, ordering included.
   assert.match(card, /if \(shownAt\.current === null\) shownAt\.current = now/)
   assert.match(card, /sinceLoadMs: now,\s+sinceCardMs: now - shownAt\.current,/)
+})
+
+test('stage height: forced only where CSS vh is smaller than the window', () => {
+  // The bare web view measured on 2026-11-10: a 644 px window with the stage at its 280 px minimum.
+  assert.equal(stageHeightFix(644, 280), 399)
+  assert.equal(stageHeightFix(689, 280), 427)
+  assert.equal(stageHeightFix(669, 295), 415)
+  // Right already (Facebook's browser), or taller than asked (Chrome counts its hidden address bar): left alone.
+  assert.equal(stageHeightFix(623, 386), null)
+  assert.equal(stageHeightFix(598, 405), null)
+  assert.equal(stageHeightFix(675, 400), null)
+  // The stylesheet's limits apply to the forced height too.
+  assert.equal(stageHeightFix(1150, 400), 560)
+  assert.equal(stageHeightFix(400, 280), null)
+  // Hidden stage or nothing measured: nothing forced.
+  for (const [w, h] of [[644, 0], [0, 280], [NaN, 280], [644, undefined], [null, null]]) assert.equal(stageHeightFix(w, h), null)
+})
+
+test('the player corrects its stage height from the window, and never breaks on it', () => {
+  const player = readFileSync(new URL('../src/components/DramaPlayer.jsx', import.meta.url), 'utf8')
+  assert.match(player, /stage\.style\.height = ''\s+const fix = stageHeightFix\(window\.innerHeight, stage\.getBoundingClientRect\(\)\.height\)\s+if \(fix !== null\) stage\.style\.height = `\$\{fix\}px`\s+\} catch \{/)
+  assert.match(player, /window\.addEventListener\('resize', fit\)\s+return \(\) => window\.removeEventListener\('resize', fit\)/)
+  // Declared after the state it depends on.
+  assert.ok(player.indexOf("const [status, setStatus] = useState('loading')") < player.indexOf('const fix = stageHeightFix('))
+  const card = readFileSync(new URL('../src/components/DramaPicksCard.jsx', import.meta.url), 'utf8')
+  assert.match(card, /stageHeight: stage \? stage\.getBoundingClientRect\(\)\.height : null,/)
 })

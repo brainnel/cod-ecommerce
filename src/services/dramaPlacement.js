@@ -7,7 +7,7 @@
 const whole = (value) => (Number.isFinite(value) ? Math.round(value) : null)
 
 // rects: { top, bottom } in viewport pixels (getBoundingClientRect), or null.
-export const describePlacement = ({ viewportWidth, viewportHeight, scrollY, cardRect, ctaRect, sinceLoadMs, sinceCardMs } = {}) => {
+export const describePlacement = ({ viewportWidth, viewportHeight, scrollY, cardRect, ctaRect, stageHeight, sinceLoadMs, sinceCardMs } = {}) => {
   const vh = whole(viewportHeight)
   const visible = (rect) => (rect && vh !== null && Number.isFinite(rect.top) && Number.isFinite(rect.bottom)
     ? rect.bottom > 0 && rect.top < vh
@@ -18,6 +18,9 @@ export const describePlacement = ({ viewportWidth, viewportHeight, scrollY, card
     scroll_y: whole(scrollY),
     card_top: cardRect ? whole(cardRect.top) : null,
     card_visible: visible(cardRect),
+    // Height of the player's stage (0 when hidden): tells a window whose CSS
+    // `vh` is off from the others.
+    stage_h: whole(stageHeight),
     // null = this version shows no link at that moment.
     cta_top: ctaRect ? whole(ctaRect.top) : null,
     cta_visible: visible(ctaRect),
@@ -38,6 +41,21 @@ export const describeTap = (tap, nowMs) => {
     tap_on: ['cta', 'next', 'thumbnail', 'video', 'other'].includes(tap.on) ? tap.on : 'other',
     tap_age_ms: Number.isFinite(nowMs) && Number.isFinite(tap.at) ? Math.max(0, Math.round(nowMs - tap.at)) : null,
   }
+}
+
+// Height the player's stage should have: 62 % of the window, between 280 and
+// 560 px (the stylesheet's `62vh` with its limits). CSS `vh` is not the
+// window's height everywhere: in the bare Android web view that two thirds of
+// customers use it was smaller, so the stage sat at its 280 px minimum (a
+// 157 px wide video) with the link to BabiDrama right under it on the first
+// screen, where 45 % tapped it; in Facebook's own browser the stage was right,
+// the link below the fold, and 2 % did. Returns the height to force in pixels,
+// or null when the stylesheet's height is close enough (within 40 px) or
+// nothing can be measured.
+export const stageHeightFix = (windowHeight, actualHeight) => {
+  if (!Number.isFinite(windowHeight) || !Number.isFinite(actualHeight) || windowHeight <= 0 || actualHeight <= 0) return null
+  const wanted = Math.min(560, Math.max(280, Math.round(windowHeight * 0.62)))
+  return wanted - actualHeight > 40 ? wanted : null
 }
 
 // True when `key` was already marked in this browser session, and marks it.

@@ -8,6 +8,7 @@ import {
 } from '../services/dramaEpisode'
 import { bufferedSeconds, mediaErrorDetails, networkDetails } from '../services/dramaDiagnostics'
 import { DRAMA_AUTO_NEXT_SECONDS, dramaLink } from '../services/dramaPicks'
+import { stageHeightFix } from '../services/dramaPlacement'
 import './DramaPlayer.css'
 
 // Inline BabiDrama player of the order-success card: one persistent <video>
@@ -157,6 +158,26 @@ const DramaPlayer = ({
   // Variant c: seconds left before episode 2 opens by itself (null = no countdown).
   const [autoIn, setAutoIn] = useState(null)
   const [status, setStatus] = useState('loading') // loading | starting | ready | ended | failed
+  // The stage is 62 % of the window's height (`62vh` in the stylesheet). Where CSS `vh` is
+  // smaller than the window (dramaPlacement.js `stageHeightFix`), its height is set in pixels.
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+    const fit = () => {
+      try {
+        const stage = stageRef.current
+        if (!stage) return
+        stage.style.height = ''
+        const fix = stageHeightFix(window.innerHeight, stage.getBoundingClientRect().height)
+        if (fix !== null) stage.style.height = `${fix}px`
+      } catch {
+        // The stylesheet's height stays.
+      }
+    }
+    fit()
+    window.addEventListener('resize', fit)
+    return () => window.removeEventListener('resize', fit)
+    // Measured again when the stage comes back from the failed state (it is hidden there).
+  }, [status === 'failed'])
   const [episode, setEpisode] = useState(null)
   const [paused, setPaused] = useState(true)
   const [buffering, setBuffering] = useState(false)
