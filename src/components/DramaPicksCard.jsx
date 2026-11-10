@@ -40,8 +40,11 @@ const emitEvents = (pid, events, preview) => {
 // Dev fixture only: answers the episode route from `preview.episodes`
 // (a missing slug is a 404), after a short delay like the network.
 const previewEpisodeFetch = (episodes = {}) => (url) => new Promise((resolve) => {
-  const slug = new URL(url, 'http://preview.invalid').searchParams.get('slug')
-  const payload = episodes[slug]
+  const params = new URL(url, 'http://preview.invalid').searchParams
+  const slug = params.get('slug')
+  const ep = params.get('ep')
+  // Later episodes of the fixture are keyed `<slug>#<n>`.
+  const payload = episodes[ep && ep !== '1' ? `${slug}#${ep}` : slug]
   setTimeout(() => resolve(payload
     ? { ok: true, status: 200, json: async () => payload }
     : { ok: false, status: 404, json: async () => ({}) }), 350)
@@ -153,13 +156,14 @@ const DramaPicksCard = ({ pid, impressionKey = '', preview = null, onTrack, onLe
   }
 
   // Episode 1 watched to its end here: BabiDrama orders the big card by it (once per page view).
-  const handleComplete = (series, slot, { durationS }) => {
+  // Later episodes (variant d) only go to our own analytics.
+  const handleComplete = (series, slot, { episode = 1, durationS }) => {
     const key = `${pid}|${impressionKey}|${series.slug}`
-    if (!completedKeys.has(key)) {
+    if (episode === 1 && !completedKeys.has(key)) {
       completedKeys.add(key)
       safely(() => emitEvents(pid, [{ type: 'complete', slug: series.slug, slot }], preview))
     }
-    track('order_success_drama_complete', series, slot, { duration_s: durationS })
+    track('order_success_drama_complete', series, slot, { episode, duration_s: durationS })
   }
 
   const handleOpenSite = (series, slot, { source, secondsWatched, positionS }) => {
@@ -194,10 +198,11 @@ const DramaPicksCard = ({ pid, impressionKey = '', preview = null, onTrack, onLe
         allowLoopbackHttp={DEV_MEDIA}
         onInteract={(series, slot, action) => markClick(series, slot, action)}
         onPlayStart={handlePlayStart}
-        onProgress={(series, slot, { percent, positionS }) => track('order_success_drama_progress', series, slot, { percent, position_s: positionS })}
+        onEpisodeStart={(series, slot, { episode, sound }) => track('order_success_drama_episode', series, slot, { episode, sound })}
+        onProgress={(series, slot, { episode, percent, positionS }) => track('order_success_drama_progress', series, slot, { episode, percent, position_s: positionS })}
         onComplete={handleComplete}
-        onExit={(series, slot, { trigger, ended, secondsWatched, positionS }) => track('order_success_drama_exit', series, slot, {
-          trigger, ended, seconds_watched: secondsWatched, position_s: positionS,
+        onExit={(series, slot, { episode, trigger, ended, secondsWatched, positionS }) => track('order_success_drama_exit', series, slot, {
+          episode, trigger, ended, seconds_watched: secondsWatched, position_s: positionS,
         })}
         onFail={(series, slot, reason, details) => reportPlayError(series, slot, reason, details)}
         onDiagnostic={(series, slot, name, fields) => track(`order_success_drama_${name}`, series, slot, {

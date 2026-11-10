@@ -215,7 +215,7 @@ test('a slow body after the timeout cannot resurrect the card', async () => {
 })
 
 test('variant: stable per order, spread over the three versions, a for an order without number', () => {
-  const counts = { a: 0, b: 0, c: 0 }
+  const counts = { a: 0, b: 0, c: 0, d: 0 }
   for (let n = 659000; n < 662000; n += 1) {
     const key = `FL-${n}-00001`
     const variant = dramaVariant(key)
@@ -224,11 +224,15 @@ test('variant: stable per order, spread over the three versions, a for an order 
     counts[variant] += 1
   }
   for (const variant of DRAMA_VARIANTS) assert.ok(counts[variant] > 900 && counts[variant] < 1100, JSON.stringify(counts))
+  // d took over b's third of the orders; a and c kept theirs.
+  assert.deepEqual(DRAMA_VARIANTS, ['a', 'd', 'c'])
+  assert.equal(counts.b, 0)
   for (const empty of ['', '   ', null, undefined]) assert.equal(dramaVariant(empty), 'a')
   assert.equal(dramaVariant(2611081513488681), dramaVariant('2611081513488681'))
   // The dev preview may force a version; anything else is ignored.
   assert.equal(dramaVariant('FL-1', 'c'), 'c')
   assert.equal(dramaVariant('', 'b'), 'b')
+  assert.equal(dramaVariant('FL-1', 'd'), 'd')
   assert.equal(dramaVariant('FL-659000-00001', 'z'), dramaVariant('FL-659000-00001'))
 })
 

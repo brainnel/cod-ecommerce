@@ -101,8 +101,8 @@ test('drama card renders the inline player of the featured series, its continue 
   assert.ok(html.indexOf('os-drama-cta') < html.indexOf('Autres séries'), 'thumbnails below the link')
 })
 
-test('variants b and c show no link to BabiDrama while episode 1 loads or plays; the order number picks the variant', () => {
-  for (const variant of ['b', 'c']) {
+test('variants b, c and d show no link to BabiDrama while episode 1 loads or plays; the order number picks the variant', () => {
+  for (const variant of ['b', 'c', 'd']) {
     const html = renderToStaticMarkup(createElement(DramaPicksCard, { pid: '830827813382', preview: { ...picks, variant } }))
     assert.equal((html.match(/<video/g) || []).length, 1, variant)
     assert.doesNotMatch(html, /os-drama-cta|Continuer sur BabiDrama/, variant)
@@ -116,12 +116,13 @@ test('variants b and c show no link to BabiDrama while episode 1 loads or plays;
   const seen = new Set()
   for (let n = 0; n < 60; n += 1) {
     const html = byOrder(`FL-66${String(n).padStart(4, '0')}-00001`)
-    const variant = html.match(/src=thumbnail&amp;v=([abc])"/)[1]
+    const variant = html.match(/src=thumbnail&amp;v=([abcd])"/)[1]
     seen.add(variant)
     assert.equal(/os-drama-cta/.test(html), variant === 'a', variant)
     assert.equal(byOrder(`FL-66${String(n).padStart(4, '0')}-00001`), html)
   }
-  assert.deepEqual([...seen].sort(), ['a', 'b', 'c'])
+  // b was retired for d; a and c keep their orders.
+  assert.deepEqual([...seen].sort(), ['a', 'c', 'd'])
 })
 
 test('a single series has no thumbnail row; empty, invalid or missing pid render nothing', () => {
@@ -234,7 +235,13 @@ test('completion page never emits Purchase, isolates the drama card and saves st
   assert.match(cardSource, /pid, series: series\.slug, slot, mode: picks\.mode, variant, \.\.\.extra/)
   // Only variant c leaves by itself, after the countdown, in a visible page, saving the page first.
   assert.equal((playerSource.match(/window\.location\.assign/g) || []).length, 1)
-  assert.match(playerSource, /status !== 'ended' \|\| variant !== 'c' \|\| !hasNext/)
+  assert.match(playerSource, /const autoNext = variant === 'c' \|\| variant === 'd'/)
+  assert.match(playerSource, /status !== 'ended' \|\| !autoNext \|\| !hasNext/)
+  // Variant d alone goes on with the next free episode in the card, and only when BabiDrama says it may.
+  assert.match(playerSource, /const inlineSeries = variant === 'd'/)
+  assert.match(playerSource, /if \(inlineSeries && episode\?\.nextInline\) \{\s+setEpisodeNo\(episodeNo \+ 1\)\s+return/)
+  // Only a finished episode 1 goes to BabiDrama's ranking.
+  assert.match(cardSource, /if \(episode === 1 && !completedKeys\.has\(key\)\)/)
   assert.match(playerSource, /document\.hidden\) \|\| !inViewRef\.current\) return undefined\s+const target = link\(nextHref, 'auto_next'\)\s+onLeave\('auto_next'\)/)
   assert.doesNotMatch(cardSource, /location\.assign|location\.href\s*=/)
   assert.match(playerSource, /crossOrigin="anonymous"/)

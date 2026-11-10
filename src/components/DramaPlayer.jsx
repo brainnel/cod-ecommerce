@@ -17,9 +17,10 @@ import './DramaPlayer.css'
 // confirmation page around it.
 //
 // `variant` (dramaPicks.js, test of 2026-11-10): 'a' keeps « Continuer sur
-// BabiDrama » under the playing episode; 'b' and 'c' show no link to BabiDrama
-// while episode 1 plays (the end card offers episode 2), and 'c' opens episode
-// 2 by itself after a countdown the customer can cancel.
+// BabiDrama » under the playing episode; 'b', 'c' and 'd' show no link to
+// BabiDrama while an episode plays (the end card offers the next one); 'c'
+// and 'd' open it by themselves after a countdown the customer can cancel;
+// 'd' first plays the following free episodes here, one after the other.
 
 // Uninterrupted playback fades the title so burned-in subtitles stay readable.
 const IMMERSIVE_AFTER_MS = 4000
@@ -31,15 +32,18 @@ const PROGRESS_MARKS = [25, 50, 75]
 const EPISODE_CACHE_MS = 30 * 60 * 1000
 const episodeRequests = new Map()
 
-const requestEpisode = (slug, { fetchImpl, allowLoopbackHttp }) => {
-  const cached = episodeRequests.get(slug)
+const episodeKey = (slug, ep) => (ep > 1 ? `${slug}#${ep}` : slug)
+
+const requestEpisode = (slug, ep, { fetchImpl, allowLoopbackHttp }) => {
+  const key = episodeKey(slug, ep)
+  const cached = episodeRequests.get(key)
   if (cached && Date.now() - cached.at < EPISODE_CACHE_MS) return cached.promise
-  const promise = fetchDramaEpisode(slug, { allowLoopbackHttp, ...(fetchImpl ? { fetchImpl } : {}) })
+  const promise = fetchDramaEpisode(slug, { ep, allowLoopbackHttp, ...(fetchImpl ? { fetchImpl } : {}) })
     .then((result) => {
-      if (result.status !== 'ok' && episodeRequests.get(slug)?.promise === promise) episodeRequests.delete(slug)
+      if (result.status !== 'ok' && episodeRequests.get(key)?.promise === promise) episodeRequests.delete(key)
       return result
     })
-  episodeRequests.set(slug, { at: Date.now(), promise })
+  episodeRequests.set(key, { at: Date.now(), promise })
   return promise
 }
 
@@ -117,6 +121,7 @@ const DramaPlayer = ({
   allowLoopbackHttp = false,
   onInteract,
   onPlayStart,
+  onEpisodeStart,
   onProgress,
   onComplete,
   onExit,
@@ -125,8 +130,16 @@ const DramaPlayer = ({
   onDiagnostic,
 }) => {
   const { series, slot } = current
-  const lateLink = variant === 'b' || variant === 'c'
+  const lateLink = variant !== 'a'
+  const autoNext = variant === 'c' || variant === 'd'
+  const inlineSeries = variant === 'd'
   const link = (url, source) => dramaLink(url, { pid, source, variant })
+  // The episode playing in the card: 1, then the following free ones in variant d.
+  const [episodeNo, setEpisodeNo] = useState(1)
+  const episodeNoRef = useRef(1)
+  episodeNoRef.current = episodeNo
+  // Where the next episode is on BabiDrama, kept for the link shown if it cannot be loaded here.
+  const nextUrlRef = useRef(null)
   const stageRef = useRef(null)
   const videoRef = useRef(null)
   const progressRef = useRef(null)
@@ -148,6 +161,8 @@ const DramaPlayer = ({
   const [paused, setPaused] = useState(true)
   const [buffering, setBuffering] = useState(false)
   const [muted, setMuted] = useState(false)
+  const mutedRef = useRef(false)
+  mutedRef.current = muted
   const [soundBlocked, setSoundBlocked] = useState(false)
   const [needsTap, setNeedsTap] = useState(false)
   const [href, setHref] = useState(series.watchUrl)
@@ -187,7 +202,7 @@ const DramaPlayer = ({
   diagDetailsRef.current = diagDetails
 
   const callbacks = useRef({})
-  callbacks.current = { onInteract, onPlayStart, onProgress, onComplete, onExit, onFail, onOpenSite, onDiagnostic, fetchImpl, allowLoopbackHttp }
+  callbacks.current = { onInteract, onPlayStart, onEpisodeStart, onProgress, onComplete, onExit, onFail, onOpenSite, onDiagnostic, fetchImpl, allowLoopbackHttp }
   const notify = (name, ...args) => safely(() => callbacks.current[name]?.(series, slot, ...args))
   const notifyRef = useRef(notify)
   notifyRef.current = notify
@@ -206,7 +221,7 @@ const DramaPlayer = ({
     }
     srcRef.current = null
     loadIdRef.current += 1
-    if (reason === 'video' || reason === 'timeout') episodeRequests.delete(series.slug)
+    if (reason === 'video' || reason === 'timeout') episodeRequests.delete(episodeKey(series.slug, episodeNoRef.current))
     safely(() => {
       if (!video) return
       video.pause()
@@ -227,8 +242,10 @@ const DramaPlayer = ({
   const playWithSoundFallback = async (loadId) => {
     const video = videoRef.current
     if (!video) return
-    video.muted = false
-    setMuted(false)
+    // A following episode keeps the sound as the customer left it.
+    const keepMuted = episodeNoRef.current > 1 && mutedRef.current
+    video.muted = keepMuted
+    setMuted(keepMuted)
     let outcome = await attemptPlay(video)
     if (loadIdRef.current !== loadId) return
     if (outcome !== 'blocked') return
@@ -278,10 +295,10 @@ const DramaPlayer = ({
     setBuffering(false)
     setSoundBlocked(false)
     setNeedsTap(false)
-    setHref(series.watchUrl)
+    setHref(episodeNo > 1 ? nextUrlRef.current || series.watchUrl : series.watchUrl)
 
     const { fetchImpl, allowLoopbackHttp: allowHttp } = callbacks.current
-    requestEpisode(series.slug, { fetchImpl, allowLoopbackHttp: allowHttp }).then((result) => {
+    requestEpisode(series.slug, episodeNo, { fetchImpl, allowLoopbackHttp: allowHttp }).then((result) => {
       if (loadIdRef.current !== loadId || result.status === 'aborted') return
       if (result.status !== 'ok') {
         let details = null
@@ -290,6 +307,7 @@ const DramaPlayer = ({
         return
       }
       const next = result.episode
+      nextUrlRef.current = next.nextUrl
       setEpisode(next)
       setHref(next.watchUrl)
       srcRef.current = next.videoUrl
@@ -304,9 +322,10 @@ const DramaPlayer = ({
     return () => {
       if (loadIdRef.current === loadId) loadIdRef.current += 1
     }
-    // A new `current` object (from the card) is a new request; the rest is read from refs.
+    // A new `current` object (from the card) or the next episode is a new request; the rest is
+    // read from refs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [current])
+  }, [current, episodeNo])
 
   // No `canplay` within 8 s (or no episode response): show the cover instead.
   useEffect(() => {
@@ -317,7 +336,7 @@ const DramaPlayer = ({
       failRef.current('timeout', details)
     }, DRAMA_START_TIMEOUT_MS)
     return () => clearTimeout(timer)
-  }, [status, needsTap, current])
+  }, [status, needsTap, current, episodeNo])
 
   const playingSmoothly = status === 'ready' && !paused && !buffering && !soundBlocked && !needsTap
   useEffect(() => {
@@ -347,6 +366,7 @@ const DramaPlayer = ({
       exitReportedRef.current = true
       const playing = Boolean(video && srcRef.current)
       safely(() => notifyRef.current('onExit', {
+        episode: episodeNoRef.current,
         trigger,
         ended: statusRef.current === 'ended',
         secondsWatched: playing ? playedSeconds(video.played) : lastWatchedRef.current,
@@ -404,7 +424,8 @@ const DramaPlayer = ({
     setStatus((value) => (value === 'starting' ? 'ready' : value))
     if (!startedRef.current) {
       startedRef.current = true
-      notify('onPlayStart', { sound: !video.muted, trigger: current.trigger })
+      if (episodeNo === 1) notify('onPlayStart', { sound: !video.muted, trigger: current.trigger })
+      else notify('onEpisodeStart', { episode: episodeNo, sound: !video.muted })
     }
     if (!inViewRef.current) {
       autoPausedRef.current = true
@@ -425,7 +446,7 @@ const DramaPlayer = ({
       for (const mark of PROGRESS_MARKS) {
         if (percent >= mark && !marksRef.current.has(mark)) {
           marksRef.current.add(mark)
-          notify('onProgress', { percent: mark, positionS: Math.floor(video.currentTime) })
+          notify('onProgress', { episode: episodeNo, percent: mark, positionS: Math.floor(video.currentTime) })
         }
       }
     }
@@ -435,10 +456,18 @@ const DramaPlayer = ({
 
   const onEnded = (event) => {
     if (!isCurrent(event)) return
+    notify('onComplete', {
+      episode: episodeNo,
+      durationS: Math.round(event.currentTarget.duration || episode?.durationS || 0),
+    })
+    // Variant d: the next free episode follows here, without a stop.
+    if (inlineSeries && episode?.nextInline) {
+      setEpisodeNo(episodeNo + 1)
+      return
+    }
     setStatus('ended')
     setBuffering(false)
     if (progressRef.current) progressRef.current.style.transform = 'scaleX(1)'
-    notify('onComplete', { durationS: Math.round(event.currentTarget.duration || episode?.durationS || 0) })
   }
 
   const onSurfaceTap = () => {
@@ -518,13 +547,13 @@ const DramaPlayer = ({
   // Variant c: the end of episode 1 starts the countdown to episode 2, only while the card is
   // on screen in a visible page. « Revoir » and « Rester ici » stop it.
   useEffect(() => {
-    if (status !== 'ended' || variant !== 'c' || !hasNext) {
+    if (status !== 'ended' || !autoNext || !hasNext) {
       setAutoIn(null)
       return
     }
     if ((typeof document !== 'undefined' && document.hidden) || !inViewRef.current) return
     setAutoIn(DRAMA_AUTO_NEXT_SECONDS)
-  }, [status, variant, hasNext])
+  }, [status, autoNext, hasNext])
 
   useEffect(() => {
     if (autoIn === null) return undefined
@@ -599,7 +628,7 @@ const DramaPlayer = ({
         <div className={`os-drama-info${immersive ? ' is-immersive' : ''}`}>
           <h3>{title}</h3>
           <p>
-            <span className="os-drama-badge">Épisode 1 · gratuit</span>
+            <span className="os-drama-badge">Épisode {episodeNo} · gratuit</span>
             {genres && <span className="os-drama-genres">{genres}</span>}
           </p>
         </div>
@@ -617,12 +646,12 @@ const DramaPlayer = ({
 
         {ended && (
           <div className="os-drama-end">
-            <p>Fin de l’épisode 1</p>
+            <p>Fin de l’épisode {episodeNo}</p>
             {autoIn !== null && (
-              <p className="os-drama-auto" role="status">L’épisode 2 commence dans {Math.max(autoIn, 0)} s…</p>
+              <p className="os-drama-auto" role="status">L’épisode {episodeNo + 1} commence dans {Math.max(autoIn, 0)} s…</p>
             )}
             <a className="os-drama-next" href={link(nextHref, 'next')} target="_blank" rel="noopener" onClick={() => { setAutoIn(null); onLeave('next') }}>
-              {hasNext ? 'Épisode 2 sur BabiDrama' : 'Continuer sur BabiDrama'} <PlayIcon size={16} />
+              {hasNext ? `Épisode ${episodeNo + 1} sur BabiDrama` : 'Continuer sur BabiDrama'} <PlayIcon size={16} />
             </a>
             <button type="button" className="os-drama-replay" onClick={onReplay}><ReplayIcon size={18} />Revoir</button>
             {autoIn !== null && (

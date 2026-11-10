@@ -67,6 +67,8 @@ test('normalization keeps the requested series and plays the 480p rendition', ()
     durationS: 196,
     watchUrl: 'https://babidrama.com/w/numero-un-moins-que-rien/1?c=brainnel',
     nextUrl: 'https://babidrama.com/w/numero-un-moins-que-rien/2?c=brainnel',
+    episodeIndex: 1,
+    nextInline: false,
   })
   // 480p missing or not https: the next smallest acceptable rendition.
   assert.equal(normalizeEpisode(payload({ urls: { '1080p': signed('1080p'), '720p': signed('720p') } })).rendition, '720p')
@@ -182,4 +184,27 @@ test('player events: open joins impression and click with the same body shape', 
     ],
   })
   assert.equal(buildEventsBody('p', [{ type: 'play', slug: 'a', slot: 0 }]), null)
+})
+
+test('later free episodes: ep in the URL from episode 2 on, the episode number and nextInline in the answer', async () => {
+  assert.equal(episodeUrl('https://babidrama.com', 'le-mari', 1), 'https://babidrama.com/api/partner/brainnel/episode?slug=le-mari')
+  assert.equal(episodeUrl('https://babidrama.com', 'le-mari', 2), 'https://babidrama.com/api/partner/brainnel/episode?slug=le-mari&ep=2')
+  for (const bad of [0, -1, 1.5, 31, 'x', null, undefined]) assert.equal(episodeUrl('https://babidrama.com', 'le-mari', bad), 'https://babidrama.com/api/partner/brainnel/episode?slug=le-mari', String(bad))
+  // Answers from before the field existed read as episode 1 with nothing to follow.
+  const first = normalizeEpisode(payload(), { slug: 'numero-un-moins-que-rien' })
+  assert.equal(first.episodeIndex, 1)
+  assert.equal(first.nextInline, false)
+  const second = normalizeEpisode(payload({ episodeIndex: 2, nextInline: true }), { slug: 'numero-un-moins-que-rien' })
+  assert.equal(second.episodeIndex, 2)
+  assert.equal(second.nextInline, true)
+  assert.equal(normalizeEpisode(payload({ nextInline: 'yes' }), { slug: 'numero-un-moins-que-rien' }).nextInline, false)
+  const urls = []
+  const result = await fetchDramaEpisode('numero-un-moins-que-rien', {
+    ep: 3,
+    baseUrl: 'https://babidrama.com',
+    fetchImpl: async (url) => { urls.push(url); return okResponse(payload({ episodeIndex: 3, nextInline: false })) },
+  })
+  assert.deepEqual(urls, ['https://babidrama.com/api/partner/brainnel/episode?slug=numero-un-moins-que-rien&ep=3'])
+  assert.equal(result.status, 'ok')
+  assert.equal(result.episode.episodeIndex, 3)
 })

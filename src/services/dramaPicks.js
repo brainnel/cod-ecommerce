@@ -15,10 +15,18 @@ export const DRAMA_EVENT_TYPES = ['impression', 'click', 'open', 'complete']
 // kept watching there (72 % watched an episode for 20 s or more), those who
 // tapped « Continuer » a few seconds in mostly left within 20 s (14 %).
 //   a: « Continuer sur BabiDrama » under the playing episode (as before);
-//   b: no link while episode 1 plays, episode 2 offered when it ends;
+//   b: no link while episode 1 plays, episode 2 offered when it ends (retired
+//      the same day, see d);
 //   c: as b, and episode 2 opens by itself after a countdown the customer
-//      can cancel.
-export const DRAMA_VARIANTS = ['a', 'b', 'c']
+//      can cancel;
+//   d: as c, but the following free episodes play here one after the other,
+//      and BabiDrama only opens where the free episodes end. In the web view
+//      most customers order from, a link opens in the same window: BabiDrama
+//      replaced this page, and Back brought them here again within seconds.
+// Orders are split over DRAMA_VARIANTS; d took b's third, so a and c kept
+// theirs. DRAMA_KNOWN_VARIANTS are the versions the card can still render.
+export const DRAMA_VARIANTS = ['a', 'd', 'c']
+export const DRAMA_KNOWN_VARIANTS = ['a', 'b', 'c', 'd']
 export const DRAMA_AUTO_NEXT_SECONDS = 5
 // Which link of the card opened BabiDrama (`src` on its URL).
 export const DRAMA_LINK_SOURCES = ['continue', 'next', 'auto_next', 'thumbnail', 'fallback']
@@ -45,7 +53,7 @@ export const pidForProduct = (product) => {
 // FNV-1a over the order key: the same order always gets the same variant, and
 // consecutive order numbers spread evenly. No key (nothing to hash): 'a'.
 export const dramaVariant = (orderKey, override = null) => {
-  if (DRAMA_VARIANTS.includes(override)) return override
+  if (DRAMA_KNOWN_VARIANTS.includes(override)) return override
   const key = orderKey === null || orderKey === undefined ? '' : String(orderKey).trim()
   if (!key) return DRAMA_VARIANTS[0]
   let hash = 0x811c9dc5
@@ -69,7 +77,7 @@ export const dramaLink = (url, { pid = null, source = null, variant = null } = {
   if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return url
   if (pid && /^(?:\d{1,20}|bundle-\d{1,10})$/.test(String(pid))) parsed.searchParams.set('p', String(pid))
   if (DRAMA_LINK_SOURCES.includes(source)) parsed.searchParams.set('src', source)
-  if (DRAMA_VARIANTS.includes(variant)) parsed.searchParams.set('v', variant)
+  if (DRAMA_KNOWN_VARIANTS.includes(variant)) parsed.searchParams.set('v', variant)
   return parsed.toString()
 }
 

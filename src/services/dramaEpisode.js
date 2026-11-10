@@ -1,4 +1,5 @@
-// Episode 1 of a BabiDrama series, autoplayed inline in the order-success card.
+// A free episode of a BabiDrama series (episode 1, then the following ones in
+// variant d), autoplayed inline in the order-success card.
 // Like the picks, nothing here may throw into the page: every failure resolves
 // to a status, and the card then shows the cover and its link instead.
 
@@ -15,7 +16,20 @@ export const DRAMA_RENDITIONS = ['480p', '720p', '1080p']
 const EPISODE_PATH = '/api/partner/brainnel/episode'
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '[::1]'])
 
-export const episodeUrl = (base, slug) => `${trimDramaBase(base)}${EPISODE_PATH}?slug=${encodeURIComponent(slug)}`
+// Highest episode BabiDrama serves to the shop (free episodes only, 404 beyond).
+export const DRAMA_INLINE_MAX_EPISODE = 30
+
+export const episodeNumber = (value) => {
+  const number = Number(value)
+  return Number.isInteger(number) && number >= 1 && number <= DRAMA_INLINE_MAX_EPISODE ? number : 1
+}
+
+// `&ep=` only from episode 2 on: episode 1 keeps the URL (and edge cache entry) it always had.
+export const episodeUrl = (base, slug, ep = 1) => {
+  const url = `${trimDramaBase(base)}${EPISODE_PATH}?slug=${encodeURIComponent(slug)}`
+  const number = episodeNumber(ep)
+  return number > 1 ? `${url}&ep=${number}` : url
+}
 
 const parseUrl = (value) => {
   if (typeof value !== 'string' || !value) return null
@@ -76,6 +90,9 @@ export const normalizeEpisode = (payload, { slug, allowLoopbackHttp = false } = 
     durationS: toSeconds(payload.durationS),
     watchUrl: payload.watchUrl,
     nextUrl: isLinkUrl(payload.nextUrl) ? payload.nextUrl : null,
+    episodeIndex: episodeNumber(payload.episodeIndex),
+    // The next episode is free and ready: the card may go on with it (variant d).
+    nextInline: payload.nextInline === true,
   }
 }
 
@@ -84,6 +101,7 @@ export const normalizeEpisode = (payload, { slug, allowLoopbackHttp = false } = 
 // { status: 'aborted' }. Never rejects. Called only when the card is about to
 // play: every response issues new signed playback URLs.
 export const fetchDramaEpisode = async (slug, {
+  ep = 1,
   timeoutMs = DRAMA_EPISODE_TIMEOUT_MS,
   fetchImpl = globalThis.fetch,
   baseUrl = getDramaBaseUrl(),
@@ -101,7 +119,7 @@ export const fetchDramaEpisode = async (slug, {
     timer = timers.setTimeout(() => { abort(); resolve({ status: 'error', reason: 'timeout' }) }, timeoutMs)
   })
   const request = (async () => {
-    const response = await fetchImpl(episodeUrl(baseUrl, slug), {
+    const response = await fetchImpl(episodeUrl(baseUrl, slug, ep), {
       method: 'GET',
       credentials: 'omit',
       headers: { Accept: 'application/json' },

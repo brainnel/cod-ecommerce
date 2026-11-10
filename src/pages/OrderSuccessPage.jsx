@@ -124,11 +124,12 @@ const previewDramaCover = (from, to, label) => `data:image/svg+xml,${encodeURICo
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 400"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${from}"/><stop offset="1" stop-color="${to}"/></linearGradient></defs><rect width="300" height="400" fill="url(#g)"/><text x="150" y="360" fill="#fff" font-family="sans-serif" font-size="34" font-weight="700" text-anchor="middle">${label}</text></svg>`
 )}`
 
-const previewDramaEpisode = (slug, title, hasNext) => {
+const previewDramaEpisode = (slug, title, hasNext, index = 1, nextInline = false) => {
   const media = `${typeof window === 'undefined' ? 'http://127.0.0.1:4173' : window.location.origin}/__preview/api/bdtest`
   return {
-    slug, title, episodeIndex: 1, durationS: 10, posterUrl: `${media}/poster.jpg`, urls: { '480p': `${media}/episode-480p.mp4` },
-    watchUrl: `https://babidrama.com/w/${slug}/1?c=brainnel`, nextUrl: hasNext ? `https://babidrama.com/w/${slug}/2?c=brainnel` : null
+    slug, title, episodeIndex: index, durationS: 10, posterUrl: `${media}/poster.jpg`, urls: { '480p': `${media}/episode-480p.mp4` },
+    watchUrl: `https://babidrama.com/w/${slug}/${index}?c=brainnel`, nextUrl: hasNext ? `https://babidrama.com/w/${slug}/${index + 1}?c=brainnel` : null,
+    nextInline
   }
 }
 
@@ -141,7 +142,10 @@ const getDevDramaPreview = (search) => {
     // `&drama_variant=a|b|c` picks the version of the card under test (dramaPicks.js).
     variant: params.get('drama_variant'),
     episodes: {
-      'le-mari-infidele': previewDramaEpisode('le-mari-infidele', 'Le Mari infidèle', true),
+      // Three free episodes: variant d plays them one after the other, then hands over.
+      'le-mari-infidele': previewDramaEpisode('le-mari-infidele', 'Le Mari infidèle', true, 1, true),
+      'le-mari-infidele#2': previewDramaEpisode('le-mari-infidele', 'Le Mari infidèle', true, 2, true),
+      'le-mari-infidele#3': previewDramaEpisode('le-mari-infidele', 'Le Mari infidèle', true, 3, false),
       'la-reine-de-cocody': previewDramaEpisode('la-reine-de-cocody', 'La Reine de Cocody', false)
     },
     pid: '946101641067',
