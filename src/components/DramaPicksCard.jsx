@@ -28,13 +28,13 @@ const safely = (fn) => {
   try { fn() } catch (error) { console.warn('drama picks action failed:', error) }
 }
 
-const emitEvents = (pid, events, preview) => {
+const emitEvents = (pid, events, preview, variant) => {
   if (preview) {
     // Dev preview never reaches BabiDrama; log what would be sent instead.
-    console.info('[drama preview] events', buildEventsBody(pid, events))
+    console.info('[drama preview] events', buildEventsBody(pid, events, variant))
     return
   }
-  sendDramaEvents(pid, events)
+  sendDramaEvents(pid, events, { variant })
 }
 
 // Dev fixture only: answers the episode route from `preview.episodes`
@@ -63,8 +63,12 @@ const DramaPicksCard = ({ pid, impressionKey = '', preview = null, onTrack, onLe
   // The player always shows the big card (slot 0); the other series' thumbnails
   // open BabiDrama directly (owner request 2026-11-08).
   const playerRef = useRef(null)
-  // Which version of the card this order gets (test of when to send the customer to BabiDrama).
-  const variant = useMemo(() => dramaVariant(impressionKey, preview?.variant), [impressionKey, preview])
+  // Which version of the card this order gets (test of when to send the customer to BabiDrama),
+  // in the shares BabiDrama sent with the picks.
+  const variant = useMemo(
+    () => dramaVariant(impressionKey, preview?.variant, picks?.variants),
+    [impressionKey, preview, picks]
+  )
   const previewFetch = useMemo(() => (preview ? previewEpisodeFetch(preview.episodes) : null), [preview])
   const featured = useMemo(
     () => (picks?.series?.length ? { series: picks.series[0], slot: 0, trigger: 'autoplay' } : null),
@@ -90,7 +94,7 @@ const DramaPicksCard = ({ pid, impressionKey = '', preview = null, onTrack, onLe
     if (impressedKeys.has(key)) return
     impressedKeys.add(key)
     const slugs = picks.series.map((series) => series.slug)
-    safely(() => emitEvents(pid, slugs.map((slug, slot) => ({ type: 'impression', slug, slot })), preview))
+    safely(() => emitEvents(pid, slugs.map((slug, slot) => ({ type: 'impression', slug, slot })), preview, variant))
     safely(() => onTrack?.('order_success_drama_impression', {
       pid, series: slugs.join(','), series_count: slugs.length, mode: picks.mode, variant,
     }))
@@ -122,7 +126,7 @@ const DramaPicksCard = ({ pid, impressionKey = '', preview = null, onTrack, onLe
     const key = `${pid}|${impressionKey}|${series.slug}`
     if (clickedKeys.has(key)) return
     clickedKeys.add(key)
-    safely(() => emitEvents(pid, [{ type: 'click', slug: series.slug, slot }], preview))
+    safely(() => emitEvents(pid, [{ type: 'click', slug: series.slug, slot }], preview, variant))
     track('order_success_drama_click', series, slot, { action })
   }
 
@@ -152,16 +156,17 @@ const DramaPicksCard = ({ pid, impressionKey = '', preview = null, onTrack, onLe
     const key = `${pid}|${impressionKey}|${series.slug}`
     if (playedKeys.has(key)) return
     playedKeys.add(key)
+    safely(() => emitEvents(pid, [{ type: 'play', slug: series.slug, slot }], preview, variant))
     track('order_success_drama_play', series, slot, { sound, trigger })
   }
 
-  // Episode 1 watched to its end here: BabiDrama orders the big card by it (once per page view).
-  // Later episodes (variant d) only go to our own analytics.
+  // An episode watched to its end here, once each per page view: BabiDrama orders the big card by
+  // the finished episodes 1 and counts the later ones (variant d) for the test.
   const handleComplete = (series, slot, { episode = 1, durationS }) => {
-    const key = `${pid}|${impressionKey}|${series.slug}`
-    if (episode === 1 && !completedKeys.has(key)) {
+    const key = `${pid}|${impressionKey}|${series.slug}|${episode}`
+    if (!completedKeys.has(key)) {
       completedKeys.add(key)
-      safely(() => emitEvents(pid, [{ type: 'complete', slug: series.slug, slot }], preview))
+      safely(() => emitEvents(pid, [{ type: 'complete', slug: series.slug, slot, ep: episode }], preview, variant))
     }
     track('order_success_drama_complete', series, slot, { episode, duration_s: durationS })
   }
@@ -170,7 +175,7 @@ const DramaPicksCard = ({ pid, impressionKey = '', preview = null, onTrack, onLe
     // Preserve the confirmation page when the customer comes back.
     safely(() => onLeave?.())
     markClick(series, slot, source)
-    safely(() => emitEvents(pid, [{ type: 'open', slug: series.slug, slot }], preview))
+    safely(() => emitEvents(pid, [{ type: 'open', slug: series.slug, slot, src: source }], preview, variant))
     track('order_success_drama_open', series, slot, { source, seconds_watched: secondsWatched, position_s: positionS })
     // The anchor itself navigates; nothing here may block it.
   }

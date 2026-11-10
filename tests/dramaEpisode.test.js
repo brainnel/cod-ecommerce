@@ -183,7 +183,10 @@ test('player events: open joins impression and click with the same body shape', 
       { type: 'open', slug: 'numero-un-moins-que-rien', slot: 0 },
     ],
   })
-  assert.equal(buildEventsBody('p', [{ type: 'play', slug: 'a', slot: 0 }]), null)
+  // The inline start is reported too (BabiDrama counts it per card version); other names are not.
+  assert.deepEqual(JSON.parse(buildEventsBody('p', [{ type: 'play', slug: 'a', slot: 0 }])),
+    { pid: 'p', events: [{ type: 'play', slug: 'a', slot: 0 }] })
+  assert.equal(buildEventsBody('p', [{ type: 'pause', slug: 'a', slot: 0 }]), null)
 })
 
 test('later free episodes: ep in the URL from episode 2 on, the episode number and nextInline in the answer', async () => {

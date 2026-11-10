@@ -7,6 +7,7 @@ import {
   dramaLink,
   dramaVariant,
   eventsUrl,
+  normalizeWeights,
   fetchDramaPicks,
   orderForDisplay,
   pidForProduct,
@@ -248,6 +249,71 @@ test('links to BabiDrama carry the product, the link used and the variant, and n
   assert.equal(dramaLink(watch, { pid: '<script>', source: 'evil', variant: 'zz' }), watch)
   assert.equal(dramaLink(watch), watch)
   for (const bad of ['javascript:alert(1)', 'not a url', '', null, undefined]) assert.equal(dramaLink(bad, { pid: '1', source: 'next', variant: 'a' }), bad)
+})
+
+test('variant shares come from BabiDrama: weights of a, c and d, stable per order', () => {
+  const split = (weights) => {
+    const counts = { a: 0, c: 0, d: 0 }
+    for (let n = 659000; n < 665000; n += 1) {
+      const key = `FL-${n}-00001`
+      const variant = dramaVariant(key, null, weights)
+      assert.equal(dramaVariant(key, null, weights), variant)
+      counts[variant] += 1
+    }
+    return counts
+  }
+  const even = split({ a: 34, c: 33, d: 33 })
+  for (const variant of DRAMA_VARIANTS) assert.ok(even[variant] > 1850 && even[variant] < 2190, JSON.stringify(even))
+  const skewed = split({ a: 10, c: 20, d: 70 })
+  assert.ok(skewed.a > 480 && skewed.a < 720, JSON.stringify(skewed))
+  assert.ok(skewed.c > 1050 && skewed.c < 1350, JSON.stringify(skewed))
+  assert.ok(skewed.d > 4000 && skewed.d < 4400, JSON.stringify(skewed))
+  // A version at 0 is off; the control alone gets every order.
+  assert.deepEqual(split({ a: 0, c: 1, d: 1 }).a, 0)
+  assert.deepEqual(split({ a: 100, c: 0, d: 0 }), { a: 6000, c: 0, d: 0 })
+  // An order without number takes the first version that is on.
+  assert.equal(dramaVariant('', null, { a: 0, c: 0, d: 5 }), 'd')
+  // Unusable shares fall back to the thirds of the order number; a forced version wins.
+  for (const bad of [null, undefined, {}, { a: 1, c: 1 }, { a: -1, c: 1, d: 1 }, { a: 0, c: 0, d: 0 }, { a: 'x', c: 1, d: 1 }, 'a']) {
+    assert.equal(normalizeWeights(bad), null)
+    assert.equal(dramaVariant('FL-659000-00001', null, bad), dramaVariant('FL-659000-00001'))
+  }
+  assert.deepEqual(normalizeWeights({ a: 34.9, c: '33', d: 33, b: 9 }), { a: 34, d: 33, c: 33 })
+  assert.equal(dramaVariant('FL-1', 'b', { a: 1, c: 1, d: 1 }), 'b')
+})
+
+test('the display list carries the shares BabiDrama sent, or none', () => {
+  assert.equal(orderForDisplay(response('ranked', ['a', 'b'])).variants, null)
+  assert.deepEqual(orderForDisplay({ ...response('ranked', ['a', 'b']), variants: { a: 10, c: 45, d: 45 } }).variants,
+    { a: 10, d: 45, c: 45 })
+  assert.equal(orderForDisplay({ ...response('ranked', ['a']), variants: { a: 0, c: 0, d: 0 } }).variants, null)
+})
+
+test('events tell BabiDrama the card version, the link used and the episode finished', () => {
+  const body = JSON.parse(buildEventsBody('830827813382', [
+    { type: 'impression', slug: 'le-mari', slot: 0, src: 'next', ep: 2 },
+    { type: 'play', slug: 'le-mari', slot: 0 },
+    { type: 'open', slug: 'le-mari', slot: 0, src: 'auto_next' },
+    { type: 'open', slug: 'le-mari', slot: 0, src: 'evil' },
+    { type: 'complete', slug: 'le-mari', slot: 0, ep: 1 },
+    { type: 'complete', slug: 'le-mari', slot: 0, ep: 3 },
+  ], 'd'))
+  assert.deepEqual(body, {
+    pid: '830827813382',
+    v: 'd',
+    events: [
+      { type: 'impression', slug: 'le-mari', slot: 0 },
+      { type: 'play', slug: 'le-mari', slot: 0 },
+      { type: 'open', slug: 'le-mari', slot: 0, src: 'auto_next' },
+      { type: 'open', slug: 'le-mari', slot: 0 },
+      { type: 'complete', slug: 'le-mari', slot: 0 },
+      { type: 'complete', slug: 'le-mari', slot: 0, ep: 3 },
+    ],
+  })
+  // An unknown version is left out; episodes outside 2–30 are sent as episode 1 would be.
+  assert.equal('v' in JSON.parse(buildEventsBody('p', [{ type: 'click', slug: 'a', slot: 0 }], 'z')), false)
+  assert.deepEqual(JSON.parse(buildEventsBody('p', [{ type: 'complete', slug: 'a', slot: 0, ep: 31 }], 'a')).events,
+    [{ type: 'complete', slug: 'a', slot: 0 }])
 })
 
 test('a finished episode 1 is an accepted event', () => {

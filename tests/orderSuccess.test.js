@@ -240,8 +240,15 @@ test('completion page never emits Purchase, isolates the drama card and saves st
   // Variant d alone goes on with the next free episode in the card, and only when BabiDrama says it may.
   assert.match(playerSource, /const inlineSeries = variant === 'd'/)
   assert.match(playerSource, /if \(inlineSeries && episode\?\.nextInline\) \{\s+setEpisodeNo\(episodeNo \+ 1\)\s+return/)
-  // Only a finished episode 1 goes to BabiDrama's ranking.
-  assert.match(cardSource, /if \(episode === 1 && !completedKeys\.has\(key\)\)/)
+  // Every finished episode goes to BabiDrama once per page view, with its number (it ranks by the
+  // episodes 1), the card version, the link used and the inline start.
+  assert.match(cardSource, /const key = `\$\{pid\}\|\$\{impressionKey\}\|\$\{series\.slug\}\|\$\{episode\}`\s+if \(!completedKeys\.has\(key\)\)/)
+  assert.match(cardSource, /type: 'complete', slug: series\.slug, slot, ep: episode \}\], preview, variant\)/)
+  assert.match(cardSource, /type: 'open', slug: series\.slug, slot, src: source \}\], preview, variant\)/)
+  assert.match(cardSource, /type: 'play', slug: series\.slug, slot \}\], preview, variant\)/)
+  assert.match(cardSource, /sendDramaEvents\(pid, events, \{ variant \}\)/)
+  // The shares of the versions come with the picks.
+  assert.match(cardSource, /dramaVariant\(impressionKey, preview\?\.variant, picks\?\.variants\)/)
   assert.match(playerSource, /document\.hidden\) \|\| !inViewRef\.current\) return undefined\s+const target = link\(nextHref, 'auto_next'\)\s+onLeave\('auto_next'\)/)
   assert.doesNotMatch(cardSource, /location\.assign|location\.href\s*=/)
   assert.match(playerSource, /crossOrigin="anonymous"/)

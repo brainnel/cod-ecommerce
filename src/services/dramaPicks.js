@@ -5,10 +5,11 @@
 export const DRAMA_PICKS_TIMEOUT_MS = 2500
 export const DRAMA_MAX_SERIES = 5
 export const DRAMA_MAX_EVENTS = 6
-// open = « Continuer sur BabiDrama » / « Épisode 2 » from the inline player;
-// complete = episode 1 played to its end in the card (BabiDrama orders the
-// big card by it).
-export const DRAMA_EVENT_TYPES = ['impression', 'click', 'open', 'complete']
+// open = « Continuer sur BabiDrama » / « Épisode 2 » from the inline player
+// (with `src`, the link used); play = the inline episode 1 started; complete =
+// an episode played to its end in the card (`ep`; BabiDrama orders the big
+// card by the finished episodes 1).
+export const DRAMA_EVENT_TYPES = ['impression', 'click', 'open', 'complete', 'play']
 
 // Test of when the customer is sent to BabiDrama (2026-11-10). Measured on
 // 2026-11-08…09: customers who finished episode 1 here and opened episode 2
@@ -25,8 +26,25 @@ export const DRAMA_EVENT_TYPES = ['impression', 'click', 'open', 'complete']
 //      replaced this page, and Back brought them here again within seconds.
 // Orders are split over DRAMA_VARIANTS; d took b's third, so a and c kept
 // theirs. DRAMA_KNOWN_VARIANTS are the versions the card can still render.
+// BabiDrama sends the shares with the picks (`variants`: weights of a, c and
+// d, set in its console and by its growth agent), so the split changes without
+// a release here; equal thirds from the order number when it sends none.
 export const DRAMA_VARIANTS = ['a', 'd', 'c']
 export const DRAMA_KNOWN_VARIANTS = ['a', 'b', 'c', 'd']
+
+// { a, c, d } as whole weights ≥ 0 with at least one above 0, or null.
+export const normalizeWeights = (value) => {
+  if (!value || typeof value !== 'object') return null
+  const weights = {}
+  let total = 0
+  for (const variant of DRAMA_VARIANTS) {
+    const weight = Number(value[variant])
+    if (!Number.isFinite(weight) || weight < 0) return null
+    weights[variant] = Math.floor(weight)
+    total += weights[variant]
+  }
+  return total > 0 ? weights : null
+}
 export const DRAMA_AUTO_NEXT_SECONDS = 5
 // Which link of the card opened BabiDrama (`src` on its URL).
 export const DRAMA_LINK_SOURCES = ['continue', 'next', 'auto_next', 'thumbnail', 'fallback']
@@ -52,16 +70,35 @@ export const pidForProduct = (product) => {
 
 // FNV-1a over the order key: the same order always gets the same variant, and
 // consecutive order numbers spread evenly. No key (nothing to hash): 'a'.
-export const dramaVariant = (orderKey, override = null) => {
+// With `weights` (BabiDrama's shares) the hash picks a point of the order's own
+// and the versions take their share of the line, so an order keeps its version
+// while the shares stay the same.
+export const dramaVariant = (orderKey, override = null, weights = null) => {
   if (DRAMA_KNOWN_VARIANTS.includes(override)) return override
   const key = orderKey === null || orderKey === undefined ? '' : String(orderKey).trim()
-  if (!key) return DRAMA_VARIANTS[0]
+  const shares = normalizeWeights(weights)
+  if (!key) return shares ? DRAMA_VARIANTS.find((variant) => shares[variant] > 0) : DRAMA_VARIANTS[0]
   let hash = 0x811c9dc5
   for (let index = 0; index < key.length; index += 1) {
     hash ^= key.charCodeAt(index)
     hash = Math.imul(hash, 0x01000193)
   }
-  return DRAMA_VARIANTS[(hash >>> 0) % DRAMA_VARIANTS.length]
+  hash >>>= 0
+  if (!shares) return DRAMA_VARIANTS[hash % DRAMA_VARIANTS.length]
+  const total = DRAMA_VARIANTS.reduce((sum, variant) => sum + shares[variant], 0)
+  // FNV-1a mixes its low bits poorly (order numbers differ in their last
+  // digits), so a murmur3 finalizer spreads them before taking the point.
+  hash ^= hash >>> 16
+  hash = Math.imul(hash, 0x85ebca6b)
+  hash ^= hash >>> 13
+  hash = Math.imul(hash, 0xc2b2ae35)
+  hash = (hash ^ (hash >>> 16)) >>> 0
+  let point = hash % total
+  for (const variant of DRAMA_VARIANTS) {
+    if (point < shares[variant]) return variant
+    point -= shares[variant]
+  }
+  return DRAMA_VARIANTS[0]
 }
 
 // A BabiDrama link with what its analytics read: `p` (product), `src` (which
@@ -151,32 +188,46 @@ export const orderForDisplay = (response, random = Math.random) => {
   if (!valid.length) return null
   const mode = response.mode === 'explore' ? 'explore' : 'ranked'
   const ordered = mode === 'explore' ? shuffle(valid, random) : valid
-  return { mode, series: ordered.slice(0, DRAMA_MAX_SERIES) }
+  return { mode, series: ordered.slice(0, DRAMA_MAX_SERIES), variants: normalizeWeights(response.variants) }
 }
 
 // JSON text for the events endpoint (sent as text/plain), or null when there
 // is no valid event. At most DRAMA_MAX_EVENTS events per request.
-export const buildEventsBody = (pid, events) => {
+// `variant` (the card version of this page view) goes with every request as
+// `v`; an open carries the link used (`src`), a finished episode its number
+// (`ep`, from episode 2 on).
+export const buildEventsBody = (pid, events, variant = null) => {
   if (!pid || !Array.isArray(events)) return null
   const valid = events
     .filter((event) => event && DRAMA_EVENT_TYPES.includes(event.type)
       && typeof event.slug === 'string' && event.slug
       && Number.isInteger(event.slot) && event.slot >= 0 && event.slot < DRAMA_MAX_SERIES)
     .slice(0, DRAMA_MAX_EVENTS)
-    .map(({ type, slug, slot }) => ({ type, slug, slot }))
+    .map(({ type, slug, slot, src, ep }) => ({
+      type,
+      slug,
+      slot,
+      ...(type === 'open' && DRAMA_LINK_SOURCES.includes(src) ? { src } : {}),
+      ...(type === 'complete' && Number.isInteger(ep) && ep > 1 && ep <= 30 ? { ep } : {}),
+    }))
   if (!valid.length) return null
-  return JSON.stringify({ pid: String(pid), events: valid })
+  return JSON.stringify({
+    pid: String(pid),
+    ...(DRAMA_KNOWN_VARIANTS.includes(variant) ? { v: variant } : {}),
+    events: valid,
+  })
 }
 
 // Fire-and-forget: never awaited, never throws. Returns true when a request
 // was handed to the browser.
 export const sendDramaEvents = (pid, events, {
+  variant = null,
   baseUrl = getDramaBaseUrl(),
   navigatorImpl = globalThis.navigator,
   fetchImpl = globalThis.fetch,
 } = {}) => {
   try {
-    const body = buildEventsBody(pid, events)
+    const body = buildEventsBody(pid, events, variant)
     if (!body) return false
     const url = eventsUrl(baseUrl)
     if (typeof navigatorImpl?.sendBeacon === 'function') {
