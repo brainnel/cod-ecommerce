@@ -68,18 +68,22 @@ const DramaPicksCard = ({ pid, impressionKey = '', preview = null, onTrack, onLe
   // analytics (dramaPlacement.js). Measuring must never break the card.
   const rootRef = useRef(null)
   const lastTap = useRef(null)
+  const shownAt = useRef(null)
   const placement = () => {
     try {
       const root = rootRef.current
       if (!root || typeof window === 'undefined') return {}
       const cta = root.querySelector('.os-drama-cta')
+      const now = performance.now()
+      if (shownAt.current === null) shownAt.current = now
       return describePlacement({
         viewportWidth: window.innerWidth,
         viewportHeight: window.innerHeight,
         scrollY: window.scrollY,
         cardRect: root.getBoundingClientRect(),
         ctaRect: cta ? cta.getBoundingClientRect() : null,
-        sinceLoadMs: performance.now(),
+        sinceLoadMs: now,
+        sinceCardMs: now - shownAt.current,
       })
     } catch {
       return {}

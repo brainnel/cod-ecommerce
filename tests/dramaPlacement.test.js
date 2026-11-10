@@ -6,8 +6,8 @@ import { describePlacement, describeTap, seenInSession, tapTarget } from '../src
 test('placement: where the card and its link sit in the window', () => {
   assert.deepEqual(describePlacement({
     viewportWidth: 360, viewportHeight: 667.4, scrollY: 12.6,
-    cardRect: { top: 410.2, bottom: 1100 }, ctaRect: { top: 930, bottom: 978 }, sinceLoadMs: 1834.7,
-  }), { vw: 360, vh: 667, scroll_y: 13, card_top: 410, card_visible: true, cta_top: 930, cta_visible: false, since_load_ms: 1835 })
+    cardRect: { top: 410.2, bottom: 1100 }, ctaRect: { top: 930, bottom: 978 }, sinceLoadMs: 91834.7, sinceCardMs: 7420.2,
+  }), { vw: 360, vh: 667, scroll_y: 13, card_top: 410, card_visible: true, cta_top: 930, cta_visible: false, since_load_ms: 91835, since_card_ms: 7420 })
   // The link on screen; the card scrolled past the top is no longer visible.
   assert.equal(describePlacement({ viewportHeight: 700, cardRect: { top: 80, bottom: 640 }, ctaRect: { top: 560, bottom: 608 } }).cta_visible, true)
   assert.equal(describePlacement({ viewportHeight: 700, cardRect: { top: -900, bottom: -20 }, ctaRect: null }).card_visible, false)
@@ -16,7 +16,7 @@ test('placement: where the card and its link sit in the window', () => {
   assert.equal(noLink.cta_top, null)
   assert.equal(noLink.cta_visible, null)
   // Nothing measured: every field is null, never NaN.
-  assert.deepEqual(describePlacement(), { vw: null, vh: null, scroll_y: null, card_top: null, card_visible: null, cta_top: null, cta_visible: null, since_load_ms: null })
+  assert.deepEqual(describePlacement(), { vw: null, vh: null, scroll_y: null, card_top: null, card_visible: null, cta_top: null, cta_visible: null, since_load_ms: null, since_card_ms: null })
   assert.deepEqual(describePlacement({ viewportWidth: NaN, viewportHeight: undefined, cardRect: { top: NaN, bottom: 5 } }).card_visible, null)
 })
 
@@ -70,4 +70,11 @@ test('the card reports a display, an inline start and a finished episode to Babi
   assert.match(card, /'order_success_drama_impression', \{\s+pid, series: slugs\.join\(','\), series_count: slugs\.length, mode: picks\.mode, variant, repeat, \.\.\.placement\(\),/)
   // An open is an action of its own: never deduplicated.
   assert.doesNotMatch(card, /seenInSession\(`open/)
+})
+
+test('the card times its events from when it appeared, not only from the site load', () => {
+  const card = readFileSync(new URL('../src/components/DramaPicksCard.jsx', import.meta.url), 'utf8')
+  // The shop is a single page: performance.now() alone counts the whole visit, ordering included.
+  assert.match(card, /if \(shownAt\.current === null\) shownAt\.current = now/)
+  assert.match(card, /sinceLoadMs: now,\s+sinceCardMs: now - shownAt\.current,/)
 })

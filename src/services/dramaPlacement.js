@@ -7,7 +7,7 @@
 const whole = (value) => (Number.isFinite(value) ? Math.round(value) : null)
 
 // rects: { top, bottom } in viewport pixels (getBoundingClientRect), or null.
-export const describePlacement = ({ viewportWidth, viewportHeight, scrollY, cardRect, ctaRect, sinceLoadMs } = {}) => {
+export const describePlacement = ({ viewportWidth, viewportHeight, scrollY, cardRect, ctaRect, sinceLoadMs, sinceCardMs } = {}) => {
   const vh = whole(viewportHeight)
   const visible = (rect) => (rect && vh !== null && Number.isFinite(rect.top) && Number.isFinite(rect.bottom)
     ? rect.bottom > 0 && rect.top < vh
@@ -21,7 +21,11 @@ export const describePlacement = ({ viewportWidth, viewportHeight, scrollY, card
     // null = this version shows no link at that moment.
     cta_top: ctaRect ? whole(ctaRect.top) : null,
     cta_visible: visible(ctaRect),
+    // Since the site's document loaded: the shop is one page, so this covers
+    // the whole visit, ordering included.
     since_load_ms: whole(sinceLoadMs),
+    // Since the card appeared on the confirmation page.
+    since_card_ms: whole(sinceCardMs),
   }
 }
 
