@@ -527,6 +527,9 @@ export const trackProductLandingView = (product, extra = {}) => {
       ...extra,
       landing_session_id: landingSessionId
     }),
+    // Landing image rollout (utils/landingImageOptimization.js): 'webp828' or 'orig'.
+    // Reported on this event only; join later events through landing_session_id.
+    ...(extra.img_opt ? { img_opt: extra.img_opt } : {}),
     checkout_flow: CHECKOUT_FLOW,
     event_id: createId('event'),
     ...getPageProperties()

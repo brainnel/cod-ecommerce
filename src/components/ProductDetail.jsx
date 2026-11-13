@@ -33,9 +33,11 @@ import {
 import { saveCheckoutPaymentState } from '../utils/checkoutPaymentStateCache';
 import { preloadPaymentPage, schedulePaymentPagePreload } from '../utils/preloadRoutes';
 import { getProductImageLoadingPolicy } from '../utils/productImageLoadingPolicy';
+import { getLandingImageOptimization } from '../utils/landingImageOptimization';
 import { isClarityLanding, getStoredLandingReviews, buildProductSpecRows } from '../utils/landingPresentation';
 import { getCheckoutOptimizationAssignment, getProductClarityCopy } from '../utils/checkoutOptimizationExperiment';
 import { ClarityHeader, ClaritySummary, ClarityPurchaseBar, ClarityAftercare, ClarityReviews, ClaritySpecs } from './landing/LandingClarity';
+import LandingImage from './landing/LandingImage';
 
 const PRODUCT_UNAVAILABLE_BACKEND_MESSAGE = '此商品已下架，请查看其它商品';
 const PRODUCT_UNAVAILABLE_MESSAGE_FR = "Ce produit n'est plus disponible. Veuillez consulter d'autres produits.";
@@ -268,6 +270,8 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
   const specsOpenTrackedRef = useRef(null);
   const checkoutQuantityExperiment = useMemo(() => getCheckoutQuantityExperiment(), []);
   const imageLoadingPolicy = useMemo(() => getProductImageLoadingPolicy(), []);
+  // Only what this page displays changes; `product` keeps the stored URLs for checkout.
+  const landingImages = useMemo(() => getLandingImageOptimization({ deviceId: getCheckoutDeviceId() }), []);
   const checkoutOptimization = useMemo(() => getCheckoutOptimizationAssignment({
     deviceId: getCheckoutDeviceId(), productId: product?.product_id
   }), [product?.product_id]);
@@ -406,7 +410,8 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
       const landingSessionId = trackProductLandingView(product, {
         ad_id: adId,
         category_id: product.category_id,
-        product_type: 'product'
+        product_type: 'product',
+        img_opt: landingImages.variant
       });
       const startedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
       landingEngagementRef.current = {
@@ -527,7 +532,8 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
       cleanupClarityExposure?.();
     };
   }, [adId, adTrackingLoading, product, product?.product_id, product?.price, clarityLanding,
-    checkoutOptimization.group, checkoutOptimization.productEligible, checkoutOptimization.productClarityEnabled]);
+    checkoutOptimization.group, checkoutOptimization.productEligible, checkoutOptimization.productClarityEnabled,
+    landingImages.variant]);
 
   if (loading) {
     return (
@@ -730,8 +736,9 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
             {galleryImages.map((image, index) => (
               <SwiperSlide key={`${product.product_id}-main-${index}`}>
                 <div className={`image-container ${image.type === 'detail-preview' ? 'detail-preview-image' : ''}`}>
-                  <img
+                  <LandingImage
                     src={image.src}
+                    optimizedSrc={landingImages.resolve(image.src)}
                     alt={`Image produit ${index + 1}`}
                     loading={index < imageLoadingPolicy.eagerGalleryImageCount ? 'eager' : 'lazy'}
                     fetchPriority={index < 2 ? 'high' : index < imageLoadingPolicy.eagerGalleryImageCount ? 'auto' : 'low'}
@@ -855,9 +862,10 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
             {productDetailImages.length > 0 && (
               <div className="description-images">
                 {productDetailImages.map((image, index) => (
-                  <img
+                  <LandingImage
                     key={`${product.product_id}-desc-${index}`}
                     src={image}
+                    optimizedSrc={landingImages.resolve(image)}
                     alt={`Détails produit ${index + 1}`}
                     loading="lazy"
                     fetchPriority="low"

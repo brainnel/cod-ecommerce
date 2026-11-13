@@ -6,6 +6,7 @@ import { bundleAPI } from '../services/api'
 import {
   beginCheckoutFunnel,
   buildCheckoutProductProperties,
+  getCheckoutDeviceId,
   getCheckoutQuantityExperiment,
   isAddressFirstCheckoutVariant,
   isCodTrustLandingVariant,
@@ -27,9 +28,11 @@ import {
 import { saveCheckoutPaymentState } from '../utils/checkoutPaymentStateCache'
 import { preloadPaymentPage, schedulePaymentPagePreload } from '../utils/preloadRoutes'
 import { getProductImageLoadingPolicy } from '../utils/productImageLoadingPolicy'
+import { getLandingImageOptimization } from '../utils/landingImageOptimization'
 import { clampCheckoutQuantity, getCheckoutQuantityLimit } from '../utils/checkoutQuantity'
 import { isClarityLanding, getStoredLandingReviews, getBundleItemUnitPrice } from '../utils/landingPresentation'
 import { ClarityHeader, ClaritySummary, ClarityPurchaseBar, ClarityAftercare, ClarityReviews } from './landing/LandingClarity'
+import LandingImage from './landing/LandingImage'
 
 import 'swiper/css'
 import 'swiper/css/pagination'
@@ -73,6 +76,8 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
   const landingEngagementRef = useRef(null)
   const checkoutQuantityExperiment = useMemo(() => getCheckoutQuantityExperiment(), [])
   const imageLoadingPolicy = useMemo(() => getProductImageLoadingPolicy(), [])
+  // Only what this page displays changes; the bundle keeps its stored URLs for checkout.
+  const landingImages = useMemo(() => getLandingImageOptimization({ deviceId: getCheckoutDeviceId() }), [])
   const clarityLanding = isClarityLanding()
   const isCheckoutOptimizationVariant = isInlineCheckoutVariant(checkoutQuantityExperiment)
   const isCodTrustLanding = isCodTrustLandingVariant(checkoutQuantityExperiment)
@@ -157,7 +162,8 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
       const landingSessionId = trackProductLandingView(bundleProduct, {
         ad_id: adId,
         product_type: 'bundle',
-        bundle_id: String(bundle.id)
+        bundle_id: String(bundle.id),
+        img_opt: landingImages.variant
       })
       const startedAt = typeof performance !== 'undefined' ? performance.now() : Date.now()
       landingEngagementRef.current = {
@@ -233,7 +239,7 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
     }
 
     return cleanupLandingEngagement || undefined
-  }, [adId, adTrackingLoading, bundle?.id, bundleProduct])
+  }, [adId, adTrackingLoading, bundle?.id, bundleProduct, landingImages.variant])
 
   if (loading) {
     return (
@@ -373,9 +379,10 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
           aria-describedby={unitPrice !== null ? priceDescriptionId : undefined}
         >
           {item.cover_image_url ? (
-            <img
+            <LandingImage
               className="bundle-item-image"
               src={item.cover_image_url}
+              optimizedSrc={landingImages.resolve(item.cover_image_url)}
               alt={itemDisplayName}
               loading="lazy"
             />
@@ -456,8 +463,9 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
               {galleryImages.map((image, index) => (
                 <SwiperSlide key={`bundle-${bundle.id}-cover-${index}`}>
                   <div className={`image-container ${image.type === 'detail-preview' ? 'detail-preview-image' : ''}`}>
-                    <img
+                    <LandingImage
                       src={image.src}
+                      optimizedSrc={landingImages.resolve(image.src)}
                       alt={bundle.title_fr || `Pack ${bundle.id}`}
                       loading={index < imageLoadingPolicy.eagerGalleryImageCount ? 'eager' : 'lazy'}
                       fetchPriority={index < 2 ? 'high' : index < imageLoadingPolicy.eagerGalleryImageCount ? 'auto' : 'low'}
@@ -590,9 +598,10 @@ const BundleDetail = ({ bundleId, initialBundle = null }) => {
             {detailImages.length > 0 && (
               <div className="description-images">
                 {detailImages.map((image, index) => (
-                  <img
+                  <LandingImage
                     key={`bundle-${bundle.id}-detail-${index}`}
                     src={image}
+                    optimizedSrc={landingImages.resolve(image)}
                     alt={`Détails pack ${index + 1}`}
                     loading="lazy"
                     fetchPriority="low"
