@@ -33,9 +33,9 @@ export const ClarityHeader = ({ onHome }) => (
   </header>
 )
 
-export const ClaritySummary = ({ name, price, isBundle = false, highlights, children }) => {
+export const ClaritySummary = ({ name, price, isBundle = false, highlights, specs, children }) => {
   return (
-    <section className="clarity-summary">
+    <section className={`clarity-summary${specs ? ' has-specs' : ''}`}>
       {isBundle && <p className="clarity-eyebrow">Le pack complet</p>}
       <h1 className="product-title clarity-title">{name}</h1>
       <ClarityProductHighlights copy={highlights} />
@@ -47,6 +47,7 @@ export const ClaritySummary = ({ name, price, isBundle = false, highlights, chil
         <p><LineIcon kind="payment" /><span>Payez à la réception <span className="clarity-payment-options">· Cash ou Wave</span></span></p>
       </div>
       {children && <div className="clarity-options">{children}</div>}
+      {specs}
     </section>
   )
 }

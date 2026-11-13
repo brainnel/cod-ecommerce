@@ -747,10 +747,12 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
         <div className="product-purchase-panel" ref={clarityExposureRef}>
           {/* 产品信息 */}
           {clarityLanding ? (
-            <ClaritySummary name={product.name_fr} price={product.price} highlights={productHighlights}>
-              <ProductVariants variants={variants} currentProductId={product.product_id}
-                onVariantSelect={(id) => navigate(`/product/${id}`)} />
-              <ClaritySpecs key={product.product_id} rows={specRows} onOpen={handleSpecsOpen} />
+            <ClaritySummary name={product.name_fr} price={product.price} highlights={productHighlights}
+              specs={specRows.length > 0 ? <ClaritySpecs key={product.product_id} rows={specRows} onOpen={handleSpecsOpen} /> : null}>
+              {variants?.length > 0 && (
+                <ProductVariants variants={variants} currentProductId={product.product_id}
+                  onVariantSelect={(id) => navigate(`/product/${id}`)} />
+              )}
             </ClaritySummary>
           ) : <div className="product-info">
             <h1 className="product-title">{product.name_fr}</h1>
