@@ -39,14 +39,6 @@ export const buildProductSpecRows = (model, content) => {
   return rows
 }
 
-// One-line hint shown while the specs are folded: the spec values, without
-// repeating the model name unless it is the only thing there is.
-export const getProductSpecPreview = (rows) => {
-  const list = Array.isArray(rows) ? rows : []
-  const specs = list.length > 1 && list[0]?.label === 'Modèle' ? list.slice(1) : list
-  return specs.map(row => row.value).join(' · ')
-}
-
 export const getStoredLandingReviews = (product) => {
   const reviews = product?.reviews || product?.product_reviews
   return Array.isArray(reviews)

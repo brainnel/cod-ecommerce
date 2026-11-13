@@ -35,7 +35,7 @@ test('bundle item price stays per unit without changing the catalog amount', () 
 })
 
 test('product specs fold the model name and "Label: value" lines into rows', async () => {
-  const { buildProductSpecRows, getProductSpecPreview } = await import('../src/utils/landingPresentation.js')
+  const { buildProductSpecRows } = await import('../src/utils/landingPresentation.js')
   const rows = buildProductSpecRows(' Lot de 3 bagues ', 'Matériau : cuivre\nType: Bagues ouvertes à strass\n\n  Sans étiquette  \nDimensions: 164 x 43 x 56 mm')
   assert.deepEqual(rows, [
     { label: 'Modèle', value: 'Lot de 3 bagues' },
@@ -44,14 +44,10 @@ test('product specs fold the model name and "Label: value" lines into rows', asy
     { label: '', value: 'Sans étiquette' },
     { label: 'Dimensions', value: '164 x 43 x 56 mm' }
   ])
-  assert.equal(getProductSpecPreview(rows), 'cuivre · Bagues ouvertes à strass · Sans étiquette · 164 x 43 x 56 mm')
   assert.deepEqual(buildProductSpecRows('', 'Heure: 12:30\nVide:'), [
     { label: 'Heure', value: '12:30' },
     { label: '', value: 'Vide:' }
   ])
-  const onlyModel = buildProductSpecRows('Lot de 2', null)
-  assert.deepEqual(onlyModel, [{ label: 'Modèle', value: 'Lot de 2' }])
-  assert.equal(getProductSpecPreview(onlyModel), 'Lot de 2')
+  assert.deepEqual(buildProductSpecRows('Lot de 2', null), [{ label: 'Modèle', value: 'Lot de 2' }])
   assert.deepEqual(buildProductSpecRows(undefined, undefined), [])
-  assert.equal(getProductSpecPreview(null), '')
 })

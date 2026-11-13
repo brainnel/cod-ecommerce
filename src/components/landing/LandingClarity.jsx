@@ -1,6 +1,6 @@
 import logoImage from '../../assets/logo.png'
 import ClarityProductHighlights from './ClarityProductHighlights'
-import { CLARITY_DELIVERY_PROMISE, getProductSpecPreview } from '../../utils/landingPresentation'
+import { CLARITY_DELIVERY_PROMISE } from '../../utils/landingPresentation'
 import './LandingClarity.css'
 
 const formatFcfa = (value) => {
@@ -52,17 +52,13 @@ export const ClaritySummary = ({ name, price, isBundle = false, highlights, chil
 }
 
 // Model name and spec lines, folded by default so the detail images come up
-// sooner; the summary keeps a short preview of the values.
+// sooner.
 export const ClaritySpecs = ({ rows, onOpen }) => {
   if (!Array.isArray(rows) || rows.length === 0) return null
-  const preview = getProductSpecPreview(rows)
   return (
     <details className="clarity-specs" onToggle={(event) => { if (event.currentTarget.open) onOpen?.() }}>
       <summary>
-        <span className="clarity-specs-heading">
-          <span className="clarity-specs-title">Caractéristiques</span>
-          {preview && <span className="clarity-specs-preview">{preview}</span>}
-        </span>
+        <span className="clarity-specs-title">Caractéristiques</span>
       </summary>
       <ul className="clarity-specs-list">
         {rows.map((row, index) => (
