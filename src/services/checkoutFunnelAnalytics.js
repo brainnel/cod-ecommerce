@@ -530,6 +530,10 @@ export const trackProductLandingView = (product, extra = {}) => {
     // Landing image rollout (utils/landingImageOptimization.js): 'webp828' or 'orig'.
     // Reported on this event only; join later events through landing_session_id.
     ...(extra.img_opt ? { img_opt: extra.img_opt } : {}),
+    // Landing-page A/B experiment (utils/landingExperiment.js): experiment id and variant 'A' | 'B'.
+    // Reported on this event only; orders are attached through the device and landing session.
+    ...(Number.isInteger(extra.lp_exp) && (extra.lp_var === 'A' || extra.lp_var === 'B')
+      ? { lp_exp: extra.lp_exp, lp_var: extra.lp_var } : {}),
     checkout_flow: CHECKOUT_FLOW,
     event_id: createId('event'),
     ...getPageProperties()

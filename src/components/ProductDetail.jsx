@@ -34,6 +34,7 @@ import { saveCheckoutPaymentState } from '../utils/checkoutPaymentStateCache';
 import { preloadPaymentPage, schedulePaymentPagePreload } from '../utils/preloadRoutes';
 import { getProductImageLoadingPolicy } from '../utils/productImageLoadingPolicy';
 import { getLandingImageOptimization } from '../utils/landingImageOptimization';
+import { pickLandingVariant, landingVariantEventProperties } from '../utils/landingExperiment';
 import { isClarityLanding, getStoredLandingReviews, buildProductSpecRows } from '../utils/landingPresentation';
 import { getCheckoutOptimizationAssignment, getProductClarityCopy } from '../utils/checkoutOptimizationExperiment';
 import { ClarityHeader, ClaritySummary, ClarityPurchaseBar, ClarityAftercare, ClarityReviews, ClaritySpecs } from './landing/LandingClarity';
@@ -268,6 +269,7 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
   const viewTrackedProductRef = useRef(null);
   const landingEngagementRef = useRef(null);
   const specsOpenTrackedRef = useRef(null);
+  const landingVariantReportRef = useRef(null);
   const checkoutQuantityExperiment = useMemo(() => getCheckoutQuantityExperiment(), []);
   const imageLoadingPolicy = useMemo(() => getProductImageLoadingPolicy(), []);
   // Only what this page displays changes; `product` keeps the stored URLs for checkout.
@@ -283,8 +285,20 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
   const isCodTrustLanding = isCodTrustLandingVariant(checkoutQuantityExperiment);
   const isAddressFirstLanding = isAddressFirstCheckoutVariant(checkoutQuantityExperiment)
     || isSinglePageCheckoutVariant(checkoutQuantityExperiment);
-  const productMainImages = normalizeImageList(product?.image_url);
-  const productDetailImages = normalizeImageList(product?.description_fr);
+  // Landing-page A/B experiment (utils/landingExperiment.js). Only the images on this page change;
+  // `product` keeps its stored lists for checkout. The variant shown is the one reported with the
+  // landing view: when the view was already reported without an experiment (list data came before
+  // the detail), this visit keeps the product's own images.
+  const landingVariantCandidate = useMemo(() => pickLandingVariant({
+    experiment: product?.lp_experiment, deviceId: getCheckoutDeviceId()
+  }), [product?.lp_experiment]);
+  const reportedLandingVariant = landingVariantReportRef.current;
+  const landingVariant = reportedLandingVariant && reportedLandingVariant.productKey === String(product?.product_id ?? '')
+    ? reportedLandingVariant.variant
+    : landingVariantCandidate;
+  const showsLandingVariantB = landingVariant?.key === 'B';
+  const productMainImages = normalizeImageList(showsLandingVariantB ? landingVariant.imageUrl : product?.image_url);
+  const productDetailImages = normalizeImageList(showsLandingVariantB ? landingVariant.descriptionFr : product?.description_fr);
   const promotedDetailImages = productMainImages.length === 1
     ? productDetailImages.slice(
         0,
@@ -407,11 +421,14 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
     let cleanupLandingEngagement = null;
     let cleanupClarityExposure = null;
     try {
+      // Fix the experiment variant for this visit at the moment it is reported.
+      landingVariantReportRef.current = { productKey: trackingKey, variant: landingVariantCandidate };
       const landingSessionId = trackProductLandingView(product, {
         ad_id: adId,
         category_id: product.category_id,
         product_type: 'product',
-        img_opt: landingImages.variant
+        img_opt: landingImages.variant,
+        ...landingVariantEventProperties(landingVariantCandidate)
       });
       const startedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
       landingEngagementRef.current = {
