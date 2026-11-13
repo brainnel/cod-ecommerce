@@ -5,7 +5,7 @@
 // they are, so the app, the admin console, Meta ads and checkout are untouched.
 
 // Share of devices that get the WebP copies. The others get today's behaviour.
-export const LANDING_IMAGE_WEBP_PERCENT = 10
+export const LANDING_IMAGE_WEBP_PERCENT = 50
 // Hash salt. It differs from every other experiment, so this rollout is
 // independent of them. Buckets below the percentage are in; raising the
 // percentage keeps every device that is already in.
