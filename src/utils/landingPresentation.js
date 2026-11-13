@@ -22,6 +22,31 @@ export const isClarityLanding = (
   hostname = typeof window === 'undefined' ? '' : window.location.hostname
 ) => !LOCAL_HOSTS.has(hostname) || new URLSearchParams(search).get('landing_design') !== 'original'
 
+// Product copy (content_fr) is written as one "Label: value" spec per line.
+// The SKU model name, when it differs from the title, leads the list.
+const SPEC_LINE = /^([^:]{1,40}?)\s*:\s*(\S.*)$/
+export const buildProductSpecRows = (model, content) => {
+  const rows = []
+  const modelName = typeof model === 'string' ? model.trim() : ''
+  if (modelName) rows.push({ label: 'Modèle', value: modelName })
+  const lines = typeof content === 'string' ? content.split('\n') : []
+  for (const raw of lines) {
+    const line = raw.trim()
+    if (!line) continue
+    const match = SPEC_LINE.exec(line)
+    rows.push(match ? { label: match[1].trim(), value: match[2].trim() } : { label: '', value: line })
+  }
+  return rows
+}
+
+// One-line hint shown while the specs are folded: the spec values, without
+// repeating the model name unless it is the only thing there is.
+export const getProductSpecPreview = (rows) => {
+  const list = Array.isArray(rows) ? rows : []
+  const specs = list.length > 1 && list[0]?.label === 'Modèle' ? list.slice(1) : list
+  return specs.map(row => row.value).join(' · ')
+}
+
 export const getStoredLandingReviews = (product) => {
   const reviews = product?.reviews || product?.product_reviews
   return Array.isArray(reviews)

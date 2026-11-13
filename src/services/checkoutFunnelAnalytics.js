@@ -631,6 +631,35 @@ export const trackProductReviewTabClick = (product, extra = {}) => {
   return landingSessionId
 }
 
+// The folded "Caractéristiques" block on the landing page was opened.
+export const trackProductSpecsOpen = (product, extra = {}) => {
+  const landingSessionId = extra.landing_session_id || getLandingSessionId()
+  if (!landingSessionId) return null
+
+  sendAnalyticsPayload({
+    device_id: getCheckoutDeviceId(),
+    platform: 'web',
+    app_version: 'cod-ecommerce-web',
+    events: [
+      {
+        event_name: 'product_specs_open',
+        session_id: landingSessionId,
+        timestamp: new Date().toISOString(),
+        properties: {
+          ...buildCheckoutProductProperties(product, { ...extra, landing_session_id: landingSessionId }),
+          checkout_flow: CHECKOUT_FLOW,
+          event_id: createId('event'),
+          landing_session_id: landingSessionId,
+          spec_row_count: extra.spec_row_count ?? null,
+          ...getPageProperties()
+        }
+      }
+    ]
+  })
+
+  return landingSessionId
+}
+
 export const beginCheckoutFunnel = (product, extra = {}) => {
   const nextContext = buildCheckoutProductProperties(product, extra)
   const existingSessionId = getCheckoutSessionId()

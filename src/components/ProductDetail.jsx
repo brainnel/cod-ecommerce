@@ -18,7 +18,8 @@ import {
   trackProductLandingEngagement,
   trackProductLandingView,
   trackProductClarityExposure,
-  trackProductReviewTabClick
+  trackProductReviewTabClick,
+  trackProductSpecsOpen
 } from '../services/checkoutFunnelAnalytics';
 import { useAdTrackingContext } from '../hooks/useAdTrackingHooks.js';
 import QuantityModal from './QuantityModal';
@@ -32,9 +33,9 @@ import {
 import { saveCheckoutPaymentState } from '../utils/checkoutPaymentStateCache';
 import { preloadPaymentPage, schedulePaymentPagePreload } from '../utils/preloadRoutes';
 import { getProductImageLoadingPolicy } from '../utils/productImageLoadingPolicy';
-import { isClarityLanding, getStoredLandingReviews } from '../utils/landingPresentation';
+import { isClarityLanding, getStoredLandingReviews, buildProductSpecRows } from '../utils/landingPresentation';
 import { getCheckoutOptimizationAssignment, getProductClarityCopy } from '../utils/checkoutOptimizationExperiment';
-import { ClarityHeader, ClaritySummary, ClarityPurchaseBar, ClarityAftercare, ClarityReviews } from './landing/LandingClarity';
+import { ClarityHeader, ClaritySummary, ClarityPurchaseBar, ClarityAftercare, ClarityReviews, ClaritySpecs } from './landing/LandingClarity';
 
 const PRODUCT_UNAVAILABLE_BACKEND_MESSAGE = '此商品已下架，请查看其它商品';
 const PRODUCT_UNAVAILABLE_MESSAGE_FR = "Ce produit n'est plus disponible. Veuillez consulter d'autres produits.";
@@ -264,6 +265,7 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
   const { adId, isLoading: adTrackingLoading } = useAdTrackingContext();
   const viewTrackedProductRef = useRef(null);
   const landingEngagementRef = useRef(null);
+  const specsOpenTrackedRef = useRef(null);
   const checkoutQuantityExperiment = useMemo(() => getCheckoutQuantityExperiment(), []);
   const imageLoadingPolicy = useMemo(() => getProductImageLoadingPolicy(), []);
   const checkoutOptimization = useMemo(() => getCheckoutOptimizationAssignment({
@@ -573,6 +575,27 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
     return price.toString();
   };
 
+  const skuModelName = product.skus?.[0]?.name_fr;
+  const specRows = clarityLanding
+    ? buildProductSpecRows(skuModelName && skuModelName !== product.name_fr ? skuModelName : '', product.content_fr)
+    : [];
+
+  const handleSpecsOpen = () => {
+    if (specsOpenTrackedRef.current === product.product_id) return;
+    specsOpenTrackedRef.current = product.product_id;
+    try {
+      trackProductSpecsOpen(product, {
+        ad_id: adId,
+        category_id: product.category_id,
+        product_type: 'product',
+        landing_session_id: landingEngagementRef.current?.landingSessionId,
+        spec_row_count: specRows.length
+      });
+    } catch (error) {
+      console.warn('product_specs_open 埋点失败:', error);
+    }
+  };
+
   const handleOrderConfirm = (quantity) => {
     // 这里可以处理订单确认逻辑
     alert(`订单确认！\n产品: ${product.name_fr}\n数量: ${quantity}\n总价: ${product.price * quantity} FCFA`);
@@ -725,11 +748,9 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
           {/* 产品信息 */}
           {clarityLanding ? (
             <ClaritySummary name={product.name_fr} price={product.price} highlights={productHighlights}>
-              {product.skus?.[0]?.name_fr && product.skus[0].name_fr !== product.name_fr && (
-                <div className="clarity-model"><span>Modèle</span><strong>{product.skus[0].name_fr}</strong></div>
-              )}
               <ProductVariants variants={variants} currentProductId={product.product_id}
                 onVariantSelect={(id) => navigate(`/product/${id}`)} />
+              <ClaritySpecs key={product.product_id} rows={specRows} onOpen={handleSpecsOpen} />
             </ClaritySummary>
           ) : <div className="product-info">
             <h1 className="product-title">{product.name_fr}</h1>
@@ -819,12 +840,14 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
 
         {activeProductInfoTab === 'details' ? (
           <div className="product-tab-panel" role="tabpanel">
-            {/* 产品特性文字描述 */}
-            <div className="description-text">
-              {product.content_fr?.split('\n').map((line, index) => (
-                <p key={`${product.product_id}-content-${index}`}>{line}</p>
-              ))}
-            </div>
+            {/* 产品特性文字描述（clarity 版式已折叠进上方「Caractéristiques」） */}
+            {!clarityLanding && (
+              <div className="description-text">
+                {product.content_fr?.split('\n').map((line, index) => (
+                  <p key={`${product.product_id}-content-${index}`}>{line}</p>
+                ))}
+              </div>
+            )}
 
             {/* 产品描述图片 */}
             {productDetailImages.length > 0 && (
