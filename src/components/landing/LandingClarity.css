@@ -157,6 +157,37 @@
 .landing-clarity .clarity-reviews blockquote { margin: 0; color: #52564d; font-size: 14px; line-height: 1.65; }
 .landing-clarity .clarity-reviews figcaption { margin-top: 7px; font-size: 12px; font-weight: 650; color: var(--clarity-ink); }
 
+/* Black Friday offer (utils/blackFriday.js): gallery tag, price panel with the time left, purchase bar. */
+.landing-clarity .clarity-sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+.landing-clarity .clarity-bf-tag { position: absolute; top: 12px; left: 0; z-index: 2; display: flex; background: #000; color: #fff; font-size: 13px; font-weight: 800; line-height: 1.2; pointer-events: none; }
+.landing-clarity .clarity-bf-tag span { padding: 5px 9px 5px 16px; }
+.landing-clarity .clarity-bf-tag b { padding: 5px 9px; background: var(--clarity-orange); font-weight: 800; }
+.landing-clarity .clarity-bf-panel { margin-top: 12px; border-radius: 10px; overflow: hidden; background: #000; color: #fff; font-variant-numeric: tabular-nums; }
+.landing-clarity .clarity-bf-panel-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 13px 11px; }
+.landing-clarity .clarity-bf-label { display: block; font-size: 12px; font-weight: 650; line-height: 1.35; color: #ff9a66; }
+.landing-clarity .clarity-bf-price { display: flex; flex-wrap: wrap; align-items: baseline; gap: 5px; margin-top: 2px; }
+.landing-clarity .clarity-bf-price strong { font-size: 32px; font-weight: 800; letter-spacing: -1.2px; line-height: 1.1; }
+.landing-clarity .clarity-bf-price > span { font-size: 13px; font-weight: 650; color: #c9c9c3; }
+.landing-clarity .clarity-bf-saving { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; flex-shrink: 0; white-space: nowrap; }
+.landing-clarity .clarity-bf-saving s { font-size: 13.5px; line-height: 1.2; color: #a3a39d; }
+.landing-clarity .clarity-bf-saving b { padding: 5px 8px; border-radius: 6px; background: var(--clarity-orange); font-size: 15px; font-weight: 800; line-height: 1.15; }
+.landing-clarity .clarity-bf-timer { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 13px 9px; border-top: 1px solid rgba(255, 255, 255, .18); font-size: 12px; color: #d9d9d3; }
+.landing-clarity .clarity-bf-cells { display: flex; gap: 6px; }
+.landing-clarity .clarity-bf-cells span { display: flex; align-items: baseline; gap: 2px; font-size: 11px; color: #b5b5af; }
+.landing-clarity .clarity-bf-cells b { min-width: 28px; padding: 2px 4px; border-radius: 4px; background: #262623; color: #fff; font-size: 16px; font-weight: 800; text-align: center; }
+.landing-clarity .clarity-purchase-price.has-offer { gap: 1px; }
+.landing-clarity .clarity-purchase-price .clarity-bf-was { display: flex; align-items: center; gap: 6px; font-size: 11.5px; line-height: 1.2; color: #73756d; font-variant-numeric: tabular-nums; }
+.landing-clarity .clarity-bf-was b { color: var(--clarity-orange); font-weight: 800; }
+.landing-clarity .clarity-bf-bar-timer { position: absolute; left: 0; right: 0; bottom: 100%; padding: 5px 16px; background: #000; color: #fff; font-size: 11.5px; font-weight: 600; line-height: 1.5; text-align: center; font-variant-numeric: tabular-nums; opacity: 0; visibility: hidden; transform: translateY(4px); transition: opacity .2s ease, transform .2s ease, visibility .2s; pointer-events: none; }
+.landing-clarity .clarity-bf-bar-timer.is-visible { opacity: 1; visibility: visible; transform: none; }
+.landing-clarity .clarity-bf-bar-timer b { color: #ff9a66; font-weight: 700; }
+/* The price panel is taller than the plain price: give the gallery 20 px less on phones. */
+@supports (height: 100svh) {
+  @media (max-width: 767px) {
+    .product-detail.landing-clarity.has-bf-offer .product-gallery { height: min(100vw, clamp(280px, calc(100svh - 400px), 390px)); }
+  }
+}
+
 @media (hover: hover) and (pointer: fine) {
   .landing-clarity .buy-now-btn.clarity-order-button:hover { background: #bf3e04; transform: none; box-shadow: none; }
   .landing-clarity .clarity-brand:hover { color: var(--clarity-orange); }
@@ -193,6 +224,9 @@
   .landing-clarity .clarity-purchase-row { grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr); gap: 12px; }
   .landing-clarity .clarity-purchase-price strong { font-size: 23px; }
   .landing-clarity .clarity-purchase-price > span { font-size: 11px; }
+  .landing-clarity .clarity-bf-bar-timer { display: none; }
+  .landing-clarity .clarity-bf-price strong { font-size: 40px; }
+  .landing-clarity .clarity-bf-panel { margin-top: 20px; }
   .product-detail.landing-clarity .product-description { width: min(1120px, calc(100% - 48px)); padding: 36px 0; margin-top: 46px; background: transparent; }
   .landing-clarity .description-text { max-width: 780px; }
   .landing-clarity .bundle-items-section { margin: 24px 0 0; }

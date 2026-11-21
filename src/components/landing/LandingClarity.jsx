@@ -1,6 +1,8 @@
+import { useEffect, useState } from 'react'
 import logoImage from '../../assets/logo.png'
 import ClarityProductHighlights from './ClarityProductHighlights'
 import { CLARITY_DELIVERY_PROMISE } from '../../utils/landingPresentation'
+import { getBlackFridayTimeLeft } from '../../utils/blackFriday'
 import './LandingClarity.css'
 
 const formatFcfa = (value) => {
@@ -21,6 +23,51 @@ const LineIcon = ({ kind, className = '' }) => {
   return <svg className={className} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[kind]}</svg>
 }
 
+// Black Friday offer (utils/blackFriday.js). `offer` is null outside the offer, and every
+// element below then renders nothing.
+// The saving is shown as an amount, never as a percentage.
+const offerSaving = (offer, unit = true) => `−${formatFcfa(offer.saving)}${unit ? '\u00a0FCFA' : ''}`
+const twoDigits = (value) => String(value).padStart(2, '0')
+
+const UsualPrice = ({ offer, unit = false }) => (
+  <s><span className="clarity-sr">Prix habituel&nbsp;: </span>{formatFcfa(offer.usualPrice)}{unit ? '\u00a0FCFA' : <span className="clarity-sr"> FCFA</span>}</s>
+)
+
+// Time left before the offer ends. Renders nothing when there is no time to show.
+const OfferTimer = ({ endsAt, placement, visible = true }) => {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(timer)
+  }, [])
+  const left = getBlackFridayTimeLeft(endsAt, now)
+  if (!left) return null
+  if (placement === 'bar') {
+    const text = `${left.days}\u00a0j ${twoDigits(left.hours)}\u00a0h ${twoDigits(left.minutes)}\u00a0min ${twoDigits(left.seconds)}\u00a0s`
+    return (
+      <div className={`clarity-bf-bar-timer${visible ? ' is-visible' : ''}`} aria-hidden={!visible}>
+        Prix Black Friday&nbsp;: encore <b>{text}</b>
+      </div>
+    )
+  }
+  return (
+    <div className="clarity-bf-timer">
+      <span>Fin de l’offre dans</span>
+      <span className="clarity-bf-cells" role="timer">
+        <span><b>{twoDigits(left.days)}</b>j</span>
+        <span><b>{twoDigits(left.hours)}</b>h</span>
+        <span><b>{twoDigits(left.minutes)}</b>min</span>
+        <span><b>{twoDigits(left.seconds)}</b>s</span>
+      </span>
+    </div>
+  )
+}
+
+// Corner tag on the product gallery.
+export const ClarityOfferTag = ({ offer }) => (offer ? (
+  <div className="clarity-bf-tag"><span>Black Friday</span><b>{offerSaving(offer)}</b></div>
+) : null)
+
 export const ClarityHeader = ({ onHome }) => (
   <header className="clarity-header">
     <div className="clarity-header-inner">
@@ -33,15 +80,33 @@ export const ClarityHeader = ({ onHome }) => (
   </header>
 )
 
-export const ClaritySummary = ({ name, price, isBundle = false, highlights, specs, children }) => {
+export const ClaritySummary = ({ name, price, isBundle = false, highlights, specs, children, offer = null, offerRef }) => {
   return (
     <section className={`clarity-summary${specs ? ' has-specs' : ''}`}>
       {isBundle && <p className="clarity-eyebrow">Le pack complet</p>}
       <h1 className="product-title clarity-title">{name}</h1>
       <ClarityProductHighlights copy={highlights} />
-      <div className="clarity-price">
-        <strong>{formatFcfa(price)}</strong><span>FCFA</span>
-      </div>
+      {offer ? (
+        <div className="clarity-bf-panel" ref={offerRef}>
+          <div className="clarity-bf-panel-top">
+            <div>
+              <span className="clarity-bf-label">Prix Black Friday</span>
+              <div className="clarity-bf-price">
+                <strong>{formatFcfa(price)}</strong><span>FCFA</span>
+              </div>
+            </div>
+            <div className="clarity-bf-saving">
+              <UsualPrice offer={offer} unit />
+              <b>{offerSaving(offer)}</b>
+            </div>
+          </div>
+          <OfferTimer endsAt={offer.endsAt} placement="panel" />
+        </div>
+      ) : (
+        <div className="clarity-price">
+          <strong>{formatFcfa(price)}</strong><span>FCFA</span>
+        </div>
+      )}
       <div className="clarity-promises">
         <p><LineIcon kind="truck" /><span>{CLARITY_DELIVERY_PROMISE}</span></p>
         <p><LineIcon kind="payment" /><span>Payez à la réception <span className="clarity-payment-options">· Cash ou Wave</span></span></p>
@@ -75,11 +140,14 @@ export const ClaritySpecs = ({ rows, onOpen }) => {
 
 // `price` is the already-calculated payable total from the existing handler.
 // Do not multiply again for bundles; quantity is an accessible display hint.
-export const ClarityPurchaseBar = ({ price, onOrder, quantity = 1 }) => {
+// `showOfferTimer` is true once the price panel has scrolled out of view.
+export const ClarityPurchaseBar = ({ price, onOrder, quantity = 1, offer = null, showOfferTimer = false }) => {
   return (
     <div className="clarity-purchase-bar">
+      {offer && <OfferTimer endsAt={offer.endsAt} placement="bar" visible={showOfferTimer} />}
       <div className="clarity-purchase-row">
-        <div className="clarity-purchase-price">
+        <div className={`clarity-purchase-price${offer ? ' has-offer' : ''}`}>
+          {offer && <span className="clarity-bf-was"><UsualPrice offer={offer} /><b>{offerSaving(offer, false)}</b></span>}
           <strong>{formatFcfa(price)} <span>FCFA</span></strong>
           <span>Paiement à la livraison</span>
         </div>

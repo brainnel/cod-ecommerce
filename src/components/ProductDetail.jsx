@@ -40,7 +40,8 @@ import { getCheckoutPricing, pickQtyOfferArm, rememberQtyOfferArm } from '../uti
 import { clampCheckoutQuantity } from '../utils/checkoutQuantity';
 import { isClarityLanding, getStoredLandingReviews, buildProductSpecRows } from '../utils/landingPresentation';
 import { getCheckoutOptimizationAssignment, getProductClarityCopy } from '../utils/checkoutOptimizationExperiment';
-import { ClarityHeader, ClaritySummary, ClarityPurchaseBar, ClarityAftercare, ClarityReviews, ClaritySpecs } from './landing/LandingClarity';
+import { ClarityHeader, ClaritySummary, ClarityPurchaseBar, ClarityAftercare, ClarityReviews, ClaritySpecs, ClarityOfferTag } from './landing/LandingClarity';
+import { getBlackFridayOffer } from '../utils/blackFriday';
 import LandingImage from './landing/LandingImage';
 
 const PRODUCT_UNAVAILABLE_BACKEND_MESSAGE = '此商品已下架，请查看其它商品';
@@ -287,6 +288,13 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
     ? getProductClarityCopy(product?.product_id) : null;
   const clarityExposureRef = useRef(null);
   const clarityLanding = isClarityLanding();
+  // Black Friday offer (utils/blackFriday.js): null once it is over, and the page then shows the
+  // plain price. Only the display changes; `product.price` stays what checkout uses.
+  const [offerClock, setOfferClock] = useState(() => Date.now());
+  const blackFridayOffer = clarityLanding ? getBlackFridayOffer(product?.price, offerClock) : null;
+  const blackFridayEndsAt = blackFridayOffer?.endsAt ?? null;
+  const offerPanelRef = useRef(null);
+  const [offerPanelPassed, setOfferPanelPassed] = useState(false);
   const isCheckoutOptimizationVariant = isInlineCheckoutVariant(checkoutQuantityExperiment);
   const isCodTrustLanding = isCodTrustLandingVariant(checkoutQuantityExperiment);
   const isAddressFirstLanding = isAddressFirstCheckoutVariant(checkoutQuantityExperiment)
@@ -345,6 +353,28 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
   useEffect(() => {
     setActiveProductInfoTab('details');
   }, [productId]);
+
+  // Drop the offer display at the moment it ends, for a page that stays open.
+  useEffect(() => {
+    if (!blackFridayEndsAt) return undefined;
+    const delay = Math.min(Math.max(blackFridayEndsAt - Date.now(), 0) + 500, 2 ** 31 - 1);
+    const timer = window.setTimeout(() => setOfferClock(Date.now()), delay);
+    return () => window.clearTimeout(timer);
+  }, [blackFridayEndsAt]);
+
+  // Once the price panel has scrolled away above the screen, the purchase bar shows the time left.
+  useEffect(() => {
+    const panel = offerPanelRef.current;
+    if (!blackFridayEndsAt || !panel || typeof IntersectionObserver !== 'function') {
+      setOfferPanelPassed(false);
+      return undefined;
+    }
+    const observer = new IntersectionObserver(([entry]) => {
+      setOfferPanelPassed(!entry.isIntersecting && entry.boundingClientRect.bottom <= 0);
+    });
+    observer.observe(panel);
+    return () => observer.disconnect();
+  }, [blackFridayEndsAt, loading, error, product?.product_id]);
 
   useEffect(() => {
     if (!product || error) return undefined;
@@ -446,6 +476,7 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
         category_id: product.category_id,
         product_type: 'product',
         img_opt: landingImages.variant,
+        price_display: clarityLanding ? getBlackFridayOffer(product.price)?.id : undefined,
         ...landingVariantEventProperties(landingVariantCandidate)
       });
       const startedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
@@ -792,7 +823,7 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
   };
 
   return (
-    <div className={`product-detail${clarityLanding ? ' landing-clarity' : ''}`}>
+    <div className={`product-detail${clarityLanding ? ' landing-clarity' : ''}${blackFridayOffer ? ' has-bf-offer' : ''}`}>
       {/* 顶部标题栏 */}
       {clarityLanding ? <ClarityHeader onHome={() => navigate('/')} /> : <div className="product-header">
         <button
@@ -849,12 +880,14 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
               </SwiperSlide>
             ))}
           </Swiper>
+          <ClarityOfferTag offer={blackFridayOffer} />
         </div>
 
         <div className="product-purchase-panel" ref={clarityExposureRef}>
           {/* 产品信息 */}
           {clarityLanding ? (
             <ClaritySummary name={product.name_fr} price={product.price} highlights={productHighlights}
+              offer={blackFridayOffer} offerRef={offerPanelRef}
               specs={specRows.length > 0 ? <ClaritySpecs key={product.product_id} rows={specRows} onOpen={handleSpecsOpen} /> : null}>
               {variants?.length > 0 && (
                 <ProductVariants variants={variants} currentProductId={product.product_id}
@@ -905,7 +938,8 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
           {!clarityLanding && !isCheckoutOptimizationVariant && <ServiceInfo variant="classic" />}
 
           {/* 底部操作按钮 */}
-          {clarityLanding ? <ClarityPurchaseBar price={product.price} onOrder={handleBuyNowClick} /> : <div className="bottom-actions">
+          {clarityLanding ? <ClarityPurchaseBar price={product.price} onOrder={handleBuyNowClick}
+            offer={blackFridayOffer} showOfferTimer={offerPanelPassed} /> : <div className="bottom-actions">
             {isCheckoutOptimizationVariant && (
               <div className={`cta-trust-note ${isCodTrustLanding ? 'cod-trust' : ''}`}>
                 {isCodTrustLanding

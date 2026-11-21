@@ -541,6 +541,9 @@ export const trackProductLandingView = (product, extra = {}) => {
     // Landing image rollout (utils/landingImageOptimization.js): 'webp828' or 'orig'.
     // Reported on this event only; join later events through landing_session_id.
     ...(extra.img_opt ? { img_opt: extra.img_opt } : {}),
+    // Price display of this view: 'bf2026' while the Black Friday panel is shown (utils/blackFriday.js),
+    // absent for the plain price. Reported on this event only.
+    ...(extra.price_display ? { price_display: extra.price_display } : {}),
     // Landing-page A/B experiment (utils/landingExperiment.js): experiment id and variant 'A' | 'B'.
     // Reported on this event only; orders are attached through the device and landing session.
     ...(Number.isInteger(extra.lp_exp) && (extra.lp_var === 'A' || extra.lp_var === 'B')
