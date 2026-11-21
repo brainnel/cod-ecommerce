@@ -23,6 +23,7 @@ import {
 } from '../services/checkoutFunnelAnalytics';
 import { useAdTrackingContext } from '../hooks/useAdTrackingHooks.js';
 import QuantityModal from './QuantityModal';
+import QtyOfferModal from './QtyOfferModal';
 import ServiceInfo from './ServiceInfo';
 import ProductVariants from './ProductVariants';
 import logoImage from '../assets/logo.png';
@@ -35,6 +36,8 @@ import { preloadPaymentPage, schedulePaymentPagePreload } from '../utils/preload
 import { getProductImageLoadingPolicy } from '../utils/productImageLoadingPolicy';
 import { getLandingImageOptimization } from '../utils/landingImageOptimization';
 import { pickLandingVariant, landingVariantEventProperties } from '../utils/landingExperiment';
+import { getCheckoutPricing, pickQtyOfferArm, rememberQtyOfferArm } from '../utils/qtyOffer';
+import { clampCheckoutQuantity } from '../utils/checkoutQuantity';
 import { isClarityLanding, getStoredLandingReviews, buildProductSpecRows } from '../utils/landingPresentation';
 import { getCheckoutOptimizationAssignment, getProductClarityCopy } from '../utils/checkoutOptimizationExperiment';
 import { ClarityHeader, ClaritySummary, ClarityPurchaseBar, ClarityAftercare, ClarityReviews, ClaritySpecs } from './landing/LandingClarity';
@@ -262,6 +265,8 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
   const [errorRedirectCategoryId, setErrorRedirectCategoryId] = useState(null);
   const [redirectCountdown, setRedirectCountdown] = useState(PRODUCT_UNAVAILABLE_REDIRECT_SECONDS);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  // Quantity-discount popup (arm B): { sessionId } while open.
+  const [qtyOfferPopup, setQtyOfferPopup] = useState(null);
   const [variants, setVariants] = useState([]);
   const [activeProductInfoTab, setActiveProductInfoTab] = useState('details');
   const navigate = useNavigate();
@@ -270,6 +275,7 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
   const landingEngagementRef = useRef(null);
   const specsOpenTrackedRef = useRef(null);
   const landingVariantReportRef = useRef(null);
+  const qtyOfferReportRef = useRef(null);
   const checkoutQuantityExperiment = useMemo(() => getCheckoutQuantityExperiment(), []);
   const imageLoadingPolicy = useMemo(() => getProductImageLoadingPolicy(), []);
   // Only what this page displays changes; `product` keeps the stored URLs for checkout.
@@ -297,6 +303,15 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
     ? reportedLandingVariant.variant
     : landingVariantCandidate;
   const showsLandingVariantB = landingVariant?.key === 'B';
+  // Quantity-discount experiment (utils/qtyOffer.js), fixed for this visit like the landing
+  // variant: when the view was reported without an offer, this visit keeps today's checkout.
+  const qtyOfferCandidate = useMemo(() => pickQtyOfferArm({
+    offer: product?.qty_offer, deviceId: getCheckoutDeviceId()
+  }), [product?.qty_offer]);
+  const reportedQtyOffer = qtyOfferReportRef.current;
+  const qtyOfferArm = reportedQtyOffer && reportedQtyOffer.productKey === String(product?.product_id ?? '')
+    ? reportedQtyOffer.arm
+    : qtyOfferCandidate;
   const productMainImages = normalizeImageList(showsLandingVariantB ? landingVariant.imageUrl : product?.image_url);
   const productDetailImages = normalizeImageList(showsLandingVariantB ? landingVariant.descriptionFr : product?.description_fr);
   const promotedDetailImages = productMainImages.length === 1
@@ -423,6 +438,9 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
     try {
       // Fix the experiment variant for this visit at the moment it is reported.
       landingVariantReportRef.current = { productKey: trackingKey, variant: landingVariantCandidate };
+      // The checkout events of this product carry the same qty-offer arm (qo_exp / qo_var).
+      qtyOfferReportRef.current = { productKey: trackingKey, arm: qtyOfferCandidate };
+      rememberQtyOfferArm(product.product_id, qtyOfferCandidate);
       const landingSessionId = trackProductLandingView(product, {
         ad_id: adId,
         category_id: product.category_id,
@@ -550,7 +568,7 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
     };
   }, [adId, adTrackingLoading, product, product?.product_id, product?.price, clarityLanding,
     checkoutOptimization.group, checkoutOptimization.productEligible, checkoutOptimization.productClarityEnabled,
-    landingImages.variant]);
+    landingImages.variant, qtyOfferCandidate]);
 
   if (loading) {
     return (
@@ -635,7 +653,8 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
     const quantityExperiment = checkoutQuantityExperiment;
     const isInlineQuantityVariant = isInlineCheckoutVariant(quantityExperiment);
     const defaultQuantity = 1;
-    const totalPrice = product.price * defaultQuantity;
+    rememberQtyOfferArm(product.product_id, qtyOfferArm);
+    const totalPrice = getCheckoutPricing(product, defaultQuantity, qtyOfferArm).total;
     let checkoutSessionId = null;
 
     try {
@@ -647,6 +666,13 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
       });
     } catch (error) {
       console.warn('checkout_start 埋点失败:', error);
+    }
+
+    // Quantity-discount arm B: the popup chooses the quantity before checkout.
+    if (qtyOfferArm?.arm === 'B') {
+      setQtyOfferPopup({ sessionId: checkoutSessionId });
+      trackQtyOfferEvent('qty_offer_view', checkoutSessionId, defaultQuantity);
+      return;
     }
 
     if (isInlineQuantityVariant) {
@@ -690,6 +716,63 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
     }
 
     setIsModalOpen(true);
+  };
+
+  const trackQtyOfferEvent = (eventName, sessionId, quantity, extra = {}) => {
+    if (!sessionId) return;
+    try {
+      const pricing = getCheckoutPricing(product, quantity, qtyOfferArm);
+      trackCheckoutEvent(eventName, {
+        ...buildCheckoutProductProperties(product, {
+          ad_id: adId,
+          quantity,
+          total_price: pricing.total,
+          ...checkoutQuantityExperiment
+        }),
+        quantity,
+        unit_price: pricing.unitPrice,
+        total_price: pricing.total,
+        ...extra
+      }, { sessionId });
+    } catch (error) {
+      console.warn(`${eventName} 埋点失败:`, error);
+    }
+  };
+
+  const handleQtyOfferSelect = (quantity) => {
+    trackQtyOfferEvent('qty_offer_select', qtyOfferPopup?.sessionId, quantity);
+  };
+
+  const handleQtyOfferConfirm = (chosenQuantity) => {
+    const quantity = clampCheckoutQuantity(chosenQuantity, product);
+    const pricing = getCheckoutPricing(product, quantity, qtyOfferArm);
+    const checkoutSessionId = qtyOfferPopup?.sessionId || null;
+    trackQtyOfferEvent('quantity_confirmed', checkoutSessionId, quantity, {
+      quantity_confirm_method: 'qty_offer_popup'
+    });
+
+    try {
+      trackAddToCartEvent({
+        productId: product.product_id,
+        quantity,
+        totalPrice: pricing.total,
+        unitPrice: pricing.unitPrice
+      }, getClientInfo()).catch(err => console.warn('Facebook AddToCart 事件失败:', err));
+    } catch (fbError) {
+      console.warn('Facebook AddToCart 事件错误:', fbError);
+    }
+
+    const paymentState = {
+      product,
+      quantity,
+      checkoutSessionId,
+      checkoutQuantityExperiment,
+      quantityConfirmed: true
+    };
+    saveCheckoutPaymentState(paymentState);
+    navigate(`/payment?step=1${getLocalPreviewBrowserContextParam()}`, {
+      state: paymentState
+    });
   };
 
   const handleProductInfoTabClick = (tab) => {
@@ -937,6 +1020,17 @@ const ProductDetail = ({ productId = "194", initialProduct = null }) => {
         )}
       </div>
       {clarityLanding && <ClarityAftercare />}
+
+      {/* 件数优化弹窗（B 组） */}
+      {qtyOfferPopup && qtyOfferArm?.arm === 'B' && (
+        <QtyOfferModal
+          product={product}
+          offerArm={qtyOfferArm}
+          onSelect={handleQtyOfferSelect}
+          onConfirm={handleQtyOfferConfirm}
+          onClose={() => setQtyOfferPopup(null)}
+        />
+      )}
 
       {/* 数量选择弹窗 */}
       <QuantityModal

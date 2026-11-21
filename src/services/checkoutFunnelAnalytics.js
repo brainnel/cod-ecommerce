@@ -1,5 +1,6 @@
 import { buildApiUrl } from '../config/api.config.js'
 import { getCheckoutOptimizationAssignment } from '../utils/checkoutOptimizationExperiment.js'
+import { getCheckoutPricing, qtyOfferEventProperties, recallQtyOfferArm } from '../utils/qtyOffer.js'
 
 const ANALYTICS_ENDPOINT = '/api/vite/analytics/events'
 const DEVICE_ID_STORAGE_KEY = 'cod_checkout_device_id'
@@ -359,7 +360,13 @@ const getSku = (product) => {
 export const buildCheckoutProductProperties = (product, extra = {}) => {
   const sku = getSku(product)
   const quantity = extra.quantity || 1
-  const unitPrice = Number(product?.price || extra.unit_price || 0)
+  // Quantity-discount experiment (utils/qtyOffer.js): the arm the product page kept for this
+  // product. Arm B reports the offer's unit price; everything else keeps product.price.
+  const qtyOfferArm = recallQtyOfferArm(product?.product_id ?? extra.product_id) || null
+  const qtyOfferPricing = product ? getCheckoutPricing(product, quantity, qtyOfferArm) : null
+  const unitPrice = qtyOfferPricing?.offerId
+    ? qtyOfferPricing.unitPrice
+    : Number(product?.price || extra.unit_price || 0)
   const quantityExperiment = extra.checkout_quantity_experiment
     ? {
       checkout_quantity_experiment: extra.checkout_quantity_experiment,
@@ -384,6 +391,7 @@ export const buildCheckoutProductProperties = (product, extra = {}) => {
     ...getCheckoutOptimizationAssignment({
       deviceId: getCheckoutDeviceId(), productId: product?.product_id || extra.product_id
     }).analyticsProps,
+    ...qtyOfferEventProperties(qtyOfferArm),
     product_id: product?.product_id ? String(product.product_id) : extra.product_id || null,
     product_name: product?.name_fr || extra.product_name || null,
     internal_no: product?.internal_no || extra.internal_no || null,
@@ -485,12 +493,15 @@ export const trackCheckoutEvent = (eventName, properties = {}, options = {}) => 
 
   const context = getCheckoutContext()
   const trackedAt = new Date().toISOString()
+  const productId = properties.product_id || context.product_id
+  // qo_exp / qo_var always come from the arm kept for this product id, never from an old context.
+  const { qo_exp: _qoExp, qo_var: _qoVar, ...eventInput } = { ...context, ...properties }
   const eventProperties = {
-    ...context,
-    ...properties,
+    ...eventInput,
     ...getCheckoutOptimizationAssignment({
-      deviceId: getCheckoutDeviceId(), productId: properties.product_id || context.product_id
+      deviceId: getCheckoutDeviceId(), productId
     }).analyticsProps,
+    ...qtyOfferEventProperties(recallQtyOfferArm(productId)),
     checkout_flow: CHECKOUT_FLOW,
     event_id: createId('event'),
     ...getPageProperties()

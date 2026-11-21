@@ -45,6 +45,7 @@ import {
 } from '../utils/checkoutAddress'
 import { validateCheckoutDeliveryArea } from '../utils/checkoutDeliveryArea'
 import { clampCheckoutQuantity, getCheckoutQuantityLimit } from '../utils/checkoutQuantity'
+import { getCheckoutPricing, resolveQtyOfferArm } from '../utils/qtyOffer'
 import {
   buildCheckoutDistrictCacheEntry,
   getCachedManualMarkerForDistrict,
@@ -100,6 +101,8 @@ const buildDistrictMemoryEntry = (district) => (
     cityName: district?.city_name
   })
 )
+
+const formatQtyOfferAmount = (value) => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(value)
 
 const clampCheckoutStep = (step) => {
   const parsedStep = Number(step)
@@ -262,6 +265,11 @@ const PaymentPage = () => {
   const [rawQuantity, setQuantity] = useState(() => clampCheckoutQuantity(routeQuantity || 1, product))
   // Normalize synchronously so restored routes, totals and order payloads agree.
   const quantity = clampCheckoutQuantity(rawQuantity, product)
+  // Quantity-discount experiment (utils/qtyOffer.js): arm B prices this checkout and the order
+  // with the offer that travels in the product. Without it, the numbers are today's.
+  const qtyOfferArm = useMemo(() => (isBundleFlow ? null : resolveQtyOfferArm({
+    productId: product?.product_id, offer: product?.qty_offer, deviceId: getCheckoutDeviceId()
+  })), [isBundleFlow, product])
 
   // 步顢1：大区选择
   const [districts, setDistricts] = useState([])
@@ -479,7 +487,7 @@ const PaymentPage = () => {
 
     if (!product) return null
 
-    const totalPrice = product.price * (quantity || 1)
+    const totalPrice = getCheckoutPricing(product, quantity || 1, qtyOfferArm).total
     checkoutSessionIdRef.current = startCheckoutSession(product, {
       quantity: quantity || 1,
       total_price: totalPrice,
@@ -524,7 +532,7 @@ const PaymentPage = () => {
   }
 
   const getCheckoutAnalyticsProps = (extra = {}) => {
-    const totalPrice = product ? product.price * (quantity || 1) : 0
+    const totalPrice = product ? getCheckoutPricing(product, quantity || 1, qtyOfferArm).total : 0
     return {
       ...buildCheckoutProductProperties(product, {
         quantity: quantity || 1,
@@ -672,7 +680,8 @@ const PaymentPage = () => {
     if (normalizedQuantity === quantity) return
 
     const previousQuantity = quantity
-    const totalPrice = product.price * normalizedQuantity
+    const nextPricing = getCheckoutPricing(product, normalizedQuantity, qtyOfferArm)
+    const totalPrice = nextPricing.total
     setQuantity(normalizedQuantity)
     updateCheckoutContext(product, {
       quantity: normalizedQuantity,
@@ -683,6 +692,7 @@ const PaymentPage = () => {
     trackPaymentEvent('quantity_changed', {
       quantity: normalizedQuantity,
       previous_quantity: previousQuantity,
+      unit_price: nextPricing.unitPrice,
       total_price: totalPrice,
       quantity_change_method: 'district_stepper',
       ...checkoutQuantityExperiment
@@ -841,7 +851,7 @@ const PaymentPage = () => {
     const info = getClientInfo()
     setClientInfo(info)
 
-    const totalPrice = product.price * quantity
+    const totalPrice = getCheckoutPricing(product, quantity, qtyOfferArm).total
     if (routeCheckoutSessionId) {
       checkoutSessionIdRef.current = routeCheckoutSessionId
       resumeCheckoutSession(routeCheckoutSessionId, product, {
@@ -862,7 +872,7 @@ const PaymentPage = () => {
         ...checkoutQuantityExperiment
       })
     }
-  }, [product, quantity, navigate, routeCheckoutSessionId, adId, checkoutQuantityExperiment])
+  }, [product, quantity, navigate, routeCheckoutSessionId, adId, checkoutQuantityExperiment, qtyOfferArm])
 
   useEffect(() => {
     if (!product) return
@@ -978,7 +988,7 @@ const PaymentPage = () => {
 
     updateCheckoutContext(product, {
       quantity,
-      total_price: product.price * quantity,
+      total_price: getCheckoutPricing(product, quantity, qtyOfferArm).total,
       ad_id: adId,
       ...checkoutQuantityExperiment,
       ...districtProps
@@ -1003,7 +1013,8 @@ const PaymentPage = () => {
     quantity,
     districts,
     adId,
-    checkoutQuantityExperiment
+    checkoutQuantityExperiment,
+    qtyOfferArm
   ])
 
   // 选择大区
@@ -1016,7 +1027,7 @@ const PaymentPage = () => {
     setSelectedDistrict(district)
     updateCheckoutContext(product, {
       quantity,
-      total_price: product.price * quantity,
+      total_price: getCheckoutPricing(product, quantity, qtyOfferArm).total,
       ad_id: adId,
       ...checkoutQuantityExperiment,
       ...getDistrictAnalyticsProps(district)
@@ -1989,13 +2000,14 @@ const PaymentPage = () => {
         }
         response = await bundleAPI.createBundleOrder(bundle.id, bundleOrderData)
       } else {
+        const orderPricing = getCheckoutPricing(product, quantity, qtyOfferArm)
         const orderData = {
           items: [{
             product_id: product.product_id.toString(),
             sku_id: product.skus && product.skus.length > 0 ? product.skus[0].sku_id : product.product_id.toString(),
             quantity: quantity,
-            unit_price: product.price,
-            total_price: product.price * quantity
+            unit_price: orderPricing.unitPrice,
+            total_price: orderPricing.total
           }],
           district_id: selectedDistrict.id,
           full_name: userInfo.fullName,
@@ -2005,9 +2017,11 @@ const PaymentPage = () => {
           latitude: deliveryMarker.lat,
           longitude: deliveryMarker.lng,
           payment_method: "cod",
-          total_amount: product.price * quantity,
-          actual_amount: product.price * quantity,
+          total_amount: orderPricing.total,
+          actual_amount: orderPricing.total,
           discount_amount: 0,
+          // Arm B only (any quantity): the server prices the item with the offer again.
+          ...(orderPricing.offerId ? { qty_offer_id: orderPricing.offerId } : {}),
           currency: "FCFA",
           is_web: 1,
           ad_id: adId,
@@ -2059,7 +2073,7 @@ const PaymentPage = () => {
         quantity,
         userInfo: effectiveUserInfo,
         selectedLocation: selectedDistrict,
-        totalPrice: product.price * quantity,
+        totalPrice: getCheckoutPricing(product, quantity, qtyOfferArm).total,
         orderResponse: response.data,
         checkoutQuantityExperiment
       }
@@ -2107,7 +2121,10 @@ const PaymentPage = () => {
 
   if (!product || !quantity) return null
 
-  const totalPrice = product.price * quantity
+  const pricing = getCheckoutPricing(product, quantity, qtyOfferArm)
+  const totalPrice = pricing.total
+  // Arm B shows its amounts grouped (25 500); everything else keeps today's display.
+  const displayAmount = (value) => (pricing.offerId ? formatQtyOfferAmount(value) : value)
   const fullNameReady = userInfo.fullName.trim().length > 0 && !errors.fullName
   const phoneReady = isValidCheckoutPhone(userInfo.phone) && !errors.phone
   const addressValidationState = validateCheckoutAddress(userInfo.addressDescription, {
@@ -2175,7 +2192,10 @@ const PaymentPage = () => {
                 />
                 <div className="inline-quantity-info">
                   <div className="inline-quantity-title">{product.name_fr}</div>
-                  <div className="inline-quantity-price">{product.price} FCFA</div>
+                  <div className="inline-quantity-price">
+                    {displayAmount(pricing.unitPrice)} FCFA
+                    {pricing.saved > 0 && <s className="inline-quantity-full-price">{displayAmount(product.price)}</s>}
+                  </div>
                 </div>
                 <div className="inline-quantity-control" aria-label="Quantité">
                   <span className="inline-quantity-label">Quantité</span>
@@ -2211,8 +2231,18 @@ const PaymentPage = () => {
                 </div>
                 <div className="inline-quantity-total">
                   <span>Total</span>
-                  <strong>{totalPrice} FCFA</strong>
+                  {pricing.saved > 0 ? (
+                    <span className="inline-quantity-total-amount">
+                      <s>{displayAmount(pricing.fullTotal)} FCFA</s>
+                      <strong>{displayAmount(totalPrice)} FCFA</strong>
+                    </span>
+                  ) : <strong>{displayAmount(totalPrice)} FCFA</strong>}
                 </div>
+                {pricing.saved > 0 && (
+                  <div className="inline-quantity-discount">
+                    Remise −{pricing.pct} % · −{displayAmount(pricing.saved)} FCFA
+                  </div>
+                )}
               </div>
             )}
             <div id="checkout-district-feedback" aria-live="polite">
@@ -2572,23 +2602,29 @@ const PaymentPage = () => {
                   />
                   <div className="order-item-details">
                     <div className="order-item-name">{product.name_fr}</div>
-                    <div className="order-item-price">{product.price} FCFA × {quantity}</div>
+                    <div className="order-item-price">{displayAmount(pricing.unitPrice)} FCFA × {quantity}</div>
                   </div>
-                  <div className="order-item-total">{totalPrice} FCFA</div>
+                  <div className="order-item-total">{displayAmount(totalPrice)} FCFA</div>
                 </div>
                 
                 <div className="order-totals">
                   <div className="total-row">
                     <span>Sous-total</span>
-                    <span>{totalPrice} FCFA</span>
+                    <span>{displayAmount(pricing.fullTotal)} FCFA</span>
                   </div>
+                  {pricing.saved > 0 && (
+                    <div className="total-row qty-offer-discount">
+                      <span>Remise −{pricing.pct} %</span>
+                      <span>−{displayAmount(pricing.saved)} FCFA</span>
+                    </div>
+                  )}
                   <div className="total-row shipping">
                     <span>Livraison</span>
                     <span className="free-shipping">Gratuite</span>
                   </div>
                   <div className="total-row final-total">
                     <span>Total</span>
-                    <span>{totalPrice} FCFA</span>
+                    <span>{displayAmount(totalPrice)} FCFA</span>
                   </div>
                 </div>
 

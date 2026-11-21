@@ -2367,3 +2367,40 @@
 .district-recovery-note button:disabled { opacity: .65; cursor: wait; }
 .district-recovery-note button:focus-visible { outline: 3px solid #166534; outline-offset: 2px; }
 .checkout-guidance-note { margin: -4px 0 18px; font-size: 14px; line-height: 1.5; color: #59655e; }
+
+/* Quantity-discount experiment (arm B): struck full price and the discount line. */
+.inline-quantity-full-price {
+  margin-left: 6px;
+  color: #9a9c94;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.inline-quantity-total-amount {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.inline-quantity-total-amount s {
+  color: #9a9c94;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.inline-quantity-discount {
+  grid-column: 1 / -1;
+  justify-self: end;
+  padding: 2px 9px;
+  border-radius: 10px;
+  background: #e9f3ed;
+  color: #246b48;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.order-totals .qty-offer-discount {
+  color: #246b48;
+  font-weight: 700;
+}
