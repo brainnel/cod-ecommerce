@@ -9,6 +9,7 @@ import { getCheckoutOptimizationAssignment } from '../utils/checkoutOptimization
 import { useAdId } from '../hooks/useAdTrackingHooks.js'
 import { buildMetaPurchaseContext, getClientInfo, trackPurchaseEvent } from '../services/facebookConversions'
 import { trackGoogleAdsPurchaseConversion } from '../services/googleAdsConversions'
+import { scheduleDramaWarm, warmDramaAtOrder } from '../services/dramaWarmup'
 import {
   buildCheckoutProductProperties,
   getCheckoutQuantityExperiment,
@@ -220,6 +221,9 @@ const PaymentPage = () => {
   }, [isBundleFlow, bundleFromState, productFromState])
 
   const bundle = isBundleFlow ? bundleFromState : null
+  // The confirmation page's BabiDrama card: its picks are asked for while the customer fills
+  // the form, so the card is there when the order is placed (dramaWarmup.js; fire-and-forget).
+  useEffect(() => scheduleDramaWarm(product), [product])
   const checkoutQuantityExperiment = useMemo(
     () => routeCheckoutQuantityExperiment || getCheckoutQuantityExperiment(),
     [routeCheckoutQuantityExperiment]
@@ -1963,6 +1967,8 @@ const PaymentPage = () => {
       ...getDistrictAnalyticsProps(),
       whatsapp_same_as_phone: whatsappSameAsPhone
     })
+    // Opens the connections the confirmation page's BabiDrama card needs; never throws.
+    warmDramaAtOrder(product)
 
     let shouldReleaseSubmitLock = true
     try {

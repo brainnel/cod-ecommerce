@@ -6,10 +6,6 @@
 // given ran out; the first picture came another 1.4 s later, and 42 % of the
 // customers who saw it had left within 5 s.
 //
-// Not wired into the checkout as of 2026-11-24: PaymentPage.jsx calls neither
-// scheduleDramaWarm (in an effect on the product) nor warmDramaAtOrder (when the
-// order is sent) yet, so the confirmation page asks for its picks itself.
-//
 // Self-contained on purpose: the checkout imports this file alone, so none of
 // the card's code is loaded before the order and nothing of it can fail there.
 // The confirmation page reads the answer from `globalThis` (dramaPicks.js

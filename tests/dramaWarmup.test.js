@@ -197,15 +197,10 @@ test('the card takes the early answer only for its product and while it is recen
   assert.deepEqual(reports, [{ outcome: 'ok', source: 'warm' }])
 })
 
-test('the checkout imports nothing of the card but the warm-up, and the warm-up imports nothing', () => {
+test('the checkout imports the warm-up alone, and the warm-up imports nothing', () => {
   const warmup = readFileSync(new URL('../src/services/dramaWarmup.js', import.meta.url), 'utf8')
   assert.doesNotMatch(warmup, /^\s*import\s/m)
-  // The checkout's two calls are a release of their own (2026-11-24: not wired yet). Whenever it
-  // imports something of BabiDrama, it is the warm-up alone.
   const checkout = readFileSync(new URL('../src/pages/PaymentPage.jsx', import.meta.url), 'utf8')
   const dramaImports = checkout.split('\n').filter((line) => /^import .*[dD]rama/.test(line))
-  assert.ok(dramaImports.length <= 1)
-  for (const line of dramaImports) {
-    assert.equal(line, "import { scheduleDramaWarm, warmDramaAtOrder } from '../services/dramaWarmup'")
-  }
+  assert.deepEqual(dramaImports, ["import { scheduleDramaWarm, warmDramaAtOrder } from '../services/dramaWarmup'"])
 })

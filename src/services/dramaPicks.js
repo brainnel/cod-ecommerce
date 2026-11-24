@@ -4,10 +4,9 @@
 
 // How long the confirmation page waits for the picks. 2.5 s until 2026-11-15:
 // the card then appeared 1 to 2.5 s after the order and never on 11.6 % of
-// orders, the ones cut off here. When the checkout has asked for the picks
-// before the order (dramaWarmup.js; its two calls on the checkout are a release
-// of their own, not wired as of 2026-11-24), this is the wait for what is left
-// of that request; otherwise for a request of this page.
+// orders, the ones cut off here. The checkout now asks for the picks before the
+// order (dramaWarmup.js), so this is the wait for what is left of that request,
+// or for a request of this page when there was none.
 export const DRAMA_PICKS_TIMEOUT_MS = 4000
 // The answer the checkout asked for is used this long (it carries the order of
 // the series and the split of the card versions, both slow to change).
