@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import {
   DRAMA_MAX_EVENTS,
+  DRAMA_PICKS_TIMEOUT_MS,
   DRAMA_VARIANTS,
   buildEventsBody,
   dramaLink,
@@ -186,11 +187,12 @@ test('fetch: times out (aborting the request) even if fetch ignores the signal',
   assert.equal(respectsAbort, null)
 })
 
-test('fetch: uses 2500 ms by default and an external abort cancels it', async () => {
+test('fetch: waits 4 s by default and an external abort cancels it', async () => {
   const delays = []
   const timers = { setTimeout: (fn, delay) => { delays.push(delay); return 1 }, clearTimeout: () => {} }
   await fetchDramaPicks('p', { timers, fetchImpl: async () => okResponse(response('ranked', ['a'])) })
-  assert.deepEqual(delays, [2500])
+  assert.equal(DRAMA_PICKS_TIMEOUT_MS, 4000)
+  assert.deepEqual(delays, [4000])
 
   const controller = new AbortController()
   let innerSignal
@@ -205,6 +207,104 @@ test('fetch: uses 2500 ms by default and an external abort cancels it', async ()
   assert.equal(await pending, null)
   assert.equal(innerSignal.aborted, true)
   assert.equal(await fetchDramaPicks('p', { signal: controller.signal, fetchImpl: async () => okResponse(response('ranked', ['a'])) }), null)
+})
+
+test('fetch: tells once how it ended, and nothing for a page that was left', async () => {
+  const outcome = async (fetchImpl, options = {}) => {
+    const reports = []
+    const result = await fetchDramaPicks('p', { fetchImpl, report: (info) => reports.push(info), ...options })
+    return { result, reports }
+  }
+  assert.deepEqual((await outcome(async () => okResponse(response('ranked', ['a'])))).reports, [{ outcome: 'ok', source: 'page' }])
+  const cases = [
+    [async () => { throw new TypeError('Failed to fetch') }, 'network'],
+    [async () => ({ ok: false, status: 403, json: async () => ({}) }), 'http'],
+    [async () => ({ ok: true, json: async () => { throw new SyntaxError('bad json') } }), 'invalid'],
+    [async () => okResponse({ pid: 'p', mode: 'ranked', series: [] }), 'empty'],
+    [async () => okResponse(null), 'invalid'],
+    [() => new Promise(() => {}), 'timeout'],
+  ]
+  for (const [fetchImpl, expected] of cases) {
+    const { result, reports } = await outcome(fetchImpl, { timeoutMs: 20 })
+    assert.equal(result, null, expected)
+    assert.deepEqual(reports, [{ outcome: expected, source: 'page' }])
+  }
+  // The customer left before the answer: nobody waited for the card.
+  const controller = new AbortController()
+  const reports = []
+  const pending = fetchDramaPicks('p', {
+    signal: controller.signal,
+    report: (info) => reports.push(info),
+    fetchImpl: (url, init) => new Promise((resolve, reject) => {
+      init.signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')))
+    }),
+  })
+  controller.abort()
+  assert.equal(await pending, null)
+  assert.deepEqual(reports, [])
+  // A report that throws changes nothing.
+  const result = await fetchDramaPicks('p', { report: () => { throw new Error('analytics') }, fetchImpl: async () => okResponse(response('ranked', ['a'])) })
+  assert.deepEqual(result.series.map((item) => item.slug), ['a'])
+})
+
+test('fetch: the answer asked for on the checkout is used; a failed one is asked again, a late one given up', async () => {
+  const fresh = async () => okResponse(response('ranked', ['from-page']))
+  const run = async (warm, options = {}) => {
+    const reports = []
+    let called = 0
+    const result = await fetchDramaPicks('p', {
+      warm, report: (info) => reports.push(info), timeoutMs: 20,
+      fetchImpl: async (...args) => { called += 1; return fresh(...args) }, ...options,
+    })
+    return { slugs: result ? result.series.map((item) => item.slug) : null, reports, called }
+  }
+  // Answered before the order: no request from this page.
+  assert.deepEqual(await run(Promise.resolve(response('ranked', ['warm-a', 'warm-b']))),
+    { slugs: ['warm-a', 'warm-b'], reports: [{ outcome: 'ok', source: 'warm' }], called: 0 })
+  // Still on its way when the page opens: waited for.
+  const slow = new Promise((resolve) => setTimeout(() => resolve(response('ranked', ['warm-late'])), 5))
+  assert.deepEqual((await run(slow)).slugs, ['warm-late'])
+  // BabiDrama has no series for the product: known, not asked again.
+  assert.deepEqual(await run(Promise.resolve({ pid: 'p', mode: 'explore', series: [] })),
+    { slugs: null, reports: [{ outcome: 'empty', source: 'warm' }], called: 0 })
+  // The early request failed (null), rejected, or answered something else: this page asks.
+  for (const warm of [Promise.resolve(null), Promise.reject(new Error('x')), Promise.resolve('nope'), Promise.resolve({})]) {
+    assert.deepEqual(await run(warm), { slugs: ['from-page'], reports: [{ outcome: 'ok', source: 'page' }], called: 1 })
+  }
+  // Not answered within the wait: given up without a second request.
+  assert.deepEqual(await run(new Promise(() => {})), { slugs: null, reports: [{ outcome: 'timeout', source: 'warm' }], called: 0 })
+  // Not a promise: ignored.
+  assert.deepEqual((await run('nope')).slugs, ['from-page'])
+  // The page was left while waiting: nothing is shown or reported.
+  const controller = new AbortController()
+  let release
+  const reports = []
+  const pending = fetchDramaPicks('p', {
+    warm: new Promise((resolve) => { release = resolve }), signal: controller.signal,
+    report: (info) => reports.push(info), fetchImpl: fresh,
+  })
+  controller.abort()
+  release(response('ranked', ['warm-a']))
+  assert.equal(await pending, null)
+  assert.deepEqual(reports, [])
+})
+
+test('events: a big card that goes on, or that follows another on the same page, says so', () => {
+  const body = JSON.parse(buildEventsBody('830827813382', [
+    { type: 'impression', slug: 'a', slot: 0, resume: true },
+    { type: 'impression', slug: 'b', slot: 1, resume: true, again: true },
+    { type: 'impression', slug: 'c', slot: 0, again: true },
+    { type: 'impression', slug: 'd', slot: 0, resume: 'yes', again: 1 },
+    { type: 'complete', slug: 'a', slot: 0, ep: 4, resume: true, again: true },
+  ], 'd'))
+  assert.deepEqual(body.events, [
+    { type: 'impression', slug: 'a', slot: 0, resume: true },
+    // Thumbnails never carry them.
+    { type: 'impression', slug: 'b', slot: 1 },
+    { type: 'impression', slug: 'c', slot: 0, again: true },
+    { type: 'impression', slug: 'd', slot: 0 },
+    { type: 'complete', slug: 'a', slot: 0, ep: 4 },
+  ])
 })
 
 test('a slow body after the timeout cannot resurrect the card', async () => {

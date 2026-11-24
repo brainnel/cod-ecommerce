@@ -125,6 +125,49 @@ test('variants b, c and d show no link to BabiDrama while episode 1 loads or pla
   assert.deepEqual([...seen].sort(), ['a', 'c', 'd'])
 })
 
+test('a returning device: the series it was watching goes on, one it already saw gives way', () => {
+  const now = Date.now()
+  const seen = (extra = {}) => ({ at: now - 86400000, order: 'FL-OLD', shown: 1, ep: 0, done: false, series: null, ...extra })
+  const render = (memory, extra = {}) => renderToStaticMarkup(createElement(DramaPicksCard, {
+    pid: '830827813382', impressionKey: 'FL-NEW', preview: { ...picks, variant: 'd', memory, ...extra },
+  }))
+  const playing = (html) => html.match(/<h3>([^<]*)<\/h3>/)[1]
+  // Nothing remembered: BabiDrama's order, episode 1.
+  const first = render({})
+  assert.equal(playing(first), 'Le Mari &lt;infidèle&gt;')
+  assert.match(first, /Épisode 1 · gratuit/)
+  assert.match(first, /En attendant votre livraison/)
+  // Two episodes of the third pick were finished on an earlier order: it plays, from episode 3.
+  const resumed = render({ 'le-boss': seen({ ep: 2 }) })
+  assert.equal(playing(resumed), 'Le Boss')
+  assert.match(resumed, /Épisode 3 · gratuit/)
+  assert.match(resumed, /La suite de votre série/)
+  assert.doesNotMatch(resumed, /En attendant votre livraison/)
+  // The others keep BabiDrama's order as thumbnails.
+  assert.ok(resumed.indexOf('aria-label="Regarder Le Mari') < resumed.indexOf('aria-label="Regarder La Reine'))
+  assert.doesNotMatch(resumed, /aria-label="Regarder Le Boss/)
+  // A series that is not among this product's picks goes on from what the device kept of it.
+  const kept = { slug: 'ailleurs', title: 'Vue ailleurs', genres: ['Drame'], episodeCount: 50, freeEpisodes: 9, hook: '', coverUrl: null, watchUrl: 'https://babidrama.com/w/ailleurs/1?c=brainnel' }
+  const elsewhere = render({ ailleurs: seen({ ep: 4, series: kept }) })
+  assert.equal(playing(elsewhere), 'Vue ailleurs')
+  assert.match(elsewhere, /Épisode 5 · gratuit/)
+  assert.match(elsewhere, /Les 9 premiers épisodes sont gratuits/)
+  // Already on the big card of an earlier order, nothing finished: the next pick plays.
+  const skipped = render({ 'le-mari': seen() })
+  assert.equal(playing(skipped), 'La Reine')
+  assert.match(skipped, /Épisode 1 · gratuit/)
+  assert.match(skipped, /En attendant votre livraison/)
+  assert.match(skipped, /aria-label="Regarder Le Mari/)
+  // Its free episodes were all watched (or it was opened on BabiDrama): the same.
+  assert.equal(playing(render({ 'le-mari': seen({ ep: 5, done: true }) })), 'La Reine')
+  // A version that sends the customer to BabiDrama after episode 1 has nothing to go on with here.
+  const handsOver = render({ 'le-boss': seen({ ep: 2 }) }, { variant: 'a' })
+  assert.equal(playing(handsOver), 'Le Mari &lt;infidèle&gt;')
+  assert.match(handsOver, /Épisode 1 · gratuit/)
+  // The same order page again keeps its series.
+  assert.equal(playing(render({ 'la-reine': seen({ order: 'FL-NEW' }), 'le-mari': seen() })), 'La Reine')
+})
+
 test('versions sent by BabiDrama: d renders as before under its id, the hook switch moves the hook to the head', () => {
   const versions = [
     { id: 'a', weight: 0, base: 'a' },

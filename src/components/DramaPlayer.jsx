@@ -2,6 +2,7 @@ import { useEffect, useImperativeHandle, useRef, useState } from 'react'
 import {
   DRAMA_START_TIMEOUT_MS,
   continueUrl,
+  episodeNumber,
   fetchDramaEpisode,
   freeEpisodesBadge,
   freeEpisodesLine,
@@ -28,6 +29,9 @@ import './DramaPlayer.css'
 // (variant d) hands over after that many episodes played here instead of where
 // the free episodes end; `freeBadge` puts the free episodes on the picture (a
 // badge at its top) instead of the line under it.
+// `current.startEpisode` (variant d) is the episode the card starts with: above
+// 1 for a customer who already finished the ones before on an earlier order
+// page (dramaMemory.js). The card remounts the player for another series.
 
 // Uninterrupted playback fades the title so burned-in subtitles stay readable.
 const IMMERSIVE_AFTER_MS = 4000
@@ -144,9 +148,10 @@ const DramaPlayer = ({
   const autoNext = variant === 'c' || variant === 'd'
   const inlineSeries = variant === 'd'
   const link = (url, source) => dramaLink(url, { pid, source, variant: versionId })
-  // The episode playing in the card: 1, then the following free ones in variant d.
-  const [episodeNo, setEpisodeNo] = useState(1)
-  const episodeNoRef = useRef(1)
+  // The episode playing in the card: the first one (1, or where the customer stopped on an
+  // earlier order page), then the following free ones in variant d.
+  const [episodeNo, setEpisodeNo] = useState(() => (inlineSeries ? episodeNumber(current.startEpisode) : 1))
+  const episodeNoRef = useRef(episodeNo)
   episodeNoRef.current = episodeNo
   // Where the next episode is on BabiDrama, kept for the link shown if it cannot be loaded here.
   const nextUrlRef = useRef(null)

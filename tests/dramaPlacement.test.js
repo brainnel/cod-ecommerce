@@ -63,13 +63,22 @@ test('once per browser session: a reload after Back from BabiDrama is not anothe
 
 test('the card reports a display, an inline start and a finished episode to BabiDrama once per session', () => {
   const card = readFileSync(new URL('../src/components/DramaPicksCard.jsx', import.meta.url), 'utf8')
-  assert.match(card, /const repeat = seenInSession\(`display\|\$\{key\}`\)\s+if \(!repeat\) \{\s+safely\(\(\) => emitEvents\(pid, slugs\.map/)
+  // The page once per order; a reload is not another page.
+  assert.match(card, /const repeat = first \? seenInSession\(`display\|\$\{key\}`\) : true\s+const seriesSeen = seenInSession\(`display\|\$\{key\}\|\$\{shown\.slug\}`\)\s+if \(!repeat\) \{\s+safely\(\(\) => emitEvents\(pid, slugs\.map/)
+  // Another series on the big card of a page already counted: a display of that series, once, marked `again`.
+  assert.match(card, /\} else if \(!seriesSeen\) \{\s+safely\(\(\) => emitEvents\(pid, \[\{ \.\.\.bigCard, again: true \}\], preview, variant\)\)/)
+  // A big card that goes on with a later episode says so.
+  assert.match(card, /const bigCard = \{ type: 'impression', slug: shown\.slug, slot: 0, \.\.\.\(resumeFrom \? \{ resume: true \} : \{\}\) \}/)
   assert.match(card, /const repeat = seenInSession\(`play\|\$\{pid\}\|\$\{impressionKey\}`\)\s+if \(!repeat\) safely\(\(\) => emitEvents\(pid, \[\{ type: 'play'/)
   assert.match(card, /if \(!seenInSession\(`complete\|\$\{key\}`\)\) \{\s+safely\(\(\) => emitEvents\(pid, \[\{ type: 'complete'/)
-  // Our own analytics keep every page view, marked.
-  assert.match(card, /'order_success_drama_impression', \{\s+pid, series: slugs\.join\(','\), series_count: slugs\.length, mode: picks\.mode, variant, repeat, \.\.\.placement\(\),/)
+  // Our own analytics keep every page view, marked, with what the device's memory made of the picks.
+  assert.match(card, /'order_success_drama_impression', \{\s+pid, series: slugs\.join\(','\), series_count: slugs\.length, mode: picks\.mode, variant, repeat,\s+arranged: arranged\.reason, resume_episode: resumeFrom, remembered: Object\.keys\(memory\)\.length,\s+picks_source: loadRef\.current\.source, picks_ms: loadRef\.current\.ms,\s+\.\.\.placement\(\),/)
   // An open is an action of its own: never deduplicated.
   assert.doesNotMatch(card, /seenInSession\(`open/)
+  // An order page without a card says why, once.
+  assert.match(card, /onTrack\?\.\('order_success_drama_unavailable', \{ pid, reason, source, waited_ms: waitedMs \}\)/)
+  // Only an episode BabiDrama no longer serves ends a series for the device; a slow network does not.
+  assert.match(card, /if \(reason === 'not_found' && slot === 0 && resumeFrom && !startedRef\.current\) safely\(\(\) => dropResume\(series\)\)/)
 })
 
 test('the card times its events from when it appeared, not only from the site load', () => {

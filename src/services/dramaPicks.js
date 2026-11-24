@@ -2,14 +2,30 @@
 // Everything here is optional: no function may throw into the page, and every
 // failure (network, timeout, malformed data, empty list) simply hides the card.
 
-export const DRAMA_PICKS_TIMEOUT_MS = 2500
+// How long the confirmation page waits for the picks. 2.5 s until 2026-11-15:
+// the card then appeared 1 to 2.5 s after the order and never on 11.6 % of
+// orders, the ones cut off here. When the checkout has asked for the picks
+// before the order (dramaWarmup.js; its two calls on the checkout are a release
+// of their own, not wired as of 2026-11-24), this is the wait for what is left
+// of that request; otherwise for a request of this page.
+export const DRAMA_PICKS_TIMEOUT_MS = 4000
+// The answer the checkout asked for is used this long (it carries the order of
+// the series and the split of the card versions, both slow to change).
+export const DRAMA_WARM_MAX_AGE_MS = 15 * 60 * 1000
+// Where dramaWarmup.js leaves its request (the same name there).
+export const DRAMA_WARM_KEY = '__bdDramaWarm'
 export const DRAMA_MAX_SERIES = 5
 export const DRAMA_MAX_EVENTS = 6
 // open = « Continuer sur BabiDrama » / « Épisode 2 » from the inline player
 // (with `src`, the link used); play = the inline episode 1 started; complete =
 // an episode played to its end in the card (`ep`; BabiDrama orders the big
-// card by the finished episodes 1); quarter = episode 1 reached a quarter of
-// its length in the card.
+// card by the episodes 1 and the last free episodes finished); quarter =
+// episode 1 reached a quarter of its length in the card. An impression of the
+// big card carries `resume` when the card went on with a later episode for a
+// device that had watched the first ones (dramaMemory.js): BabiDrama counts the
+// page, not a display of episode 1. It carries `again` when the series took the
+// big card of an order page already counted: a display of the series, not
+// another page.
 export const DRAMA_EVENT_TYPES = ['impression', 'click', 'open', 'complete', 'play', 'quarter']
 
 // Test of when the customer is sent to BabiDrama (2026-11-10). Measured on
@@ -288,12 +304,14 @@ export const buildEventsBody = (pid, events, variant = null) => {
       && typeof event.slug === 'string' && event.slug
       && Number.isInteger(event.slot) && event.slot >= 0 && event.slot < DRAMA_MAX_SERIES)
     .slice(0, DRAMA_MAX_EVENTS)
-    .map(({ type, slug, slot, src, ep }) => ({
+    .map(({ type, slug, slot, src, ep, resume, again }) => ({
       type,
       slug,
       slot,
       ...(type === 'open' && DRAMA_LINK_SOURCES.includes(src) ? { src } : {}),
       ...(type === 'complete' && Number.isInteger(ep) && ep > 1 && ep <= 30 ? { ep } : {}),
+      ...(type === 'impression' && slot === 0 && resume === true ? { resume: true } : {}),
+      ...(type === 'impression' && slot === 0 && again === true ? { again: true } : {}),
     }))
   if (!valid.length) return null
   return JSON.stringify({
@@ -338,8 +356,29 @@ export const sendDramaEvents = (pid, events, {
   }
 }
 
+// The answer the checkout asked for early (dramaWarmup.js), when it is for this
+// product and recent: a promise of BabiDrama's raw answer, null when that
+// request failed. Null when there is none to use.
+export const takeWarmPicks = (pid, { store = globalThis, now = Date.now } = {}) => {
+  try {
+    const entry = store?.[DRAMA_WARM_KEY]
+    if (!entry || !pid || entry.pid !== pid || entry.failed) return null
+    if (typeof entry.promise?.then !== 'function') return null
+    const age = now() - Number(entry.at)
+    if (!(age >= 0 && age < DRAMA_WARM_MAX_AGE_MS)) return null
+    return entry.promise
+  } catch {
+    return null
+  }
+}
+
 // Resolves to orderForDisplay(...) or null; never rejects. The timeout also
 // wins when a fetch implementation ignores the abort signal.
+// `warm` (takeWarmPicks) is the answer asked for on the checkout: it is waited
+// for like a request of this page, and a failed one is asked again here.
+// `report` is told once how it ended, for the shop's own analytics:
+// { outcome: 'ok' | 'empty' | 'timeout' | 'http' | 'network' | 'invalid',
+//   source: 'warm' | 'page' }. `empty` = BabiDrama answered with no series.
 export const fetchDramaPicks = async (pid, {
   timeoutMs = DRAMA_PICKS_TIMEOUT_MS,
   fetchImpl = globalThis.fetch,
@@ -347,14 +386,34 @@ export const fetchDramaPicks = async (pid, {
   random = Math.random,
   signal,
   timers = globalThis,
+  warm = null,
+  report,
 } = {}) => {
-  if (!pid || typeof fetchImpl !== 'function' || signal?.aborted) return null
+  const tell = (outcome, source) => { try { report?.({ outcome, source }) } catch { /* analytics only */ } }
+  if (!pid || signal?.aborted) return null
+  if (warm && typeof warm.then === 'function') {
+    let timer
+    const late = new Promise((resolve) => { timer = timers.setTimeout(() => resolve({ late: true }), timeoutMs) })
+    const early = await Promise.race([Promise.resolve(warm).then((payload) => ({ payload }), () => ({ payload: null })), late])
+    timers.clearTimeout(timer)
+    if (signal?.aborted) return null
+    if (early.late) {
+      tell('timeout', 'warm')
+      return null
+    }
+    if (early.payload && Array.isArray(early.payload.series)) {
+      const picks = orderForDisplay(early.payload, random)
+      tell(picks ? 'ok' : 'empty', 'warm')
+      return picks
+    }
+  }
+  if (typeof fetchImpl !== 'function') return null
   const controller = new AbortController()
   const abort = () => controller.abort()
   signal?.addEventListener?.('abort', abort)
   let timer
   const timeout = new Promise((resolve) => {
-    timer = timers.setTimeout(() => { abort(); resolve(null) }, timeoutMs)
+    timer = timers.setTimeout(() => { abort(); resolve({ picks: null, outcome: 'timeout' }) }, timeoutMs)
   })
   const request = (async () => {
     const response = await fetchImpl(picksUrl(baseUrl, pid), {
@@ -363,12 +422,22 @@ export const fetchDramaPicks = async (pid, {
       headers: { Accept: 'application/json' },
       signal: controller.signal,
     })
-    if (!response?.ok) return null
-    const payload = await response.json()
-    return controller.signal.aborted ? null : orderForDisplay(payload, random)
-  })().catch(() => null)
+    if (!response?.ok) return { picks: null, outcome: 'http' }
+    let payload
+    try {
+      payload = await response.json()
+    } catch {
+      return { picks: null, outcome: 'invalid' }
+    }
+    if (controller.signal.aborted) return { picks: null, outcome: null }
+    const picks = orderForDisplay(payload, random)
+    return { picks, outcome: picks ? 'ok' : Array.isArray(payload?.series) ? 'empty' : 'invalid' }
+  })().catch(() => ({ picks: null, outcome: 'network' }))
   try {
-    return await Promise.race([request, timeout])
+    const { picks, outcome } = await Promise.race([request, timeout])
+    // A page that was left reports nothing: nobody waited for the card.
+    if (outcome && !signal?.aborted) tell(outcome, 'page')
+    return picks
   } finally {
     timers.clearTimeout(timer)
     signal?.removeEventListener?.('abort', abort)

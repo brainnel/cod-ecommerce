@@ -9,6 +9,7 @@ import {
 import { appDownloadAPI } from '../services/api'
 import { trackCheckoutEvent } from '../services/checkoutFunnelAnalytics'
 import { pidForProduct } from '../services/dramaPicks'
+import { parseDramaMemory } from '../services/dramaMemory'
 import DramaPicksCard, { DramaPicksBoundary } from '../components/DramaPicksCard'
 import './OrderSuccessPage.css'
 
@@ -133,6 +134,20 @@ const previewDramaEpisode = (slug, title, hasNext, index = 1, nextInline = false
   }
 }
 
+// Dev-only: `&drama_memory={"<slug>":{"ep":2}}` is what the device remembers of earlier order
+// pages (dramaMemory.js: `ep` the last episode finished, `done`, `order`), as if seen just now.
+const previewDramaMemory = (text) => {
+  try {
+    const raw = text ? JSON.parse(text) : {}
+    const now = Date.now()
+    return parseDramaMemory(JSON.stringify(Object.fromEntries(
+      Object.entries(raw).map(([slug, entry]) => [slug, { at: now, shown: 1, ...entry }])
+    )), now)
+  } catch {
+    return {}
+  }
+}
+
 const getDevDramaPreview = (search) => {
   if (!import.meta.env.DEV) return null
   const params = new URLSearchParams(search)
@@ -141,6 +156,7 @@ const getDevDramaPreview = (search) => {
   return {
     // `&drama_variant=a|b|c|d|e|k` picks the version of the card under test (dramaPicks.js).
     variant: params.get('drama_variant'),
+    memory: previewDramaMemory(params.get('drama_memory')),
     // As BabiDrama sends them: e is d with the hook headline, k a d that hands over after 2 episodes.
     versions: [
       { id: 'a', weight: 0, base: 'a' },
@@ -156,7 +172,8 @@ const getDevDramaPreview = (search) => {
       'la-reine-de-cocody': previewDramaEpisode('la-reine-de-cocody', 'La Reine de Cocody', false)
     },
     pid: '946101641067',
-    mode: 'explore',
+    // `&drama_mode=ranked` keeps the order below (BabiDrama always answers `ranked` now).
+    mode: params.get('drama_mode') === 'ranked' ? 'ranked' : 'explore',
     series: [
       {
         slug: 'le-mari-infidele', title: 'Le Mari infidèle', genres: ['Romance', 'Vengeance'], episodeCount: 73, freeEpisodes: 5,
